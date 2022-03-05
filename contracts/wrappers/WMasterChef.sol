@@ -9,8 +9,10 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import { AdvancedMath, SafeMath } from "../utils/AdvancedMath.sol";
 import { IERC20Wrapper } from "../interfaces/IERC20Wrapper.sol";
 import { IMasterChef } from "../interfaces/IMasterChef.sol";
+import { FeeBase } from "./FeeBase.sol";
 
-contract WMasterChef is ERC20, ReentrancyGuard, IERC20Wrapper {
+
+contract WMasterChef is FeeBase, ERC20, ReentrancyGuard, IERC20Wrapper {
   using SafeMath for uint;
   using AdvancedMath for uint;
   using SafeERC20 for IERC20;
@@ -20,7 +22,6 @@ contract WMasterChef is ERC20, ReentrancyGuard, IERC20Wrapper {
   IERC20 public immutable sushi; // Sushi token
 
   uint256 private constant MAX_UINT256 = type(uint128).max;
-
 
   constructor(
     string memory _name, string memory _symbol,
@@ -71,6 +72,8 @@ contract WMasterChef is ERC20, ReentrancyGuard, IERC20Wrapper {
 
     uint stSushi = stSushiPerShare.mul(amount).divCeil(1e12);
     uint enSushi = enSushiPerShare.mul(amount).div(1e12);
-    if (enSushi > stSushi) sushi.safeTransfer(msg.sender, enSushi.sub(stSushi));
+    if (enSushi > stSushi) {
+      _chargeFeeAndTransfer(sushi, enSushi.sub(stSushi), msg.sender);
+    }
   }
 }
