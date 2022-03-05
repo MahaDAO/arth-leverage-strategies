@@ -11,9 +11,7 @@ async function main() {
 
   await wait(60 * 1000); // wait for a minute
 
-  await hre.run("verify:verify", {
-    address: instance.address,
-  });
+  await hre.run("verify:verify", { address: instance.address });
 }
 
 // We recommend this pattern to be able to use async/await everywhere
