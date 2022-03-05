@@ -37,7 +37,7 @@ contract WMasterChef is FeeBase, ERC20, ReentrancyGuard, IERC20Wrapper {
 
   /// @dev Mint ERC20 token
   /// @param amount Token amount to wrap
-  function deposit(uint256 amount) external nonReentrant override {
+  function deposit(uint256 amount) external nonReentrant override returns (bool) {
     // take the LP tokens
     lpToken.safeTransferFrom(msg.sender, address(this), amount);
 
@@ -46,11 +46,12 @@ contract WMasterChef is FeeBase, ERC20, ReentrancyGuard, IERC20Wrapper {
     chef.deposit(pid, amount);
 
     _mint(msg.sender, amount);
+    return true;
   }
 
   /// @dev Burn ERC20 token to redeem LP ERC20 token back plus SUSHI rewards.
   /// @param amount Token amount to burn
-  function withdraw(uint256 amount) external nonReentrant override {
+  function withdraw(uint256 amount) external nonReentrant override returns (bool) {
     _burn(msg.sender, amount);
 
     // withdraw and send the lp token back
@@ -60,5 +61,6 @@ contract WMasterChef is FeeBase, ERC20, ReentrancyGuard, IERC20Wrapper {
     // tax and send the earnings
     uint256 earnings = rewardToken.balanceOf(address(this));
     if (earnings > 0) _chargeFeeAndTransfer(rewardToken, earnings, msg.sender);
+    return true;
   }
 }
