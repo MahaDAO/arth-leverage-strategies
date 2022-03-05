@@ -23,8 +23,10 @@ contract WMasterChef is FeeBase, ERC20, ReentrancyGuard, IERC20Wrapper {
   uint256 private constant MAX_UINT256 = type(uint128).max;
 
   constructor(
-    string memory _name, string memory _symbol,
-    IMasterChef _chef, uint _pid
+    string memory _name,
+    string memory _symbol,
+    IMasterChef _chef,
+    uint _pid
   ) ERC20(_name, _symbol) {
     chef = _chef;
 

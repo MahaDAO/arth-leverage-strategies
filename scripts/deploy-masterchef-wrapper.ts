@@ -5,7 +5,7 @@ async function main() {
   const constructorArguments = [""];
 
   // We get the contract to deploy
-  const ArthUSDWrapper = await ethers.getContractFactory("ArthUSDWrapper");
+  const ArthUSDWrapper = await ethers.getContractFactory("WMasterChef");
   const instance = await ArthUSDWrapper.deploy(
     String(constructorArguments[0]),
     String(constructorArguments[1]),

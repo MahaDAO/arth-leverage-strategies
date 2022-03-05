@@ -30,6 +30,10 @@ contract FeeBase is Ownable {
   }
 
   function setRewardFeeAddress(address _new) external onlyOwner {
+    _setRewardFeeAddress(_new);
+  }
+
+  function _setRewardFeeAddress(address _new) internal {
     emit RewardAddressChanged(rewardFeeDestination, _new);
     rewardFeeDestination = _new;
   }
