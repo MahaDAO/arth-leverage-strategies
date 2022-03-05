@@ -1,26 +1,18 @@
 import hre, { ethers } from "hardhat";
-// const hre = require("hardhat");
+import { wait } from "./utils";
 
 async function main() {
-  const constructorArguments = [""];
-
   // We get the contract to deploy
-  const ArthUSDWrapper = await ethers.getContractFactory("ArthUSDWrapper");
-  const instance = await ArthUSDWrapper.deploy(
-    String(constructorArguments[0]),
-    String(constructorArguments[1]),
-    String(constructorArguments[2]),
-    String(constructorArguments[3]),
-    String(constructorArguments[4]),
-    constructorArguments[5]
-  );
+  const DSProxyFactory = await ethers.getContractFactory("DSProxyFactory");
+  const instance = await DSProxyFactory.deploy();
 
   await instance.deployed();
-  console.log("ArthUSDWrapper deployed to:", instance.address);
+  console.log("DSProxyFactory deployed to:", instance.address);
+
+  await wait(60 * 1000); // wait for a minute
 
   await hre.run("verify:verify", {
     address: instance.address,
-    constructorArguments,
   });
 }
 
