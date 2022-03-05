@@ -18,8 +18,9 @@
 
 pragma solidity ^0.8.0;
 
-import "./DSAuth.sol";
-import "./DSNote.sol";
+import { DSAuth } from "./DSAuth.sol";
+import { DSNote } from "./DSNote.sol";
+import { DSProxyCache } from "./DSProxyCache.sol";
 
 // DSProxy
 // Allows code execution using a persistant identity This can be very
@@ -93,64 +94,5 @@ contract DSProxy is DSAuth, DSNote {
         require(_cacheAddr != address(0), "ds-proxy-cache-address-required");
         cache = DSProxyCache(_cacheAddr);  // overwrite cache
         return true;
-    }
-}
-
-// DSProxyFactory
-// This factory deploys new proxy instances through build()
-// Deployed proxy addresses are logged
-contract DSProxyFactory {
-    event Created(address indexed sender, address indexed owner, address proxy, address cache);
-    mapping(address=>bool) public isProxy;
-    DSProxyCache public cache;
-
-    constructor() {
-        cache = new DSProxyCache();
-    }
-
-    // deploys a new proxy instance
-    // sets owner of proxy to caller
-    function build() public returns (address payable proxy) {
-        proxy = build(msg.sender);
-    }
-
-    // deploys a new proxy instance
-    // sets custom owner of proxy
-    function build(address owner) public returns (address payable proxy) {
-        proxy = payable(address(new DSProxy(address(cache))));
-        emit Created(msg.sender, owner, address(proxy), address(cache));
-        DSProxy(proxy).setOwner(owner);
-        isProxy[proxy] = true;
-    }
-}
-
-// DSProxyCache
-// This global cache stores addresses of contracts previously deployed
-// by a proxy. This saves gas from repeat deployment of the same
-// contracts and eliminates blockchain bloat.
-
-// By default, all proxies deployed from the same factory store
-// contracts in the same cache. The cache a proxy instance uses can be
-// changed.  The cache uses the sha3 hash of a contract's bytecode to
-// lookup the address
-contract DSProxyCache {
-    mapping(bytes32 => address) public cache;
-
-    function read(bytes memory _code) public view returns (address) {
-        bytes32 hash = keccak256(_code);
-        return cache[hash];
-    }
-
-    function write(bytes memory _code) public returns (address target) {
-        assembly {
-            target := create(0, add(_code, 0x20), mload(_code))
-            switch iszero(extcodesize(target))
-            case 1 {
-                // throw if contract failed to deploy
-                revert(0, 0)
-            }
-        }
-        bytes32 hash = keccak256(_code);
-        cache[hash] = target;
     }
 }
