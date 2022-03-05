@@ -6,11 +6,12 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import { AdvancedMath, SafeMath } from "../utils/AdvancedMath.sol";
+import { SafeMath } from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import { IERC20Wrapper } from "../interfaces/IERC20Wrapper.sol";
 
 contract FeeBase is Ownable {
   using SafeERC20 for IERC20;
+  using SafeMath for uint256;
 
   uint256 public pct100 = 100000000000;
   uint256 public rewardFeeRate = 500000000; // 0.5% in 10^9
@@ -29,13 +30,13 @@ contract FeeBase is Ownable {
   }
 
   function setRewardFeeAddress(address _new) external onlyOwner {
-    emit RewardAddressChanged(feeDestination, _new);
+    emit RewardAddressChanged(rewardFeeDestination, _new);
     rewardFeeDestination = _new;
   }
 
   function _chargeFeeAndTransfer(IERC20 token, uint256 amount, address dest) internal {
     uint256 feeToCharge = amount.mul(rewardFeeRate).div(pct100);
-    uint256 remainderToSend = amount.sub(remainderToSend);
+    uint256 remainderToSend = amount.sub(feeToCharge);
 
     if (feeToCharge > 0 && rewardFeeDestination != address(0)) {
         token.safeTransfer(rewardFeeDestination, feeToCharge);
