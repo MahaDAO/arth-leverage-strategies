@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // proxy.sol - execute actions atomically through the proxy's identity
 
 // Copyright (C) 2017  DappHub, LLC

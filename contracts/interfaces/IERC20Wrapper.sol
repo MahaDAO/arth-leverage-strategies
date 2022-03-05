@@ -2,9 +2,12 @@
 pragma solidity ^0.8.0;
 
 interface IERC20Wrapper {
-  /// @dev Return the underlying ERC-20 for the given ERC-1155 token id.
-  function getUnderlyingToken(uint id) external view returns (address);
 
-  /// @dev Return the conversion rate from ERC-1155 to ERC-20, multiplied by 2**112.
-  function getUnderlyingRate(uint id) external view returns (uint);
+  /// @dev Mint ERC20 token
+  /// @param amount Token amount to wrap
+  function deposit(uint amount) external;
+
+  /// @dev Burn ERC20 token to redeem LP ERC20 token back plus SUSHI rewards.
+  /// @param amount Token amount to burn
+  function withdraw(uint amount) external;
 }
