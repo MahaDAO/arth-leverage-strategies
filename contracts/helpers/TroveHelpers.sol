@@ -10,16 +10,15 @@ import {ILeverageStrategy} from "../interfaces/ILeverageStrategy.sol";
 import {ITroveManager} from "../interfaces/ITroveManager.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ProxyHelpers} from "./ProxyHelpers.sol";
 
-abstract contract TroveHelpers {
+abstract contract TroveHelpers is ProxyHelpers {
   using SafeMath for uint256;
   bytes4 private constant OPEN_LOAN_SELECTOR =
     bytes4(keccak256("openTrove(uint256,uint256,uint256,address,address,address)"));
 
   bytes4 private constant CLOSE_LOAN_SELECTOR =
     bytes4(keccak256("openTrove(uint256,uint256,uint256,address,address,address)"));
-
-  bytes4 private constant TRANSFER_SELECTOR = bytes4(keccak256("transfer(address,uint256)"));
 
   function openLoan(
     DSProxy userProxy,
@@ -61,15 +60,5 @@ abstract contract TroveHelpers {
     // send the collateral back to the flash loan contract
     uint256 bal = IERC20(returnTokenAddress).balanceOf(address(userProxy));
     captureTokenViaProxy(userProxy, returnTokenAddress, bal);
-  }
-
-  function captureTokenViaProxy(
-    DSProxy userProxy,
-    address token,
-    uint256 amount
-  ) private {
-    // send tokens back to the contract
-    bytes memory transferData = abi.encodeWithSelector(TRANSFER_SELECTOR, address(this), amount);
-    userProxy.execute(token, transferData);
   }
 }
