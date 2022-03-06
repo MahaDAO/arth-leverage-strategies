@@ -11,57 +11,57 @@ import {IMasterChef} from "../interfaces/IMasterChef.sol";
 import {FeeBase} from "./FeeBase.sol";
 
 contract WMasterChef is FeeBase, ERC20, ReentrancyGuard, IERC20Wrapper {
-    using SafeMath for uint256;
-    using SafeERC20 for IERC20;
+  using SafeMath for uint256;
+  using SafeERC20 for IERC20;
 
-    uint256 public pid;
-    IMasterChef public chef; // Sushiswap masterChef
-    IERC20 public rewardToken; // reward token
-    IERC20 public lpToken; // Sushi token
+  uint256 public pid;
+  IMasterChef public chef; // Sushiswap masterChef
+  IERC20 public rewardToken; // reward token
+  IERC20 public lpToken; // Sushi token
 
-    uint256 private constant MAX_UINT256 = type(uint128).max;
+  uint256 private constant MAX_UINT256 = type(uint128).max;
 
-    constructor(
-        string memory _name,
-        string memory _symbol,
-        IMasterChef _chef,
-        uint256 _pid
-    ) ERC20(_name, _symbol) {
-        chef = _chef;
+  constructor(
+    string memory _name,
+    string memory _symbol,
+    IMasterChef _chef,
+    uint256 _pid
+  ) ERC20(_name, _symbol) {
+    chef = _chef;
 
-        (address _lpToken, , , ) = chef.poolInfo(pid);
+    (address _lpToken, , , ) = chef.poolInfo(pid);
 
-        lpToken = IERC20(_lpToken);
-        rewardToken = IERC20(_chef.sushi());
-        pid = _pid;
-    }
+    lpToken = IERC20(_lpToken);
+    rewardToken = IERC20(_chef.sushi());
+    pid = _pid;
+  }
 
-    /// @dev Mint ERC20 token
-    /// @param amount Token amount to wrap
-    function deposit(uint256 amount) external override nonReentrant returns (bool) {
-        // take the LP tokens
-        lpToken.safeTransferFrom(msg.sender, address(this), amount);
+  /// @dev Mint ERC20 token
+  /// @param amount Token amount to wrap
+  function deposit(uint256 amount) external override nonReentrant returns (bool) {
+    // take the LP tokens
+    lpToken.safeTransferFrom(msg.sender, address(this), amount);
 
-        // stake into the masterchef contract
-        lpToken.safeIncreaseAllowance(address(chef), amount);
-        chef.deposit(pid, amount);
+    // stake into the masterchef contract
+    lpToken.safeIncreaseAllowance(address(chef), amount);
+    chef.deposit(pid, amount);
 
-        _mint(msg.sender, amount);
-        return true;
-    }
+    _mint(msg.sender, amount);
+    return true;
+  }
 
-    /// @dev Burn ERC20 token to redeem LP ERC20 token back plus SUSHI rewards.
-    /// @param amount Token amount to burn
-    function withdraw(uint256 amount) external override nonReentrant returns (bool) {
-        _burn(msg.sender, amount);
+  /// @dev Burn ERC20 token to redeem LP ERC20 token back plus SUSHI rewards.
+  /// @param amount Token amount to burn
+  function withdraw(uint256 amount) external override nonReentrant returns (bool) {
+    _burn(msg.sender, amount);
 
-        // withdraw and send the lp token back
-        chef.withdraw(pid, amount);
-        lpToken.safeTransfer(msg.sender, amount);
+    // withdraw and send the lp token back
+    chef.withdraw(pid, amount);
+    lpToken.safeTransfer(msg.sender, amount);
 
-        // tax and send the earnings
-        uint256 earnings = rewardToken.balanceOf(address(this));
-        if (earnings > 0) _chargeFeeAndTransfer(rewardToken, earnings, msg.sender);
-        return true;
-    }
+    // tax and send the earnings
+    uint256 earnings = rewardToken.balanceOf(address(this));
+    if (earnings > 0) _chargeFeeAndTransfer(rewardToken, earnings, msg.sender);
+    return true;
+  }
 }

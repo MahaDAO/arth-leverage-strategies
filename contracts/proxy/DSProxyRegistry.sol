@@ -23,30 +23,29 @@ import {DSProxy, DSProxyFactory} from "./DSProxyFactory.sol";
 
 // This Registry deploys new proxy instances through DSProxyFactory.build(address) and keeps a registry of owner => proxy
 contract DSProxyRegistry {
-    mapping(address => DSProxy) public proxies;
-    DSProxyFactory public factory;
+  mapping(address => DSProxy) public proxies;
+  DSProxyFactory public factory;
 
-    constructor(address factory_) {
-        factory = DSProxyFactory(factory_);
-    }
+  constructor(address factory_) {
+    factory = DSProxyFactory(factory_);
+  }
 
-    // deploys a new proxy instance
-    // sets owner of proxy to caller
-    function build() public returns (address payable proxy) {
-        proxy = build(msg.sender);
-    }
+  // deploys a new proxy instance
+  // sets owner of proxy to caller
+  function build() public returns (address payable proxy) {
+    proxy = build(msg.sender);
+  }
 
-    // deploys a new proxy instance
-    // sets custom owner of proxy
-    function build(address owner) public returns (address payable proxy) {
-        // Not allow new proxy if the user already has one and remains being the owner
-        require(
-            address(proxies[owner]) == address(DSProxy(address(0))) ||
-                proxies[owner].owner() != owner,
-            "proxy exists"
-        );
+  // deploys a new proxy instance
+  // sets custom owner of proxy
+  function build(address owner) public returns (address payable proxy) {
+    // Not allow new proxy if the user already has one and remains being the owner
+    require(
+      address(proxies[owner]) == address(DSProxy(address(0))) || proxies[owner].owner() != owner,
+      "proxy exists"
+    );
 
-        proxy = factory.build(owner);
-        proxies[owner] = DSProxy(proxy);
-    }
+    proxy = factory.build(owner);
+    proxies[owner] = DSProxy(proxy);
+  }
 }

@@ -28,73 +28,66 @@ import {DSProxyCache} from "./DSProxyCache.sol";
 // the proxy can be changed, this allows for dynamic ownership models
 // i.e. a multisig
 contract DSProxy is DSAuth, DSNote {
-    DSProxyCache public cache; // global cache for contracts
+  DSProxyCache public cache; // global cache for contracts
 
-    constructor(address _cacheAddr) {
-        setCache(_cacheAddr);
+  constructor(address _cacheAddr) {
+    setCache(_cacheAddr);
+  }
+
+  // fallback() external payable {
+  //     // do nothing
+  // }
+
+  // receive() external payable {
+  //     // do nothing
+  // }
+
+  // use the proxy to execute calldata _data on contract _code
+  function execute(bytes memory _code, bytes memory _data)
+    public
+    payable
+    returns (address target, bytes memory response)
+  {
+    target = cache.read(_code);
+    if (target == address(0)) {
+      // deploy contract & store its address in cache
+      target = cache.write(_code);
     }
 
-    // fallback() external payable {
-    //     // do nothing
-    // }
+    response = execute(target, _data);
+  }
 
-    // receive() external payable {
-    //     // do nothing
-    // }
+  function execute(address _target, bytes memory _data)
+    public
+    payable
+    auth
+    note
+    returns (bytes memory response)
+  {
+    require(_target != address(0), "ds-proxy-target-address-required");
 
-    // use the proxy to execute calldata _data on contract _code
-    function execute(bytes memory _code, bytes memory _data)
-        public
-        payable
-        returns (address target, bytes memory response)
-    {
-        target = cache.read(_code);
-        if (target == address(0)) {
-            // deploy contract & store its address in cache
-            target = cache.write(_code);
-        }
+    // call contract in current context
+    assembly {
+      let succeeded := delegatecall(sub(gas(), 5000), _target, add(_data, 0x20), mload(_data), 0, 0)
+      let size := returndatasize()
 
-        response = execute(target, _data);
+      response := mload(0x40)
+      mstore(0x40, add(response, and(add(add(size, 0x20), 0x1f), not(0x1f))))
+      mstore(response, size)
+      returndatacopy(add(response, 0x20), 0, size)
+
+      switch iszero(succeeded)
+      case 1 {
+        // throw if delegatecall failed
+        revert(add(response, 0x20), size)
+      }
     }
+  }
 
-    function execute(address _target, bytes memory _data)
-        public
-        payable
-        auth
-        note
-        returns (bytes memory response)
-    {
-        require(_target != address(0), "ds-proxy-target-address-required");
-
-        // call contract in current context
-        assembly {
-            let succeeded := delegatecall(
-                sub(gas(), 5000),
-                _target,
-                add(_data, 0x20),
-                mload(_data),
-                0,
-                0
-            )
-            let size := returndatasize()
-
-            response := mload(0x40)
-            mstore(0x40, add(response, and(add(add(size, 0x20), 0x1f), not(0x1f))))
-            mstore(response, size)
-            returndatacopy(add(response, 0x20), 0, size)
-
-            switch iszero(succeeded)
-            case 1 {
-                // throw if delegatecall failed
-                revert(add(response, 0x20), size)
-            }
-        }
-    }
-
-    //set new cache
-    function setCache(address _cacheAddr) public auth note returns (bool) {
-        require(_cacheAddr != address(0), "ds-proxy-cache-address-required");
-        cache = DSProxyCache(_cacheAddr); // overwrite cache
-        return true;
-    }
+  //set new cache
+  function setCache(address _cacheAddr) public auth note returns (bool) {
+    require(_cacheAddr != address(0), "ds-proxy-cache-address-required");
+    cache = DSProxyCache(_cacheAddr); // overwrite cache
+    return true;
+  }
 }

@@ -8,5 +8,5 @@ import {IFlashBorrower} from "../interfaces/IFlashBorrower.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 abstract contract UniswapV2Helpers {
-    using SafeMath for uint256;
+  using SafeMath for uint256;
 }

@@ -17,11 +17,11 @@ pragma solidity ^0.8.0;
 import {DSAuthority} from "./proxy/DSAuth.sol";
 
 contract LeverageAuthority is DSAuthority {
-    function canCall(
-        address src,
-        address dst,
-        bytes4 sig
-    ) external view override returns (bool) {
-        return true;
-    }
+  function canCall(
+    address src,
+    address dst,
+    bytes4 sig
+  ) external view override returns (bool) {
+    return true;
+  }
 }

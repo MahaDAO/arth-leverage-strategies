@@ -28,23 +28,23 @@ pragma solidity ^0.8.0;
 // changed.  The cache uses the sha3 hash of a contract's bytecode to
 // lookup the address
 contract DSProxyCache {
-    mapping(bytes32 => address) public cache;
+  mapping(bytes32 => address) public cache;
 
-    function read(bytes memory _code) public view returns (address) {
-        bytes32 hash = keccak256(_code);
-        return cache[hash];
-    }
+  function read(bytes memory _code) public view returns (address) {
+    bytes32 hash = keccak256(_code);
+    return cache[hash];
+  }
 
-    function write(bytes memory _code) public returns (address target) {
-        assembly {
-            target := create(0, add(_code, 0x20), mload(_code))
-            switch iszero(extcodesize(target))
-            case 1 {
-                // throw if contract failed to deploy
-                revert(0, 0)
-            }
-        }
-        bytes32 hash = keccak256(_code);
-        cache[hash] = target;
+  function write(bytes memory _code) public returns (address target) {
+    assembly {
+      target := create(0, add(_code, 0x20), mload(_code))
+      switch iszero(extcodesize(target))
+      case 1 {
+        // throw if contract failed to deploy
+        revert(0, 0)
+      }
     }
+    bytes32 hash = keccak256(_code);
+    cache[hash] = target;
+  }
 }
