@@ -9,7 +9,5 @@ interface ILeverageStrategy {
         bytes calldata data
     ) external;
 
-    function closePosition() external;
-
-    function calculateSlippage(uint256 amountIn, uint256 borrowAmount) external;
+    function closePosition(uint256 borrowAmount) external;
 }

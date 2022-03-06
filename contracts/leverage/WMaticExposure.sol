@@ -9,6 +9,7 @@ import {ILeverageStrategy} from "../interfaces/ILeverageStrategy.sol";
 import {IUniswapV2Router02} from "../interfaces/IUniswapV2Router02.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {TroveHelpers} from "../helpers/TroveHelpers.sol";
+import {DSProxyRegistry} from "../proxy/DSProxyRegistry.sol";
 
 contract WMaticExposure is ILeverageStrategy, IFlashBorrower, TroveHelpers {
     using SafeMath for uint256;
@@ -20,6 +21,7 @@ contract WMaticExposure is ILeverageStrategy, IFlashBorrower, TroveHelpers {
     IERC20 public immutable usdc;
     IERC20 public immutable wmatic;
     IFlashLoan public flashLoan;
+    DSProxyRegistry public proxyRegistry;
     IUniswapV2Router02 public immutable uniswapRouter;
 
     constructor(
@@ -28,7 +30,8 @@ contract WMaticExposure is ILeverageStrategy, IFlashBorrower, TroveHelpers {
         address _wmatic,
         address _usdc,
         address _uniswapRouter,
-        address _borrowerOperations
+        address _borrowerOperations,
+        address _proxyRegistry
     ) {
         flashLoan = IFlashLoan(_flashloan);
 
@@ -37,23 +40,50 @@ contract WMaticExposure is ILeverageStrategy, IFlashBorrower, TroveHelpers {
         wmatic = IERC20(_wmatic);
         uniswapRouter = IUniswapV2Router02(_uniswapRouter);
         borrowerOperations = _borrowerOperations;
+        proxyRegistry = DSProxyRegistry(_proxyRegistry);
     }
 
     function openPosition(
         uint256 borrowAmount,
         uint256 minExposure,
-        bytes calldata flashloanData
+        bytes memory data
     ) external override {
+        (
+            uint256 maxFee,
+            uint256 debt,
+            uint256 collateralAmount,
+            address upperHint,
+            address lowerHint,
+            address frontEndTag
+        ) = abi.decode(data, (uint256, uint256, uint256, address, address, address));
+
+        bytes memory flashloanData = abi.encode(
+            msg.sender,
+            uint256(0),
+            maxFee,
+            debt,
+            collateralAmount,
+            upperHint,
+            lowerHint,
+            frontEndTag
+        );
+
         flashLoan.flashLoan(address(this), borrowAmount, flashloanData);
-        // require(borrowerOperations)
     }
 
-    function closePosition() external override {
-        flashLoan.flashLoan(address(this), 0, "c");
-    }
+    function closePosition(uint256 borrowAmount) external override {
+        bytes memory flashloanData = abi.encode(
+            msg.sender,
+            uint256(1),
+            uint256(0),
+            uint256(0),
+            uint256(0),
+            address(0),
+            address(0),
+            address(0)
+        );
 
-    function calculateSlippage(uint256 amountIn, uint256 borrowAmount) external override {
-        // nothing
+        flashLoan.flashLoan(address(this), borrowAmount, flashloanData);
     }
 
     function onFlashLoan(
@@ -65,7 +95,9 @@ contract WMaticExposure is ILeverageStrategy, IFlashBorrower, TroveHelpers {
         require(msg.sender == address(flashLoan), "untrusted lender");
         require(initiator == address(this), "not contract");
 
+        // decode the data
         (
+            address who,
             uint256 action,
             uint256 maxFee,
             uint256 debt,
@@ -73,10 +105,15 @@ contract WMaticExposure is ILeverageStrategy, IFlashBorrower, TroveHelpers {
             address upperHint,
             address lowerHint,
             address frontEndTag
-        ) = abi.decode(data, (uint256, uint256, uint256, uint256, address, address, address));
+        ) = abi.decode(
+                data,
+                (address, uint256, uint256, uint256, uint256, address, address, address)
+            );
 
+        // open or close the loan position
         if (action == 0) {
             onFlashloanOpenPosition(
+                who,
                 flashloanedAmount,
                 maxFee,
                 debt,
@@ -85,12 +122,13 @@ contract WMaticExposure is ILeverageStrategy, IFlashBorrower, TroveHelpers {
                 lowerHint,
                 frontEndTag
             );
-        } else onFlashloanClosePosition();
+        } else onFlashloanClosePosition(who);
 
         return keccak256("FlashMinter.onFlashLoan");
     }
 
     function onFlashloanOpenPosition(
+        address who,
         uint256 flashloanedAmount,
         uint256 maxFee,
         uint256 debt,
@@ -99,9 +137,12 @@ contract WMaticExposure is ILeverageStrategy, IFlashBorrower, TroveHelpers {
         address lowerHint,
         address frontEndTag
     ) internal {
+        // step 1: sell arth for collateral
         sellARTH(flashloanedAmount, collateralAmount);
 
+        // step 2: open loan using the collateral
         openLoan(
+            proxyRegistry.proxies(who),
             borrowerOperations,
             maxFee,
             debt,
@@ -110,11 +151,16 @@ contract WMaticExposure is ILeverageStrategy, IFlashBorrower, TroveHelpers {
             lowerHint,
             frontEndTag
         );
+
+        // over here we will have a open loan with collateral and dsproxy would
+        // send us back the minted arth
+
+        // step 3: payback the loan..
     }
 
-    function onFlashloanClosePosition() internal {
+    function onFlashloanClosePosition(address who) internal {
         // 1. use the flashloan'd ARTH to payback the debt
-        closeLoan(borrowerOperations);
+        closeLoan(proxyRegistry.proxies(who), borrowerOperations);
 
         // 2. get the collateral and swap back to arth
         uint256 collateralAmount = wmatic.balanceOf(msg.sender);
