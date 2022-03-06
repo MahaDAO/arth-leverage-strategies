@@ -3,14 +3,12 @@
 pragma solidity ^0.8.0;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
-import {ILeverageStrategy} from "../interfaces/ILeverageStrategy.sol";
-import {IFlashLoan} from "../interfaces/IFlashLoan.sol";
-import {IUniswapV2Router02} from "../interfaces/IUniswapV2Router02.sol";
-import {TroveHelpers} from "../helpers/TroveHelpers.sol";
-
 import {IFlashBorrower} from "../interfaces/IFlashBorrower.sol";
+import {IFlashLoan} from "../interfaces/IFlashLoan.sol";
+import {ILeverageStrategy} from "../interfaces/ILeverageStrategy.sol";
+import {IUniswapV2Router02} from "../interfaces/IUniswapV2Router02.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import {TroveHelpers} from "../helpers/TroveHelpers.sol";
 
 contract WMaticExposure is ILeverageStrategy, IFlashBorrower, TroveHelpers {
     using SafeMath for uint256;
@@ -41,8 +39,13 @@ contract WMaticExposure is ILeverageStrategy, IFlashBorrower, TroveHelpers {
         borrowerOperations = _borrowerOperations;
     }
 
-    function openPosition(uint256 amountIn, uint256 borrowAmount) external override {
-        flashLoan.flashLoan(address(this), borrowAmount, "o");
+    function openPosition(
+        uint256 borrowAmount,
+        uint256 minExposure,
+        bytes calldata flashloanData
+    ) external override {
+        flashLoan.flashLoan(address(this), borrowAmount, flashloanData);
+        // require(borrowerOperations)
     }
 
     function closePosition() external override {
@@ -62,7 +65,6 @@ contract WMaticExposure is ILeverageStrategy, IFlashBorrower, TroveHelpers {
         require(msg.sender == address(flashLoan), "untrusted lender");
         require(initiator == address(this), "not contract");
 
-        // uint256 paybackAmount = amount.add(fee);
         (
             uint256 action,
             uint256 maxFee,

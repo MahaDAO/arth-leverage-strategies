@@ -11,7 +11,7 @@ async function main() {
     "0xf28164A485B0B2C90639E47b0f377b4a438a16B1", // address _reward
 
     "0xc4e65254bb14dd5a99259247b0b9760722dc2a7f", // address _rewardDestination
-    "0xa1bc5163FADAbE25880897C95d3701ed388A2AA0", // address _governance
+    "0xa1bc5163FADAbE25880897C95d3701ed388A2AA0" // address _governance
   ];
 
   // We get the contract to deploy
@@ -33,13 +33,13 @@ async function main() {
 
   await hre.run("verify:verify", {
     address: instance.address,
-    constructorArguments,
+    constructorArguments
   });
 }
 
 // We recommend this pattern to be able to use async/await everywhere
 // and properly handle errors.
-main().catch((error) => {
+main().catch(error => {
   console.error(error);
   process.exitCode = 1;
 });
