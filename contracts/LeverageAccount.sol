@@ -2,36 +2,45 @@
 
 pragma solidity ^0.8.0;
 
-contract LeverageAccount {
-  function callFn(
-    address target,
-    bytes4 sig,
-    bytes memory data
-  ) public returns (uint256 answer) {
-    assembly {
-      // move pointer to free memory spot
-      let ptr := mload(0x40)
-      // put function sig at memory spot
-      mstore(ptr, sig)
-      // append argument after function sig
-      mstore(add(ptr, 0x04), data)
+import {ILeverageAccount} from "./interfaces/ILeverageAccount.sol";
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
-      let result := call(
-        15000, // gas limit
-        sload(target), // to addr. append var to _slot to access storage variable
-        0, // not transfer any ether
-        ptr, // Inputs are stored at location ptr
-        0x24, // Inputs are 36 bytes long
-        ptr, // Store output over input
-        0x20
-      ) // Outputs are 32 bytes long
+contract LeverageAccount is AccessControl, ILeverageAccount {
+  bytes32 public constant STRATEGY_ROLE = keccak256("STRATEGY_ROLE");
 
-      if eq(result, 0) {
-        revert(0, 0)
-      }
+  constructor(address owner) {
+    _setupRole(DEFAULT_ADMIN_ROLE, owner);
+    _setRoleAdmin(STRATEGY_ROLE, DEFAULT_ADMIN_ROLE);
+  }
 
-      answer := mload(ptr) // Assign output to answer var
-      mstore(0x40, add(ptr, 0x24)) // Set storage pointer to new space
-    }
+  modifier onlyStrategiesOrAdmin() {
+    require(_canExecute(msg.sender), "only strategies or owner.");
+    _;
+  }
+
+  modifier onlyAdmin() {
+    require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "only owner.");
+    _;
+  }
+
+  function canExecute(address who) external view override returns (bool) {
+    return _canExecute(who);
+  }
+
+  function _canExecute(address who) internal view returns (bool) {
+    return hasRole(STRATEGY_ROLE, who) || hasRole(DEFAULT_ADMIN_ROLE, who);
+  }
+
+  function approveStrategy(address strategy) external override onlyAdmin {
+    _grantRole(STRATEGY_ROLE, strategy);
+  }
+
+  function revokeStrategy(address strategy) external override onlyAdmin {
+    _revokeRole(STRATEGY_ROLE, strategy);
+  }
+
+  function callFn(address target, bytes memory signature) external override onlyStrategiesOrAdmin {
+    (bool success, ) = target.call(signature);
+    require(success, "callFn fail");
   }
 }

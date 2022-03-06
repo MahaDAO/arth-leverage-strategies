@@ -11,8 +11,9 @@ import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {TroveHelpers} from "../helpers/TroveHelpers.sol";
 import {DSProxyRegistry} from "../proxy/DSProxyRegistry.sol";
 import {DSProxy} from "../proxy/DSProxy.sol";
+import {LeverageAccount} from "../LeverageAccount.sol";
 
-contract WMaticExposure is ILeverageStrategy, IFlashBorrower, TroveHelpers {
+contract WMaticExposure is IFlashBorrower, TroveHelpers {
   using SafeMath for uint256;
 
   event OpenPosition(uint256 amount, address who);
@@ -24,6 +25,8 @@ contract WMaticExposure is ILeverageStrategy, IFlashBorrower, TroveHelpers {
   IFlashLoan public flashLoan;
   DSProxyRegistry public proxyRegistry;
   IUniswapV2Router02 public immutable uniswapRouter;
+
+  LeverageAccount public acct = LeverageAccount(0x1CdEFF7E00EF19b99Fa84F4C7311361D7FFDf899);
 
   event Where(address who, uint256 line);
 
@@ -50,70 +53,60 @@ contract WMaticExposure is ILeverageStrategy, IFlashBorrower, TroveHelpers {
 
   // }
 
-  function openPosition(
-    uint256 borrowAmount,
-    uint256 minExposure,
-    bytes memory data
-  ) external override {
-    (
-      uint256 maxFee,
-      uint256 debt,
-      uint256 collateralAmount,
-      address upperHint,
-      address lowerHint,
-      address frontEndTag
-    ) = abi.decode(data, (uint256, uint256, uint256, address, address, address));
+  // function openPosition(
+  //   uint256 borrowAmount,
+  //   uint256 minExposure,
+  //   bytes memory data
+  // ) external override {
+  //   (
+  //     uint256 maxFee,
+  //     uint256 debt,
+  //     uint256 collateralAmount,
+  //     address upperHint,
+  //     address lowerHint,
+  //     address frontEndTag
+  //   ) = abi.decode(data, (uint256, uint256, uint256, address, address, address));
 
-    bytes memory flashloanData = abi.encode(
-      msg.sender,
-      uint256(0), // action = 0 -> open loan
-      maxFee,
-      debt,
-      collateralAmount,
-      upperHint,
-      lowerHint,
-      frontEndTag
-    );
+  //   bytes memory flashloanData = abi.encode(
+  //     msg.sender,
+  //     uint256(0), // action = 0 -> open loan
+  //     maxFee,
+  //     debt,
+  //     collateralAmount,
+  //     upperHint,
+  //     lowerHint,
+  //     frontEndTag
+  //   );
 
-    flashLoan.flashLoan(address(this), borrowAmount, flashloanData);
-  }
+  //   flashLoan.flashLoan(address(this), borrowAmount, flashloanData);
+  // }
 
-  function closePosition(uint256 borrowAmount) external override {
-    // bytes memory flashloanData = abi.encode(
-    //   msg.sender,
-    //   uint256(1),
-    //   uint256(0),
-    //   uint256(0),
-    //   uint256(0),
-    //   address(0),
-    //   address(0),
-    //   address(0)
-    // );
+  // function closePosition(uint256 borrowAmount) external override {
+  //   // bytes memory flashloanData = abi.encode(
+  //   //   msg.sender,
+  //   //   uint256(1),
+  //   //   uint256(0),
+  //   //   uint256(0),
+  //   //   uint256(0),
+  //   //   address(0),
+  //   //   address(0),
+  //   //   address(0)
+  //   // );
 
-    // captureTokenViaProxy(proxyRegistry.proxies(msg.sender), address(wmatic), borrowAmount);
-    // wmatic.transferFrom(msg.sender, 100);
-    wh(94);
-    flashLoan.flashLoan(address(this), 1000, "");
-  }
+  //   // captureTokenViaProxy(proxyRegistry.proxies(msg.sender), address(wmatic), borrowAmount);
+  //   // wmatic.transferFrom(msg.sender, 100);
+  //   wh(94);
+  //   flashLoan.flashLoan(address(this), 1000, "");
+  // }
 
-  function wh(uint256 id) public {
+  function wh(uint256 id) public returns (bool) {
     emit Where(msg.sender, id);
+    return true;
   }
 
   function closePosition2() external {
-    // bytes memory flashloanData = abi.encode(
-    //   msg.sender,
-    //   uint256(1),
-    //   uint256(0),
-    //   uint256(0),
-    //   uint256(0),
-    //   address(0),
-    //   address(0),
-    //   address(0)
-    // );
-
     bytes memory data = abi.encode(getProxy());
-    wh(115);
+    wh(108);
 
     arth.approve(address(flashLoan), 1000);
     flashLoan.flashLoan(address(this), 1000, data);
@@ -122,7 +115,7 @@ contract WMaticExposure is ILeverageStrategy, IFlashBorrower, TroveHelpers {
   }
 
   function getProxy() public view returns (address) {
-    return address(proxyRegistry.proxies(msg.sender));
+    return address(0x1CdEFF7E00EF19b99Fa84F4C7311361D7FFDf899);
   }
 
   function onFlashLoan(
@@ -139,7 +132,7 @@ contract WMaticExposure is ILeverageStrategy, IFlashBorrower, TroveHelpers {
 
     wh(138);
     bytes4 CALLBACK_SELECTOR = bytes4(keccak256("wh(uint256)"));
-    DSProxy(proxy).execute(address(this), abi.encodeWithSelector(CALLBACK_SELECTOR, 142));
+    acct.callFn(address(this), abi.encodeWithSelector(CALLBACK_SELECTOR, 134));
     // // decode the data
     // (
     //   address who,

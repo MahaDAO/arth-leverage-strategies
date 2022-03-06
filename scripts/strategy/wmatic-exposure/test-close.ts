@@ -4,7 +4,7 @@ async function main() {
   // We get the contract to deploy
   const instance = await ethers.getContractAt(
     "WMaticExposure",
-    "0x9ffF134682cF437b88a2E66b54E94D9e5469fF35"
+    "0xe2dB63E09009cEBE290D27C4757CEe320647c6F7"
   );
 
   console.log(await instance.getProxy());
