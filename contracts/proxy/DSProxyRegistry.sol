@@ -22,7 +22,7 @@ pragma solidity ^0.8.0;
 import { DSProxy, DSProxyFactory } from "./DSProxyFactory.sol";
 
 // This Registry deploys new proxy instances through DSProxyFactory.build(address) and keeps a registry of owner => proxy
-contract ProxyRegistry {
+contract DSProxyRegistry {
     mapping(address => DSProxy) public proxies;
     DSProxyFactory public factory;
 
