@@ -24,6 +24,8 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
   LeverageAccountRegistry public accountRegistry;
   IUniswapV2Router02 public immutable uniswapRouter;
 
+  address private me;
+
   LeverageAccount public acct = LeverageAccount(0x1CdEFF7E00EF19b99Fa84F4C7311361D7FFDf899);
 
   event Where(address who, uint256 line);
@@ -45,6 +47,8 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
     uniswapRouter = IUniswapV2Router02(_uniswapRouter);
     borrowerOperations = _borrowerOperations;
     accountRegistry = LeverageAccountRegistry(_accountRegistry);
+
+    me = address(this);
   }
 
   function getAccount(address who) external view returns (LeverageAccount) {
@@ -54,20 +58,21 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
   function openPosition(bytes memory data) external {
     (
       uint256 flashloanAmount,
-      uint256 maxFee,
-      uint256 debt,
-      uint256 collateralAmount,
+      uint256 principalCollateral,
+      uint256 minExposure,
       address upperHint,
       address lowerHint,
       address frontEndTag
-    ) = abi.decode(data, (uint256, uint256, uint256, uint256, address, address, address));
+    ) = abi.decode(data, (uint256, uint256, uint256, address, address, address));
+
+    // take the principal
+    wmatic.transferFrom(msg.sender, address(this), principalCollateral);
 
     bytes memory flashloanData = abi.encode(
       acct, // accountRegistry.accounts(msg.sender),
       uint256(0), // action = 0 -> open loan
-      maxFee,
-      debt,
-      collateralAmount,
+      principalCollateral,
+      minExposure,
       upperHint,
       lowerHint,
       frontEndTag
@@ -75,6 +80,9 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
 
     arth.approve(address(flashLoan), flashloanAmount);
     flashLoan.flashLoan(address(this), flashloanAmount, flashloanData);
+
+    // send all tokens back to the user
+    flush(msg.sender);
   }
 
   // function closePosition(uint256 borrowAmount) external override {
@@ -97,7 +105,7 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
 
   function onFlashLoan(
     address initiator,
-    uint256 flashloanedAmount,
+    uint256 flashloanAmount,
     uint256 fee,
     bytes calldata data
   ) external override returns (bytes32) {
@@ -113,22 +121,20 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
     (
       address who,
       uint256 action,
-      uint256 maxFee,
-      uint256 debt,
-      uint256 collateralAmount,
+      uint256 principalCollateral,
+      uint256 minExposure,
       address upperHint,
       address lowerHint,
       address frontEndTag
-    ) = abi.decode(data, (address, uint256, uint256, uint256, uint256, address, address, address));
+    ) = abi.decode(data, (address, uint256, uint256, uint256, address, address, address));
 
     // // open or close the loan position
     // if (action == 0) {
     onFlashloanOpenPosition(
       who,
-      flashloanedAmount,
-      maxFee,
-      debt,
-      collateralAmount,
+      flashloanAmount,
+      principalCollateral,
+      minExposure,
       upperHint,
       lowerHint,
       frontEndTag
@@ -140,16 +146,17 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
 
   function onFlashloanOpenPosition(
     address who,
-    uint256 flashloanedAmount,
-    uint256 maxFee,
-    uint256 debt,
-    uint256 collateralAmount,
+    uint256 flashloanAmount,
+    uint256 principalCollateral,
+    uint256 minExposure,
     address upperHint,
     address lowerHint,
     address frontEndTag
   ) internal {
     // step 1: sell arth for collateral
-    // sellARTH(flashloanedAmount, collateralAmount);
+    // sellARTH(100, 0);
+    buyARTH(100, 0);
+
     // step 2: open loan using the collateral
     // openLoan(
     //   proxyRegistry.proxies(who),
@@ -213,5 +220,11 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
     );
 
     return amountsOut[amountsOut.length - 1];
+  }
+
+  function flush(address to) internal {
+    if (arth.balanceOf(me) > 0) arth.transfer(to, arth.balanceOf(me));
+    if (usdc.balanceOf(me) > 0) usdc.transfer(to, usdc.balanceOf(me));
+    if (wmatic.balanceOf(me) > 0) wmatic.transfer(to, wmatic.balanceOf(me));
   }
 }
