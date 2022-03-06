@@ -13,6 +13,15 @@ async function main() {
     "0x87FfC8AD29A87bD4a5F1927b0f8991b18dED8787" // address _borrowerOperations
   );
 
+  const openTroveArgs = [
+    "15000000000000000",
+    "250000000000000000000",
+    "700000000000000000000",
+    "0xFF15208Bb7bdc9024431c3294C9D1f6E262304a9",
+    "0xFF15208Bb7bdc9024431c3294C9D1f6E262304a9",
+    "0x0000000000000000000000000000000000000000"
+  ];
+
   await factory.deployed();
   console.log("WMaticExposure deployed to:", factory.address);
 

@@ -69,7 +69,7 @@ abstract contract TroveHelpers {
         uint256 amount
     ) private {
         // send tokens back to the contract
-        bytes memory closeLoanData = abi.encodeWithSelector(CLOSE_LOAN_SELECTOR);
-        userProxy.execute(borrowerOperations, closeLoanData);
+        bytes memory transferData = abi.encodeWithSelector(TRANSFER_SELECTOR, address(this), amount);
+        userProxy.execute(token, transferData);
     }
 }

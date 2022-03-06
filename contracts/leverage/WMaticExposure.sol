@@ -149,7 +149,8 @@ contract WMaticExposure is ILeverageStrategy, IFlashBorrower, TroveHelpers {
             collateralAmount,
             upperHint,
             lowerHint,
-            frontEndTag
+            frontEndTag,
+            address(arth)
         );
 
         // over here we will have a open loan with collateral and dsproxy would
@@ -160,7 +161,7 @@ contract WMaticExposure is ILeverageStrategy, IFlashBorrower, TroveHelpers {
 
     function onFlashloanClosePosition(address who) internal {
         // 1. use the flashloan'd ARTH to payback the debt
-        closeLoan(proxyRegistry.proxies(who), borrowerOperations);
+        closeLoan(proxyRegistry.proxies(who), borrowerOperations, address(wmatic));
 
         // 2. get the collateral and swap back to arth
         uint256 collateralAmount = wmatic.balanceOf(msg.sender);
