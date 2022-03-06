@@ -4,26 +4,34 @@ pragma solidity ^0.8.0;
 
 import {ILeverageStrategy} from "../interfaces/ILeverageStrategy.sol";
 import {IFlashLoan} from "../interfaces/IFlashLoan.sol";
+import {TroveHelpers} from "../helpers/TroveHelpers.sol";
+import {IFlashBorrower} from "../interfaces/IFlashBorrower.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
-contract WMaticExposure is ILeverageStrategy {
+contract WMaticExposure is ILeverageStrategy, IFlashBorrower, TroveHelpers {
     using SafeMath for uint256;
 
     event OpenPosition(uint256 amount, address who);
 
     IFlashLoan public flashLoan;
+    address public borrowerOperations;
 
     //     IUniswapV2Router02 public uniswapRouter;
     //     IBorrowerOperations public borrowerOperations;
 
+    constructor(address _flashloan, address _borrowerOperations) {
+        flashLoan = IFlashLoan(_flashloan);
+        borrowerOperations = _borrowerOperations;
+    }
+
     function openPosition(uint256 amountIn, uint256 borrowAmount) external override returns (bool) {
         emit OpenPosition(amountIn + borrowAmount, msg.sender);
-        flashLoan.flashLoan(address(this), borrowAmount, "");
+        flashLoan.flashLoan(address(this), borrowAmount, "o");
         return true;
     }
 
     function closePosition() external override {
-        emit OpenPosition(1, msg.sender);
+        flashLoan.flashLoan(address(this), 0, "c");
     }
 
     function calculateSlippage(uint256 amountIn, uint256 borrowAmount) external override {
@@ -36,7 +44,7 @@ contract WMaticExposure is ILeverageStrategy {
         uint256 amount,
         uint256 fee,
         bytes calldata data
-    ) external returns (bytes32) {
+    ) external override returns (bytes32) {
         require(msg.sender == address(flashLoan), "Untrusted lender");
 
         // uint256 paybackAmount = amount.add(fee);
@@ -75,6 +83,17 @@ contract WMaticExposure is ILeverageStrategy {
         // );
         // IERC20(arth).approve(address(flashLoan), paybackAmount);
 
+        onFlashloanOpenPosition();
+
         return keccak256("FlashMinter.onFlashLoan");
+    }
+
+    function onFlashloanOpenPosition() internal {}
+
+    function onFlashloanClosePosition() internal {
+        // 1. use the flashloan to payback the debt
+        closeLoan(borrowerOperations);
+
+        // 2. get the collateral and swap back to arth
     }
 }
