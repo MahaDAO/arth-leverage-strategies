@@ -3,11 +3,11 @@
 pragma solidity ^0.8.0;
 
 interface IStakingRewards {
-  function rewardPerToken() external view returns (uint);
+    function rewardPerToken() external view returns (uint256);
 
-  function stake(uint amount) external;
+    function stake(uint256 amount) external;
 
-  function withdraw(uint amount) external;
+    function withdraw(uint256 amount) external;
 
-  function getReward() external;
+    function getReward() external;
 }

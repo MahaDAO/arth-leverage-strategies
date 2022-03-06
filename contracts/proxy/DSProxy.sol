@@ -18,9 +18,9 @@
 
 pragma solidity ^0.8.0;
 
-import { DSAuth } from "./DSAuth.sol";
-import { DSNote } from "./DSNote.sol";
-import { DSProxyCache } from "./DSProxyCache.sol";
+import {DSAuth} from "./DSAuth.sol";
+import {DSNote} from "./DSNote.sol";
+import {DSProxyCache} from "./DSProxyCache.sol";
 
 // DSProxy
 // Allows code execution using a persistant identity This can be very
@@ -28,7 +28,7 @@ import { DSProxyCache } from "./DSProxyCache.sol";
 // the proxy can be changed, this allows for dynamic ownership models
 // i.e. a multisig
 contract DSProxy is DSAuth, DSNote {
-    DSProxyCache public cache;  // global cache for contracts
+    DSProxyCache public cache; // global cache for contracts
 
     constructor(address _cacheAddr) {
         setCache(_cacheAddr);
@@ -59,16 +59,23 @@ contract DSProxy is DSAuth, DSNote {
 
     function execute(address _target, bytes memory _data)
         public
+        payable
         auth
         note
-        payable
         returns (bytes memory response)
     {
         require(_target != address(0), "ds-proxy-target-address-required");
 
         // call contract in current context
         assembly {
-            let succeeded := delegatecall(sub(gas(), 5000), _target, add(_data, 0x20), mload(_data), 0, 0)
+            let succeeded := delegatecall(
+                sub(gas(), 5000),
+                _target,
+                add(_data, 0x20),
+                mload(_data),
+                0,
+                0
+            )
             let size := returndatasize()
 
             response := mload(0x40)
@@ -85,14 +92,9 @@ contract DSProxy is DSAuth, DSNote {
     }
 
     //set new cache
-    function setCache(address _cacheAddr)
-        public
-        auth
-        note
-        returns (bool)
-    {
+    function setCache(address _cacheAddr) public auth note returns (bool) {
         require(_cacheAddr != address(0), "ds-proxy-cache-address-required");
-        cache = DSProxyCache(_cacheAddr);  // overwrite cache
+        cache = DSProxyCache(_cacheAddr); // overwrite cache
         return true;
     }
 }

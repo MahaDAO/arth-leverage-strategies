@@ -19,7 +19,7 @@
 
 pragma solidity ^0.8.0;
 
-import { DSProxy, DSProxyFactory } from "./DSProxyFactory.sol";
+import {DSProxy, DSProxyFactory} from "./DSProxyFactory.sol";
 
 // This Registry deploys new proxy instances through DSProxyFactory.build(address) and keeps a registry of owner => proxy
 contract DSProxyRegistry {
@@ -42,7 +42,7 @@ contract DSProxyRegistry {
         // Not allow new proxy if the user already has one and remains being the owner
         require(
             address(proxies[owner]) == address(DSProxy(address(0))) ||
-            proxies[owner].owner() != owner,
+                proxies[owner].owner() != owner,
             "proxy exists"
         );
 
