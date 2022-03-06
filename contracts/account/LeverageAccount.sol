@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.0;
 
-import {ILeverageAccount} from "./interfaces/ILeverageAccount.sol";
+import {ILeverageAccount} from "../interfaces/ILeverageAccount.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
 contract LeverageAccount is AccessControl, ILeverageAccount {
@@ -23,16 +23,16 @@ contract LeverageAccount is AccessControl, ILeverageAccount {
     _;
   }
 
-  function canExecute(address who) external view override returns (bool) {
-    return _canExecute(who);
-  }
-
   function _canExecute(address who) internal view returns (bool) {
     return hasRole(STRATEGY_ROLE, who) || hasRole(DEFAULT_ADMIN_ROLE, who);
   }
 
   function approveStrategy(address strategy) external override onlyAdmin {
     _grantRole(STRATEGY_ROLE, strategy);
+  }
+
+  function canExecute(address who) external view override returns (bool) {
+    return _canExecute(who);
   }
 
   function revokeStrategy(address strategy) external override onlyAdmin {
