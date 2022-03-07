@@ -12,6 +12,7 @@ async function main() {
     "0x2791bca1f2de4661ed88a30c99a7a9449aa84174", // address _usdc,
     "0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff", // address _uniswapRouter,
     "0x87FfC8AD29A87bD4a5F1927b0f8991b18dED8787", // address _borrowerOperations
+    "0x8544A3d48e0821FA3891816BAd2a4095bb52a1C1", // address _controller
     "0xB16FfFa9E6F6489a2f8D77418EAe58458eFEff88" // address _proxyRegistry
   );
 
@@ -29,6 +30,7 @@ async function main() {
       "0x2791bca1f2de4661ed88a30c99a7a9449aa84174", // address _usdc,
       "0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff", // address _uniswapRouter,
       "0x87FfC8AD29A87bD4a5F1927b0f8991b18dED8787", // address _borrowerOperations
+      "0x8544A3d48e0821FA3891816BAd2a4095bb52a1C1", // address _controller
       "0xB16FfFa9E6F6489a2f8D77418EAe58458eFEff88" // address _proxyRegistry
     ]
   });

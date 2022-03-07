@@ -8,20 +8,16 @@ async function main() {
   );
 
   await approve("3000000000000000000000", instance.address);
-  const data = ethers.utils.defaultAbiCoder.encode(
-    ["uint256", "uint256", "uint256", "uint256", "address", "address", "address"],
-    [
-      "260000000000000000000", // uint256 flashloanAmount,
-      "0", // uint256 principalCollateral,
-      "600000000000000000000", // uint256 minExposure,
-      "15000000000000000", // uint256 maxBorrowingFee,
+  const tx = await instance.openPosition(
+    "260000000000000000000", // uint256 flashloanAmount,
+    "0", // uint256 principalCollateral,
+    "600000000000000000000", // uint256 minExposure,
+    "15000000000000000", // uint256 maxBorrowingFee,
 
-      "0x88fe4D4Dc27523dA91Dd13b0ce45E742017E7DeE", // address upperHint,
-      "0x88fe4D4Dc27523dA91Dd13b0ce45E742017E7DeE", // address lowerHint,
-      "0x0000000000000000000000000000000000000000" // address frontEndTag
-    ]
+    "0x88fe4D4Dc27523dA91Dd13b0ce45E742017E7DeE", // address upperHint,
+    "0x88fe4D4Dc27523dA91Dd13b0ce45E742017E7DeE", // address lowerHint,
+    "0x0000000000000000000000000000000000000000" // address frontEndTag
   );
-  const tx = await instance.openPosition(data);
   console.log("open", tx.hash);
 }
 

@@ -17,6 +17,8 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
   event OpenPosition(uint256 amount, address who);
 
   address public borrowerOperations;
+  address public controller;
+
   IERC20 public immutable arth;
   IERC20 public immutable usdc;
   IERC20 public immutable wmatic;
@@ -37,6 +39,7 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
     address _usdc,
     address _uniswapRouter,
     address _borrowerOperations,
+    address _controller,
     address _accountRegistry
   ) {
     flashLoan = IFlashLoan(_flashloan);
@@ -47,6 +50,7 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
     uniswapRouter = IUniswapV2Router02(_uniswapRouter);
     borrowerOperations = _borrowerOperations;
     accountRegistry = LeverageAccountRegistry(_accountRegistry);
+    controller = _controller;
 
     me = address(this);
   }
@@ -87,7 +91,7 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
   function closePosition(uint256 flashloanAmount) external {
     bytes memory flashloanData = abi.encode(
       msg.sender,
-      uint256(1),
+      uint256(1), // action = 0 -> close loan
       uint256(0),
       uint256(0),
       uint256(0),
@@ -180,11 +184,14 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
     arth.transfer(address(acct), flashloanAmount);
 
     // 2. use the flashloan'd ARTH to payback the debt and close the loan
-    closeLoan(acct, borrowerOperations, flashloanAmount, arth, wmatic);
+    closeLoan(acct, controller, borrowerOperations, flashloanAmount, arth, wmatic);
 
     // 3. get the collateral and swap back to arth to back the loan
-    uint256 totalCollateralAmount = wmatic.balanceOf(address(acct));
-    buyExactARTH(flashloanAmount, totalCollateralAmount, address(this));
+    uint256 totalCollateralAmount = wmatic.balanceOf(address(this));
+    uint256 arthBal = arth.balanceOf(address(this));
+    uint256 pendingArth = flashloanAmount.sub(arthBal);
+
+    buyExactARTH(pendingArth, totalCollateralAmount, address(this));
 
     // 4. payback the loan..
   }
@@ -217,6 +224,7 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
     uint256 amountInMax,
     address to
   ) internal returns (uint256) {
+    if (amountOut == 0) return 0;
     wmatic.approve(address(uniswapRouter), amountInMax);
 
     address[] memory path = new address[](3);

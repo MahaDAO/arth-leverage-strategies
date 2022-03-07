@@ -3,27 +3,25 @@ import { wait } from "./utils";
 
 async function main() {
   // We get the contract to deploy
-  // const DSProxyFactory = await ethers.getContractFactory("DSProxyFactory");
-  // const factory = await DSProxyFactory.deploy();
+  const LeverageAccountFactory = await ethers.getContractFactory("LeverageAccountFactory");
+  const factory = await LeverageAccountFactory.deploy();
 
-  // await factory.deployed();
-  // console.log("DSProxyFactory deployed to:", factory.address);
+  await factory.deployed();
+  console.log("LeverageAccountFactory deployed to:", factory.address);
 
-  // const DSProxyRegistry = await ethers.getContractFactory("DSProxyRegistry");
-  // const registry = await DSProxyRegistry.deploy(
-  //   "0x4f1dF69A95280b6bbedf89C5c7a9CFA712B995F9"
-  // );
+  const LeverageAccountRegistry = await ethers.getContractFactory("LeverageAccountRegistry");
+  const registry = await LeverageAccountRegistry.deploy(factory.address);
 
-  // await registry.deployed();
-  // console.log("DSProxyRegistry deployed to:", registry.address);
+  await registry.deployed();
+  console.log("DSProxyRegistry deployed to:", registry.address);
 
-  // await wait(60 * 1000); // wait for a minute
+  await wait(60 * 1000); // wait for a minute
 
   await hre.run("verify:verify", {
-    address: "0xb16fffa9e6f6489a2f8d77418eae58458efeff88",
-    constructorArguments: ["0x4f1dF69A95280b6bbedf89C5c7a9CFA712B995F9"]
+    address: registry.address,
+    constructorArguments: [factory.address]
   });
-  // await hre.run("verify:verify", { address: factory.address });
+  await hre.run("verify:verify", { address: factory.address });
 }
 
 // We recommend this pattern to be able to use async/await everywhere

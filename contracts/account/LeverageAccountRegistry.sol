@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 
 import {LeverageAccount, LeverageAccountFactory} from "./LeverageAccountFactory.sol";
 
-// This Registry deploys new proxy instances through DSProxyFactory.build(address) and keeps a registry of owner => proxy
+// This Registry deploys new proxy instances through LeverageAccountFactory.build(address) and keeps a registry of owner => proxy
 contract LeverageAccountRegistry {
   mapping(address => LeverageAccount) public accounts;
   LeverageAccountFactory public factory;
