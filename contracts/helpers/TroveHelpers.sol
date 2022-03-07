@@ -10,9 +10,9 @@ import {ILeverageStrategy} from "../interfaces/ILeverageStrategy.sol";
 import {ITroveManager} from "../interfaces/ITroveManager.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ProxyHelpers} from "./ProxyHelpers.sol";
+import {LeverageAccount} from "../account/LeverageAccount.sol";
 
-abstract contract TroveHelpers is ProxyHelpers {
+abstract contract TroveHelpers {
   using SafeMath for uint256;
   bytes4 private constant OPEN_LOAN_SELECTOR =
     bytes4(keccak256("openTrove(uint256,uint256,uint256,address,address,address)"));
@@ -21,7 +21,7 @@ abstract contract TroveHelpers is ProxyHelpers {
     bytes4(keccak256("openTrove(uint256,uint256,uint256,address,address,address)"));
 
   function openLoan(
-    DSProxy userProxy,
+    LeverageAccount acct,
     address borrowerOperations,
     uint256 maxFee,
     uint256 debt,
@@ -29,7 +29,8 @@ abstract contract TroveHelpers is ProxyHelpers {
     address upperHint,
     address lowerHint,
     address frontEndTag,
-    address returnTokenAddress
+    IERC20 arth,
+    IERC20 wmatic
   ) internal {
     bytes memory openLoanData = abi.encodeWithSelector(
       OPEN_LOAN_SELECTOR,
@@ -41,24 +42,50 @@ abstract contract TroveHelpers is ProxyHelpers {
       frontEndTag
     );
 
-    // open loan using the user's proxy
-    userProxy.execute(borrowerOperations, openLoanData);
+    // approve spending
+    approveTokenViaAccount(acct, address(wmatic), borrowerOperations, collateralAmount);
 
-    // send the arth back to the flash loan contract
-    captureTokenViaProxy(userProxy, returnTokenAddress, debt);
+    // open loan using the user's proxy
+    acct.callFn(borrowerOperations, openLoanData);
+
+    // send the arth back to the flash loan contract to payback the flashloan
+    uint256 arthBal = arth.balanceOf(address(acct));
+    if (arthBal > 0) transferTokenViaAccount(acct, address(arth), address(this), arthBal);
   }
 
-  function closeLoan(
-    DSProxy userProxy,
-    address borrowerOperations,
-    address returnTokenAddress
-  ) internal {
-    // close loan using the user's proxy
-    bytes memory closeLoanData = abi.encodeWithSelector(CLOSE_LOAN_SELECTOR);
-    userProxy.execute(borrowerOperations, closeLoanData);
+  // function closeLoan(
+  //   DSProxy userProxy,
+  //   address borrowerOperations,
+  //   address returnTokenAddress
+  // ) internal {
+  //   // close loan using the user's proxy
+  //   bytes memory closeLoanData = abi.encodeWithSelector(CLOSE_LOAN_SELECTOR);
+  //   userProxy.execute(borrowerOperations, closeLoanData);
 
-    // send the collateral back to the flash loan contract
-    uint256 bal = IERC20(returnTokenAddress).balanceOf(address(userProxy));
-    captureTokenViaProxy(userProxy, returnTokenAddress, bal);
+  //   // send the collateral back to the flash loan contract
+  //   uint256 bal = IERC20(returnTokenAddress).balanceOf(address(userProxy));
+  //   captureTokenViaProxy(userProxy, returnTokenAddress, bal);
+  // }
+
+  function transferTokenViaAccount(
+    LeverageAccount acct,
+    address token,
+    address who,
+    uint256 amount
+  ) internal {
+    // send tokens back to the contract
+    bytes memory transferData = abi.encodeWithSignature("transfer(address,uint256)", who, amount);
+    acct.callFn(token, transferData);
+  }
+
+  function approveTokenViaAccount(
+    LeverageAccount acct,
+    address token,
+    address who,
+    uint256 amount
+  ) internal {
+    // send tokens back to the contract
+    bytes memory transferData = abi.encodeWithSignature("approve(address,uint256)", who, amount);
+    acct.callFn(token, transferData);
   }
 }

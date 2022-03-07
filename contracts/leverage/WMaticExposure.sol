@@ -52,7 +52,8 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
   }
 
   function getAccount(address who) external view returns (LeverageAccount) {
-    return accountRegistry.accounts(who);
+    return acct;
+    // return accountRegistry.accounts(who);
   }
 
   function openPosition(bytes memory data) external {
@@ -60,17 +61,19 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
       uint256 flashloanAmount,
       uint256 principalCollateral,
       uint256 minExposure,
+      uint256 maxBorrowingFee,
       address upperHint,
       address lowerHint,
       address frontEndTag
-    ) = abi.decode(data, (uint256, uint256, uint256, address, address, address));
+    ) = abi.decode(data, (uint256, uint256, uint256, uint256, address, address, address));
 
     // take the principal
     wmatic.transferFrom(msg.sender, address(this), principalCollateral);
 
     bytes memory flashloanData = abi.encode(
-      acct, // accountRegistry.accounts(msg.sender),
+      msg.sender,
       uint256(0), // action = 0 -> open loan
+      maxBorrowingFee,
       principalCollateral,
       minExposure,
       upperHint,
@@ -81,7 +84,7 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
     arth.approve(address(flashLoan), flashloanAmount);
     flashLoan.flashLoan(address(this), flashloanAmount, flashloanData);
 
-    // send all tokens back to the user
+    // send all the tokens back to the user
     flush(msg.sender);
   }
 
@@ -112,34 +115,32 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
     require(msg.sender == address(flashLoan), "untrusted lender");
     require(initiator == address(this), "not contract");
 
-    // // decode the data
-    // address proxy = abi.decode(data, (address));
-
-    // bytes4 CALLBACK_SELECTOR = bytes4(keccak256("wh(uint256)"));
-    // acct.callFn(address(this), abi.encodeWithSelector(CALLBACK_SELECTOR, 134));
     // decode the data
     (
       address who,
       uint256 action,
+      uint256 maxBorrowingFee,
       uint256 principalCollateral,
       uint256 minExposure,
       address upperHint,
       address lowerHint,
       address frontEndTag
-    ) = abi.decode(data, (address, uint256, uint256, uint256, address, address, address));
+    ) = abi.decode(data, (address, uint256, uint256, uint256, uint256, address, address, address));
 
     // // open or close the loan position
-    // if (action == 0) {
-    onFlashloanOpenPosition(
-      who,
-      flashloanAmount,
-      principalCollateral,
-      minExposure,
-      upperHint,
-      lowerHint,
-      frontEndTag
-    );
-    // } else onFlashloanClosePosition(who);
+    if (action == 0) {
+      onFlashloanOpenPosition(
+        who,
+        flashloanAmount,
+        principalCollateral,
+        maxBorrowingFee,
+        minExposure,
+        upperHint,
+        lowerHint,
+        frontEndTag
+      );
+    }
+    // else onFlashloanClosePosition(who);
 
     return keccak256("FlashMinter.onFlashLoan");
   }
@@ -148,28 +149,34 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
     address who,
     uint256 flashloanAmount,
     uint256 principalCollateral,
+    uint256 maxBorrowingFee,
     uint256 minExposure,
     address upperHint,
     address lowerHint,
     address frontEndTag
   ) internal {
     // step 1: sell arth for collateral
-    // sellARTH(100, 0);
-    buyARTH(100, 0);
+    sellARTH(flashloanAmount, 0, address(acct));
 
     // step 2: open loan using the collateral
-    // openLoan(
-    //   proxyRegistry.proxies(who),
-    //   borrowerOperations,
-    //   maxFee,
-    //   debt,
-    //   collateralAmount,
-    //   upperHint,
-    //   lowerHint,
-    //   frontEndTag,
-    //   address(arth)
-    // );
-    // over here we will have a open loan with collateral and dsproxy would
+    wmatic.transfer(address(acct), principalCollateral);
+
+    // step 3: send the collateral to the leverage account
+    uint256 totalCollateralAmount = wmatic.balanceOf(address(acct));
+    openLoan(
+      acct,
+      borrowerOperations,
+      maxBorrowingFee, // borrowing fee
+      flashloanAmount.add(10 * 1e18), // debt
+      totalCollateralAmount, // collateral
+      upperHint,
+      lowerHint,
+      frontEndTag,
+      arth,
+      wmatic
+    );
+
+    // over here we will have a open loan with collateral and leverage account would've
     // send us back the minted arth
     // step 3: payback the loan..
   }
@@ -184,7 +191,11 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
     // 3. payback the loan..
   }
 
-  function sellARTH(uint256 _arthAmount, uint256 _minSwapAmount) internal returns (uint256) {
+  function sellARTH(
+    uint256 _arthAmount,
+    uint256 _minSwapAmount,
+    address to
+  ) internal returns (uint256) {
     arth.approve(address(uniswapRouter), _arthAmount);
 
     address[] memory path = new address[](3);
@@ -196,7 +207,7 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
       _arthAmount,
       _minSwapAmount,
       path,
-      address(this),
+      to,
       block.timestamp
     );
 
@@ -206,10 +217,10 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
   function buyARTH(uint256 _collateralAmount, uint256 _minSwapAmount) internal returns (uint256) {
     wmatic.approve(address(uniswapRouter), _collateralAmount);
 
-    address[] memory path = new address[](2);
+    address[] memory path = new address[](3);
     path[0] = address(wmatic);
     path[1] = address(usdc);
-    // path[2] = address(arth);
+    path[2] = address(arth);
 
     uint256[] memory amountsOut = uniswapRouter.swapExactTokensForTokens(
       _collateralAmount,
