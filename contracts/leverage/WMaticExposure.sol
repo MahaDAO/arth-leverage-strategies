@@ -5,6 +5,7 @@ pragma solidity ^0.8.0;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IFlashBorrower} from "../interfaces/IFlashBorrower.sol";
 import {IFlashLoan} from "../interfaces/IFlashLoan.sol";
+import {ITroveManager} from "../interfaces/ITroveManager.sol";
 import {ILeverageStrategy} from "../interfaces/ILeverageStrategy.sol";
 import {IUniswapV2Router02} from "../interfaces/IUniswapV2Router02.sol";
 import {LeverageAccount, LeverageAccountRegistry} from "../account/LeverageAccountRegistry.sol";
@@ -18,6 +19,7 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
 
   address public borrowerOperations;
   address public controller;
+  ITroveManager public troveManager;
 
   IERC20 public immutable arth;
   IERC20 public immutable usdc;
@@ -27,8 +29,6 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
   IUniswapV2Router02 public immutable uniswapRouter;
 
   address private me;
-
-  LeverageAccount public acct = LeverageAccount(0x1CdEFF7E00EF19b99Fa84F4C7311361D7FFDf899);
 
   event Where(address who, uint256 line);
 
@@ -40,7 +40,8 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
     address _uniswapRouter,
     address _borrowerOperations,
     address _controller,
-    address _accountRegistry
+    address _accountRegistry,
+    address _troveManager
   ) {
     flashLoan = IFlashLoan(_flashloan);
 
@@ -49,15 +50,15 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
     wmatic = IERC20(_wmatic);
     uniswapRouter = IUniswapV2Router02(_uniswapRouter);
     borrowerOperations = _borrowerOperations;
+    troveManager = ITroveManager(_troveManager);
     accountRegistry = LeverageAccountRegistry(_accountRegistry);
     controller = _controller;
 
     me = address(this);
   }
 
-  function getAccount(address who) external view returns (LeverageAccount) {
-    return acct;
-    // return accountRegistry.accounts(who);
+  function getAccount(address who) public view returns (LeverageAccount) {
+    return accountRegistry.accounts(who);
   }
 
   function openPosition(
@@ -153,6 +154,8 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
     address lowerHint,
     address frontEndTag
   ) internal {
+    LeverageAccount acct = getAccount(who);
+
     // 1: sell arth for collateral
     sellARTH(flashloanAmount, 0, address(acct));
 
@@ -165,7 +168,7 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
       acct,
       borrowerOperations,
       maxBorrowingFee, // borrowing fee
-      flashloanAmount.add(10 * 1e18), // debt
+      flashloanAmount.add(10 * 1e18), // debt + liquidation reserve
       totalCollateralAmount, // collateral
       upperHint,
       lowerHint,
@@ -177,9 +180,14 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
     // over here we will have a open loan with collateral and leverage account would've
     // send us back the minted arth
     // 4. payback the loan..
+
+    // 5. check if we met the min leverage conditions
+    require(troveManager.getTroveDebt(address(acct)) >= minExposure, "min exposure not met");
   }
 
   function onFlashloanClosePosition(address who, uint256 flashloanAmount) internal {
+    LeverageAccount acct = getAccount(who);
+
     // 1. send the flashloaned arth to the account
     arth.transfer(address(acct), flashloanAmount);
 
