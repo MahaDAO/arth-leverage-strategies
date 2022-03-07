@@ -27,12 +27,12 @@ contract LeverageAccount is AccessControl, ILeverageAccount {
     return hasRole(STRATEGY_ROLE, who) || hasRole(DEFAULT_ADMIN_ROLE, who);
   }
 
-  function approveStrategy(address strategy) external override onlyAdmin {
-    _grantRole(STRATEGY_ROLE, strategy);
-  }
-
   function canExecute(address who) external view override returns (bool) {
     return _canExecute(who);
+  }
+
+  function approveStrategy(address strategy) external override onlyAdmin {
+    _grantRole(STRATEGY_ROLE, strategy);
   }
 
   function revokeStrategy(address strategy) external override onlyAdmin {

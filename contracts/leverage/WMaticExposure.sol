@@ -157,12 +157,16 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
     LeverageAccount acct = getAccount(who);
 
     // 1: sell arth for collateral
-    sellARTH(flashloanAmount, 0, address(acct));
+    uint256 initCollateralAmount = wmatic.balanceOf(address(acct)).add(principalCollateral);
+    if (initCollateralAmount < minExposure) {
+      uint256 wmaticNeeded = minExposure.sub(initCollateralAmount);
+      sellARTHForExact(wmaticNeeded, flashloanAmount, address(acct));
+    }
 
-    // 2: open loan using the collateral
-    if (principalCollateral > 0) wmatic.transfer(address(acct), principalCollateral);
+    // 2: send the collateral to the leverage account
+    if (initCollateralAmount > 0) wmatic.transfer(address(acct), initCollateralAmount);
 
-    // 3: send the collateral to the leverage account
+    // 3: open loan using the collateral
     uint256 totalCollateralAmount = wmatic.balanceOf(address(acct));
     openLoan(
       acct,
@@ -182,7 +186,7 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
     // 4. payback the loan..
 
     // 5. check if we met the min leverage conditions
-    require(troveManager.getTroveDebt(address(acct)) >= minExposure, "min exposure not met");
+    // require(troveManager.getTroveDebt(address(acct)) >= minExposure, "min exposure not met");
   }
 
   function onFlashloanClosePosition(address who, uint256 flashloanAmount) internal {
@@ -204,21 +208,23 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
     // 4. payback the loan..
   }
 
-  function sellARTH(
-    uint256 _arthAmount,
-    uint256 _minSwapAmount,
+  function sellARTHForExact(
+    uint256 amountOut,
+    uint256 amountInMax,
     address to
   ) internal returns (uint256) {
-    arth.approve(address(uniswapRouter), _arthAmount);
+    if (amountOut == 0) return 0;
+
+    arth.approve(address(uniswapRouter), amountInMax);
 
     address[] memory path = new address[](3);
     path[0] = address(arth);
     path[1] = address(usdc);
     path[2] = address(wmatic);
 
-    uint256[] memory amountsOut = uniswapRouter.swapExactTokensForTokens(
-      _arthAmount,
-      _minSwapAmount,
+    uint256[] memory amountsOut = uniswapRouter.swapTokensForExactTokens(
+      amountOut,
+      amountInMax,
       path,
       to,
       block.timestamp
