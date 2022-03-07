@@ -7,10 +7,10 @@ async function main() {
     "0x37bb6ABc4Be43f103489Cf61F202Ab87dD847E1F"
   );
 
-  await approve("3000000000000000000000", instance.address);
+  await approve("300000000000000000000", instance.address);
   const tx = await instance.openPosition(
     "260000000000000000000", // uint256 flashloanAmount,
-    "0", // uint256 principalCollateral,
+    "300000000000000000000", // uint256 principalCollateral,
     "600000000000000000000", // uint256 minExposure,
     "15000000000000000", // uint256 maxBorrowingFee,
 

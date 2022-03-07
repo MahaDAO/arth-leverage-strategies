@@ -13,7 +13,8 @@ async function main() {
     "0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff", // address _uniswapRouter,
     "0x87FfC8AD29A87bD4a5F1927b0f8991b18dED8787", // address _borrowerOperations
     "0x8544A3d48e0821FA3891816BAd2a4095bb52a1C1", // address _controller
-    "0xB16FfFa9E6F6489a2f8D77418EAe58458eFEff88" // address _proxyRegistry
+    "0xB16FfFa9E6F6489a2f8D77418EAe58458eFEff88", // address _proxyRegistry
+    "0x8C021C5a2910D1812542D5495E4Fbf6a6c33Cb4f" // address _troveManager
   );
 
   await factory.deployed();
@@ -31,7 +32,8 @@ async function main() {
       "0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff", // address _uniswapRouter,
       "0x87FfC8AD29A87bD4a5F1927b0f8991b18dED8787", // address _borrowerOperations
       "0x8544A3d48e0821FA3891816BAd2a4095bb52a1C1", // address _controller
-      "0xB16FfFa9E6F6489a2f8D77418EAe58458eFEff88" // address _proxyRegistry
+      "0xB16FfFa9E6F6489a2f8D77418EAe58458eFEff88", // address _proxyRegistry
+      "0x8C021C5a2910D1812542D5495E4Fbf6a6c33Cb4f" // address _troveManager
     ]
   });
 }

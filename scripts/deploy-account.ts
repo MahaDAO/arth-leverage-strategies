@@ -13,7 +13,7 @@ async function main() {
   const registry = await LeverageAccountRegistry.deploy(factory.address);
 
   await registry.deployed();
-  console.log("DSProxyRegistry deployed to:", registry.address);
+  console.log("LeverageAccountRegistry deployed to:", registry.address);
 
   await wait(60 * 1000); // wait for a minute
 
