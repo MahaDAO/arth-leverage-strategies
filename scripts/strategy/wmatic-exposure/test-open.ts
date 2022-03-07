@@ -4,16 +4,16 @@ async function main() {
   // We get the contract to deploy
   const instance = await ethers.getContractAt(
     "WMaticExposure",
-    "0x37bb6ABc4Be43f103489Cf61F202Ab87dD847E1F"
+    "0x5Dd8649DE33cBC159965823dC3CB5A32C010F028"
   );
 
   // await registerStrategy(instance.address, "0xa91b68401bd5c436fe23a3f594ccc78ac746091a");
-  // await approve("300000000000000000000", instance.address);
+  await approve("3000000000000000000000000", instance.address);
 
   const tx = await instance.openPosition(
-    "290000000000000000000", // uint256 flashloanAmount,
+    "250000000000000000000", // uint256 flashloanAmount,
     "300000000000000000000", // uint256 principalCollateral,
-    "700000000000000000000", // uint256 minExposure,
+    "600000000000000000000", // uint256 minExposure,
     "15000000000000000", // uint256 maxBorrowingFee,
 
     "0x88fe4D4Dc27523dA91Dd13b0ce45E742017E7DeE", // address upperHint,
