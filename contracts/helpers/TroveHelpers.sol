@@ -17,8 +17,7 @@ abstract contract TroveHelpers {
   bytes4 private constant OPEN_LOAN_SELECTOR =
     bytes4(keccak256("openTrove(uint256,uint256,uint256,address,address,address)"));
 
-  bytes4 private constant CLOSE_LOAN_SELECTOR =
-    bytes4(keccak256("openTrove(uint256,uint256,uint256,address,address,address)"));
+  bytes4 private constant CLOSE_LOAN_SELECTOR = bytes4(keccak256("closeTrove()"));
 
   function openLoan(
     LeverageAccount acct,
@@ -53,19 +52,29 @@ abstract contract TroveHelpers {
     if (arthBal > 0) transferTokenViaAccount(acct, address(arth), address(this), arthBal);
   }
 
-  // function closeLoan(
-  //   DSProxy userProxy,
-  //   address borrowerOperations,
-  //   address returnTokenAddress
-  // ) internal {
-  //   // close loan using the user's proxy
-  //   bytes memory closeLoanData = abi.encodeWithSelector(CLOSE_LOAN_SELECTOR);
-  //   userProxy.execute(borrowerOperations, closeLoanData);
+  function closeLoan(
+    LeverageAccount acct,
+    address borrowerOperations,
+    uint256 availableARTH,
+    IERC20 arth,
+    IERC20 wmatic
+  ) internal {
+    bytes memory closeLoanData = abi.encodeWithSelector(CLOSE_LOAN_SELECTOR);
 
-  //   // send the collateral back to the flash loan contract
-  //   uint256 bal = IERC20(returnTokenAddress).balanceOf(address(userProxy));
-  //   captureTokenViaProxy(userProxy, returnTokenAddress, bal);
-  // }
+    // approve spending
+    approveTokenViaAccount(acct, address(arth), borrowerOperations, availableARTH);
+
+    // close loan using the user's account
+    acct.callFn(borrowerOperations, closeLoanData);
+
+    // send the arth back to the flash loan contract to payback the flashloan
+    uint256 arthBal = arth.balanceOf(address(acct));
+    if (arthBal > 0) transferTokenViaAccount(acct, address(arth), address(this), arthBal);
+
+    // send the collateral back to the flash loan contract to payback the flashloan
+    uint256 collBal = wmatic.balanceOf(address(acct));
+    if (collBal > 0) transferTokenViaAccount(acct, address(wmatic), address(this), collBal);
+  }
 
   function transferTokenViaAccount(
     LeverageAccount acct,
