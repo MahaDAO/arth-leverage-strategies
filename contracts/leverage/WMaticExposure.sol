@@ -104,6 +104,8 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
       address(0)
     );
 
+    // need to make this MEV resistant
+
     uint256 flashloanAmount = troveManager.getTroveDebt(address(getAccount(msg.sender)));
 
     arth.approve(address(flashLoan), flashloanAmount);
