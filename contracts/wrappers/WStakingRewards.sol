@@ -10,7 +10,7 @@ import {IERC20Wrapper} from "../interfaces/IERC20Wrapper.sol";
 import {IStakingRewards} from "../interfaces/IStakingRewards.sol";
 import {FeeBase} from "./FeeBase.sol";
 
-contract WStakingRewards is FeeBase, ERC20, ReentrancyGuard, IERC20Wrapper {
+abstract contract WStakingRewards is FeeBase, ERC20, ReentrancyGuard, IERC20Wrapper {
   using SafeMath for uint256;
   using SafeERC20 for IERC20;
 
