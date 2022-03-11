@@ -4,10 +4,10 @@ async function main() {
   // We get the contract to deploy
   const instance = await ethers.getContractAt(
     "WMaticExposure",
-    "0x5Dd8649DE33cBC159965823dC3CB5A32C010F028"
+    "0xAaA6a7A5d7eC7C7691576D557E1D2CDaBeca6C4A"
   );
 
-  const tx = await instance.closePosition("500000000000000000000");
+  const tx = await instance.closePosition();
   console.log("close", tx.hash);
 }
 

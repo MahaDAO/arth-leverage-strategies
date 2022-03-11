@@ -62,7 +62,7 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
   }
 
   function openPosition(
-    uint256 flashloanAmount,
+    uint256 borrowedCollateral,
     uint256 principalCollateral,
     uint256 minExposure,
     uint256 maxBorrowingFee,
@@ -72,6 +72,9 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
   ) external {
     // take the principal
     wmatic.transferFrom(msg.sender, address(this), principalCollateral);
+
+    // estimate how much we should flashloan based on how much we want to borrow
+    uint256 flashloanAmount = estimateARTHtoSell(borrowedCollateral);
 
     bytes memory flashloanData = abi.encode(
       msg.sender,
@@ -89,7 +92,7 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
     flush(msg.sender);
   }
 
-  function closePosition(uint256 flashloanAmount) external {
+  function closePosition() external {
     bytes memory flashloanData = abi.encode(
       msg.sender,
       uint256(1), // action = 0 -> close loan
@@ -100,6 +103,8 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
       address(0),
       address(0)
     );
+
+    uint256 flashloanAmount = troveManager.getTroveDebt(address(getAccount(msg.sender)));
 
     arth.approve(address(flashLoan), flashloanAmount);
     flashLoan.flashLoan(address(this), flashloanAmount, flashloanData);
@@ -255,6 +260,30 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
     );
 
     return amountsOut[amountsOut.length - 1];
+  }
+
+  function estimateARTHtoSell(uint256 maticNeeded) public view returns (uint256 arthToSell) {
+    if (maticNeeded == 0) return 0;
+
+    address[] memory path = new address[](3);
+    path[0] = address(arth);
+    path[1] = address(usdc);
+    path[2] = address(wmatic);
+
+    uint256[] memory amountsOut = uniswapRouter.getAmountsIn(maticNeeded, path);
+    arthToSell = amountsOut[0];
+  }
+
+  function estimateARTHtoBuy(uint256 arthNeeded) public view returns (uint256 maticToSell) {
+    if (arthNeeded == 0) return 0;
+
+    address[] memory path = new address[](3);
+    path[0] = address(wmatic);
+    path[1] = address(usdc);
+    path[2] = address(arth);
+
+    uint256[] memory amountsOut = uniswapRouter.getAmountsIn(arthNeeded, path);
+    maticToSell = amountsOut[0];
   }
 
   function flush(address to) internal {
