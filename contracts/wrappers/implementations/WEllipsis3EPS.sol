@@ -3,28 +3,28 @@
 pragma solidity ^0.8.0;
 
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import {IMasterChefV2} from "../../interfaces/IMasterChefV2.sol";
-import {WMasterChefV2} from "../WMasterChefV2.sol";
+import {IMasterChef} from "../../interfaces/IMasterChef.sol";
+import {WMasterChef} from "../WMasterChef.sol";
 
-interface IMiniApeV2 is IMasterChefV2 {
-  function pendingBanana(uint256 _pid, address _user) external view returns (uint256);
+interface IEllipsisStaking is IMasterChef {
+  function claimableReward(uint256 _pid, address _user) external view returns (uint256);
 }
 
-contract WApeSwapV2 is WMasterChefV2 {
+contract WEllipsis3EPS is WMasterChef {
   using SafeMath for uint256;
 
   constructor(
     string memory _name,
     string memory _symbol,
-    IMasterChefV2 _chef,
+    IEllipsisStaking _chef,
     uint256 _pid,
     address _lpToken,
     address _rewardToken,
     address _rewardDestination,
-    uint256 _rewardFee,
+    uint256 _rewardFeeRate,
     address _governance
   )
-    WMasterChefV2(
+    WMasterChef(
       _name,
       _symbol,
       _chef,
@@ -32,12 +32,15 @@ contract WApeSwapV2 is WMasterChefV2 {
       _lpToken,
       _rewardToken,
       _rewardDestination,
-      _rewardFee,
+      _rewardFeeRate,
       _governance
     )
-  {}
+  {
+    // do nothing
+  }
 
   function _accumulatedRewards() internal view override returns (uint256) {
-    return IMiniApeV2(address(chef)).pendingBanana(pid, address(this)).add(rewardTokenBalance());
+    return
+      IEllipsisStaking(address(chef)).claimableReward(pid, address(this)).add(rewardTokenBalance());
   }
 }

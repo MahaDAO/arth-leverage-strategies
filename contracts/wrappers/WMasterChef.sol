@@ -29,7 +29,7 @@ abstract contract WMasterChef is FeeBase, ERC20, ReentrancyGuard, IERC20Wrapper 
     address _lpToken,
     address _rewardToken,
     address _rewardDestination,
-    uint256 _rewardFee,
+    uint256 _rewardFeeRate,
     address _governance
   ) ERC20(_name, _symbol) {
     chef = _chef;
@@ -39,7 +39,7 @@ abstract contract WMasterChef is FeeBase, ERC20, ReentrancyGuard, IERC20Wrapper 
     pid = _pid;
 
     _setRewardFeeAddress(_rewardDestination);
-    _setRewardFeeRate(_rewardFee);
+    _setRewardFeeRate(_rewardFeeRate);
     _transferOwnership(_governance);
   }
 
@@ -70,5 +70,31 @@ abstract contract WMasterChef is FeeBase, ERC20, ReentrancyGuard, IERC20Wrapper 
     uint256 earnings = rewardToken.balanceOf(address(this));
     if (earnings > 0) _chargeFeeAndTransfer(rewardToken, earnings, msg.sender);
     return true;
+  }
+
+  function rewardTokenBalance() public view returns (uint256) {
+    return rewardToken.balanceOf(address(this));
+  }
+
+  function _accumulatedRewards() internal view virtual returns (uint256) {
+    // todo: implement this!
+    return uint256(0);
+  }
+
+  function accumulatedRewards() external view override returns (uint256) {
+    return _accumulatedRewards();
+  }
+
+  function accumulatedRewardsFor(address _user) external view override returns (uint256) {
+    return _accumulatedRewardsFor(_user);
+  }
+
+  function _accumulatedRewardsFor(address _user) internal view returns (uint256) {
+    uint256 accRewards = _accumulatedRewards();
+    uint256 bal = balanceOf(_user);
+    uint256 total = totalSupply();
+
+    uint256 perc = bal.mul(1e18).div(total);
+    return accRewards.mul(perc).div(1e18);
   }
 }

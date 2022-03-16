@@ -25,16 +25,18 @@ abstract contract WStakingRewards is FeeBase, ERC20, ReentrancyGuard, IERC20Wrap
     string memory _symbol,
     address _staking,
     address _underlying,
-    address _reward,
+    address _rewardToken,
     address _rewardDestination,
+    uint256 _rewardFeeRate,
     address _governance
   ) ERC20(_name, _symbol) {
     staking = IStakingRewards(_staking);
     underlying = IERC20(_underlying);
-    rewardToken = IERC20(_reward);
+    rewardToken = IERC20(_rewardToken);
     underlying.safeApprove(_staking, MAX_UINT256);
 
     _setRewardFeeAddress(_rewardDestination);
+    _setRewardFeeRate(_rewardFeeRate);
     _transferOwnership(_governance);
   }
 

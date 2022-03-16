@@ -18,8 +18,8 @@ async function main() {
   ];
 
   // We get the contract to deploy
-  const WStakingRewards = await ethers.getContractFactory("WApeSwapV2");
-  const instance = await WStakingRewards.deploy(
+  const WApeSwapV2 = await ethers.getContractFactory("WApeSwapV2");
+  const instance = await WApeSwapV2.deploy(
     String(constructorArguments[0]),
     String(constructorArguments[1]),
     String(constructorArguments[2]),
