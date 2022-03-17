@@ -22,11 +22,7 @@ contract FeeBase is Ownable {
   event RewardFeeCharged(uint256 initialAmount, uint256 feeAmount, address feeDestination);
 
   function setRewardFeeRate(uint256 _new) external onlyOwner {
-    require(_new >= 0, "fee is not >= 0%");
-    require(_new <= pct100, "fee is not <= 100%");
-
-    emit RewardFeeChanged(rewardFeeRate, _new);
-    rewardFeeRate = _new;
+    _setRewardFeeRate(_new);
   }
 
   function setRewardFeeAddress(address _new) external onlyOwner {
@@ -36,6 +32,14 @@ contract FeeBase is Ownable {
   function _setRewardFeeAddress(address _new) internal {
     emit RewardAddressChanged(rewardFeeDestination, _new);
     rewardFeeDestination = _new;
+  }
+
+  function _setRewardFeeRate(uint256 _new) internal {
+    require(_new >= 0, "fee is not >= 0%");
+    require(_new <= pct100, "fee is not <= 100%");
+
+    emit RewardFeeChanged(rewardFeeRate, _new);
+    rewardFeeRate = _new;
   }
 
   function _chargeFeeAndTransfer(

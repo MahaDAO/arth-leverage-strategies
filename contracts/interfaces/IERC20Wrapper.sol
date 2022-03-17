@@ -11,4 +11,9 @@ interface IERC20Wrapper is IERC20 {
   /// @dev Burn ERC20 token to redeem LP ERC20 token back plus SUSHI rewards.
   /// @param amount Token amount to burn
   function withdraw(uint256 amount) external returns (bool);
+
+  /// @dev pending rewards
+  function accumulatedRewards() external view returns (uint256);
+
+  function accumulatedRewardsFor(address _user) external view returns (uint256);
 }
