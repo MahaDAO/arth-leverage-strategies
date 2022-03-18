@@ -4,8 +4,8 @@ import { wait } from "../../utils";
 
 async function main() {
   // We get the contract to deploy
-  const WMaticExposure = await ethers.getContractFactory("LPExpsoure");
-  const factory = await WMaticExposure.deploy(
+  const LPExpsoure = await ethers.getContractFactory("LPExpsoure");
+  const factory = await LPExpsoure.deploy(
     "0xa3ae29Fb00D6dF4C28c7dDd5937C51BcBbd637AA", // address _flashloan,
     "0x8BFE2131a7Cb2072269f53624fd38EaCA6543309", // address _arth,
     "0x3467D9Fea78e9D82728aa6C3011F881ad7300a1e", // address _maha,
@@ -18,7 +18,7 @@ async function main() {
   );
 
   await factory.deployed();
-  console.log("WMaticExposure deployed to:", factory.address);
+  console.log("LPExpsoure deployed to:", factory.address);
 
   await wait(60 * 1000); // wait for a minute
 

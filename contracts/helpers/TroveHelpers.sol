@@ -26,7 +26,7 @@ abstract contract TroveHelpers {
     address lowerHint,
     address frontEndTag,
     IERC20 arth,
-    IERC20 wmatic
+    IERC20 tokenB
   ) internal {
     bytes memory openLoanData = abi.encodeWithSelector(
       OPEN_LOAN_SELECTOR,
@@ -39,7 +39,7 @@ abstract contract TroveHelpers {
     );
 
     // approve spending
-    approveTokenViaAccount(acct, wmatic, borrowerOperations, collateralAmount);
+    approveTokenViaAccount(acct, tokenB, borrowerOperations, collateralAmount);
 
     // open loan using the user's proxy
     acct.callFn(borrowerOperations, openLoanData);
