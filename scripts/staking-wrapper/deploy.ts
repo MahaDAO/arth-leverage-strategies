@@ -3,19 +3,21 @@ import { wait } from "../utils";
 
 async function main() {
   const constructorArguments = [
-    "USDT-USDC Staked QLP", // string memory _name,
-    "USDCUSDT-QLP-S", // string memory _symbol,
+    "WETH-DAI Staked QLP", // string memory _name,
+    "WETHDAI-QLP-S", // string memory _symbol,
 
-    "0xafb76771c98351aa7fca13b130c9972181612b54", // address _staking,
-    "0x2cf7252e74036d1da831d11089d326296e64a728", // addresss _underlying,
-    "0xf28164A485B0B2C90639E47b0f377b4a438a16B1", // address _reward
+    "0xa18bf6b7d39DA5F48683527ee1080F47fD50C6B5", // address _staking,
+    "0x3c9ce572eED9e205A1cdc5E2ead3DbCeD381030E", // addresss _underlying,
+    "0x82b9b6ddd709f48119d979795e9f4379870db437", // address _reward
 
-    "0xc4e65254bb14dd5a99259247b0b9760722dc2a7f", // address _rewardDestination
-    "0xa1bc5163FADAbE25880897C95d3701ed388A2AA0" // address _governance
+    "0xE595b22bEB0dEEE5a41D2B29a86E4eDeC8B7D180", // address _rewardDestination
+    "15000000000", // address _rewardFeeRate = 15%
+
+    "0xE595b22bEB0dEEE5a41D2B29a86E4eDeC8B7D180" // address _governance
   ];
 
   // We get the contract to deploy
-  const WStakingRewards = await ethers.getContractFactory("WStakingRewards");
+  const WStakingRewards = await ethers.getContractFactory("WQuickswap");
   const instance = await WStakingRewards.deploy(
     String(constructorArguments[0]),
     String(constructorArguments[1]),
@@ -23,7 +25,8 @@ async function main() {
     String(constructorArguments[3]),
     String(constructorArguments[4]),
     String(constructorArguments[5]),
-    String(constructorArguments[6])
+    String(constructorArguments[6]),
+    String(constructorArguments[7])
   );
 
   await instance.deployed();

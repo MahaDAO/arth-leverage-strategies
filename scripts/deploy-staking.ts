@@ -3,26 +3,26 @@ import hre, { ethers } from "hardhat";
 
 async function main() {
   const constructorArguments = [
-    "0xecce08c2636820a81fc0c805dbdc7d846636bbc4", // address _rewardsDistribution,
-    "0xCE86F7fcD3B40791F63B86C3ea3B8B355Ce2685b", // address _rewardsToken,
-    "0xb38b49bae104bbb6a82640094fd61b341a858f78", // address _stakingToken,
+    "0xe595b22beb0deee5a41d2b29a86e4edec8b7d180", // address _rewardsDistribution,
+    "0x82b9b6ddd709f48119d979795e9f4379870db437", // address _rewardsToken,
+    "0x3c9ce572eED9e205A1cdc5E2ead3DbCeD381030E", // address _stakingToken,
     "2592000" // uint256 _rewardsDuration
   ];
 
   // We get the contract to deploy
-  // const ArthUSDWrapper = await ethers.getContractFactory("StakingRewardsV2");
-  // const instance = await ArthUSDWrapper.deploy(
-  //   String(constructorArguments[0]),
-  //   String(constructorArguments[1]),
-  //   String(constructorArguments[2]),
-  //   String(constructorArguments[3])
-  // );
+  const ArthUSDWrapper = await ethers.getContractFactory("StakingRewardsV2");
+  const instance = await ArthUSDWrapper.deploy(
+    String(constructorArguments[0]),
+    String(constructorArguments[1]),
+    String(constructorArguments[2]),
+    String(constructorArguments[3])
+  );
 
-  // await instance.deployed();
-  // console.log("StakingRewardsV2 deployed to:", instance.address);
+  await instance.deployed();
+  console.log("StakingRewardsV2 deployed to:", instance.address);
 
   await hre.run("verify:verify", {
-    address: "0x6398C73761a802a7Db8f6418Ef0a299301bC1Fb0",
+    address: instance.address,
     constructorArguments
   });
 }
