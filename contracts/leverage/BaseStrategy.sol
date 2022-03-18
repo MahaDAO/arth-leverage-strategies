@@ -9,12 +9,11 @@ import {ITroveManager} from "../interfaces/ITroveManager.sol";
 import {ILeverageStrategy} from "../interfaces/ILeverageStrategy.sol";
 import {IUniswapV2Router02} from "../interfaces/IUniswapV2Router02.sol";
 import {IERC20Wrapper} from "../interfaces/IERC20Wrapper.sol";
-import {IUniswapV2Factory} from "../interfaces/IUniswapV2Factory.sol";
 import {LeverageAccount, LeverageAccountRegistry} from "../account/LeverageAccountRegistry.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {TroveHelpers} from "../helpers/TroveHelpers.sol";
 
-contract LPExpsoure is IFlashBorrower, TroveHelpers {
+contract BaseStrategy is IFlashBorrower, TroveHelpers {
   using SafeMath for uint256;
 
   address public borrowerOperations;
@@ -26,13 +25,11 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers {
   IERC20 public immutable dai;
   IFlashLoan public flashLoan;
   LeverageAccountRegistry public accountRegistry;
-  IUniswapV2Router02 public uniswapRouter;
-  IUniswapV2Factory public uniswapFactory;
+  IUniswapV2Router02 public immutable uniswapRouter;
 
   IERC20 public arthMaha;
   IERC20 public arthDai;
   IERC20 public mahaDai;
-
   IERC20Wrapper public mahaDaiWrapper;
 
   address private me;
@@ -59,12 +56,6 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers {
     accountRegistry = LeverageAccountRegistry(_accountRegistry);
     controller = _controller;
 
-    uniswapFactory = IUniswapV2Factory(uniswapRouter.factory());
-
-    arthDai = IERC20(uniswapFactory.getPair(_arth, _dai));
-    arthMaha = IERC20(uniswapFactory.getPair(_arth, _maha));
-    mahaDai = IERC20(uniswapFactory.getPair(_dai, _maha));
-
     me = address(this);
   }
 
@@ -86,15 +77,13 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers {
     dai.transferFrom(msg.sender, address(this), principalCollateral[1]);
 
     // estimate how much we should flashloan based on how much we want to borrow
-    uint256 flashloanAmount = 10000e18 +
-      estimateARTHtoSell(address(maha), borrowedCollateral[0]) +
+    uint256 flashloanAmount = estimateARTHtoSell(address(maha), borrowedCollateral[0]) +
       estimateARTHtoSell(address(dai), borrowedCollateral[1]);
 
     bytes memory flashloanData = abi.encode(
       msg.sender,
       uint256(0), // action = 0 -> open loan
       maxBorrowingFee,
-      borrowedCollateral,
       principalCollateral,
       minExposure,
       upperHint,
@@ -141,7 +130,6 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers {
       address who,
       uint256 action,
       uint256 maxBorrowingFee,
-      uint256[] memory borrowedCollateral,
       uint256[] memory principalCollateral,
       uint256[] memory minExposure,
       address upperHint,
@@ -149,16 +137,15 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers {
       address frontEndTag
     ) = abi.decode(
         data,
-        (address, uint256, uint256, uint256[], uint256[], uint256[], address, address, address)
+        (address, uint256, uint256, uint256[], uint256[], address, address, address)
       );
 
-    // // open or close the loan position
+    // open or close the loan position
     if (action == 0) {
       _onFlashloanOpenPosition(
         who,
         flashloanAmount,
         maxBorrowingFee,
-        borrowedCollateral,
         principalCollateral,
         minExposure,
         upperHint,
@@ -174,7 +161,6 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers {
     address who,
     uint256 flashloanAmount,
     uint256 maxBorrowingFee,
-    uint256[] memory borrowedCollateral,
     uint256[] memory principalCollateral,
     uint256[] memory minExposure,
     address upperHint,
@@ -184,13 +170,7 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers {
     LeverageAccount acct = getAccount(who);
 
     // 1: sell arth for collateral
-    _sellCollateralForARTH(
-      address(acct),
-      flashloanAmount,
-      borrowedCollateral,
-      principalCollateral,
-      minExposure
-    );
+    _sellCollateralForARTH(acct, flashloanAmount, principalCollateral, minExposure);
 
     // 2. LP all the collateral
     // 3. Stake and tokenize
@@ -220,26 +200,23 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers {
   }
 
   function _sellCollateralForARTH(
-    address acct,
+    LeverageAccount acct,
     uint256 flashloanAmount,
-    uint256[] memory borrowedCollateral,
     uint256[] memory principalCollateral,
     uint256[] memory minExposure
   ) internal {
     // 1: sell arth for collateral
-    // uint256 mahaCollateralAmount = maha.balanceOf(acct).add(principalCollateral[0]);
-    // if (mahaCollateralAmount < minExposure[0]) {
-    // uint256 mahaNeeded = minExposure[0].sub(mahaCollateralAmount);
-    uint256 sell0 = estimateARTHtoSell(address(maha), borrowedCollateral[0]);
-    _sellARTHForExact(maha, borrowedCollateral[0], sell0, acct);
-    // }
+    uint256 mahaCollateralAmount = maha.balanceOf(address(acct)).add(principalCollateral[0]);
+    if (mahaCollateralAmount < minExposure[0]) {
+      uint256 mahaNeeded = minExposure[0].sub(mahaCollateralAmount);
+      _sellARTHForExact(maha, mahaNeeded, flashloanAmount, address(acct));
+    }
 
-    // uint256 daiCollateralAmount = dai.balanceOf(acct).add(principalCollateral[1]);
-    // if (daiCollateralAmount < minExposure[1]) {
-    // uint256 daiNeeded = minExposure[1].sub(daiCollateralAmount);
-    uint256 sell1 = estimateARTHtoSell(address(dai), borrowedCollateral[1]);
-    _sellARTHForExact(dai, borrowedCollateral[1], sell1, acct);
-    // }
+    uint256 daiCollateralAmount = maha.balanceOf(address(acct)).add(principalCollateral[0]);
+    if (daiCollateralAmount < minExposure[0]) {
+      uint256 daiNeeded = minExposure[0].sub(daiCollateralAmount);
+      _sellARTHForExact(dai, daiNeeded, flashloanAmount, address(acct));
+    }
   }
 
   function _lpAndStake(LeverageAccount acct) internal returns (uint256) {
@@ -286,6 +263,7 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers {
     address to
   ) internal returns (uint256) {
     if (amountOut == 0) return 0;
+
     arth.approve(address(uniswapRouter), amountInMax);
 
     address[] memory path = new address[](2);
@@ -327,18 +305,18 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers {
     return amountsOut[amountsOut.length - 1];
   }
 
-  function estimateARTHtoSell(address tokenB, uint256 tokenBNeeded)
+  function estimateARTHtoSell(address tokenB, uint256 maticNeeded)
     public
     view
     returns (uint256 arthToSell)
   {
-    if (tokenBNeeded == 0) return 0;
+    if (maticNeeded == 0) return 0;
 
     address[] memory path = new address[](2);
     path[0] = address(arth);
     path[1] = address(tokenB);
 
-    uint256[] memory amountsOut = uniswapRouter.getAmountsIn(tokenBNeeded, path);
+    uint256[] memory amountsOut = uniswapRouter.getAmountsIn(maticNeeded, path);
     arthToSell = amountsOut[0];
   }
 

@@ -3,26 +3,40 @@ import { ethers } from "hardhat";
 async function main() {
   // We get the contract to deploy
   const instance = await ethers.getContractAt(
-    "WMaticExposure",
-    "0xAaA6a7A5d7eC7C7691576D557E1D2CDaBeca6C4A"
+    "LPExpsoure",
+    "0xB3cBe792f9DB85334C3563d997E1C8b129441FB8"
   );
 
-  // await registerStrategy(instance.address, "0xa91b68401bd5c436fe23a3f594ccc78ac746091a");
-  // await approve("3000000000000000000000000", instance.address);
+  // await registerStrategy(instance.address, "0xcC4eB1398E22F1AA799CF30c29B8Be367C77A6Fa");
+  // await approve(
+  //   "0x54406a69B4c629E4d5711140Faec3221672c71A1",
+  //   "3000000000000000000000000",
+  //   instance.address
+  // );
+  // await approve(
+  //   "0x3467D9Fea78e9D82728aa6C3011F881ad7300a1e",
+  //   "3000000000000000000000000",
+  //   instance.address
+  // );
 
-  const tx = await instance.estimateGas.openPosition(
-    "400000000000000000000", // uint256 borrowedCollateral,
-    "300000000000000000000", // uint256 principalCollateral,
-    "600000000000000000000", // uint256 minExposure,
+  const tx = await instance.openPosition(
+    ["1000000000000000000000", "1000000000000000000000"], // uint256[] memory borrowedCollateral,
+    ["1000000000000000000000", "1000000000000000000000"], // uint256[] memory principalCollateral,
+    ["2000000000000000000000", "2000000000000000000000"], // uint256[] memory minExposure,
     "15000000000000000", // uint256 maxBorrowingFee,
 
-    "0x88fe4D4Dc27523dA91Dd13b0ce45E742017E7DeE", // address upperHint,
-    "0x88fe4D4Dc27523dA91Dd13b0ce45E742017E7DeE", // address lowerHint,
+    // "400000000000000000000", // uint256 borrowedCollateral,
+    // "300000000000000000000", // uint256 principalCollateral,
+    // "600000000000000000000", // uint256 minExposure,
+    // "15000000000000000", // uint256 maxBorrowingFee,0xa3ae29fb00d6df4c28c7ddd5937c51bcbbd637aa
+
+    "0x0000000000000000000000000000000000000000", // address upperHint,
+    "0x0000000000000000000000000000000000000000", // address lowerHint,
     "0x0000000000000000000000000000000000000000" // address frontEndTag
   );
 
   console.log(tx);
-  // console.log("open", tx.hash);
+  console.log("open", tx.hash);
 }
 
 const registerStrategy = async (strategy: string, acct: string) => {
@@ -33,10 +47,10 @@ const registerStrategy = async (strategy: string, acct: string) => {
   console.log("registerStrategy", tx.hash);
 };
 
-const approve = async (amount: string, whom: string) => {
-  const erc20 = await ethers.getContractAt("ERC20", "0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270");
+const approve = async (addr: string, amount: string, whom: string) => {
+  const erc20 = await ethers.getContractAt("ERC20", addr);
   const tx = await erc20.approve(whom, amount);
-  console.log("approve", tx.hash);
+  console.log("approve", addr, tx.hash);
 };
 
 // We recommend this pattern to be able to use async/await everywhere
