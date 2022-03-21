@@ -1,23 +1,26 @@
 import { ethers } from "hardhat";
+import { wait } from "../../utils";
 
 async function main() {
   // We get the contract to deploy
   const instance = await ethers.getContractAt(
     "LPExpsoure",
-    "0xB3cBe792f9DB85334C3563d997E1C8b129441FB8"
+    "0xd95b2262D084E1847c961b89361B8d9cD6db6aEf"
   );
 
-  // await registerStrategy(instance.address, "0xcC4eB1398E22F1AA799CF30c29B8Be367C77A6Fa");
-  // await approve(
-  //   "0x54406a69B4c629E4d5711140Faec3221672c71A1",
-  //   "3000000000000000000000000",
-  //   instance.address
-  // );
-  // await approve(
-  //   "0x3467D9Fea78e9D82728aa6C3011F881ad7300a1e",
-  //   "3000000000000000000000000",
-  //   instance.address
-  // );
+  await registerStrategy(instance.address, "0x62354a97E4886b2bD452Cb37d0291339dF05eAD9");
+  await approve(
+    "0x54406a69B4c629E4d5711140Faec3221672c71A1",
+    "3000000000000000000000000",
+    instance.address
+  );
+  await approve(
+    "0x3467D9Fea78e9D82728aa6C3011F881ad7300a1e",
+    "3000000000000000000000000",
+    instance.address
+  );
+
+  await wait(10 * 1000);
 
   const tx = await instance.openPosition(
     ["1000000000000000000000", "1000000000000000000000"], // uint256[] memory borrowedCollateral,

@@ -41,23 +41,6 @@ contract LeverageAccount is AccessControl, ILeverageAccount {
 
   function callFn(address target, bytes memory signature) external override onlyStrategiesOrAdmin {
     (bool success, bytes memory response) = target.call(signature);
-
-    // Has the function call reverted?
-    if (!success) {
-      // Is there a reason string available for the revert?
-      if (response.length > 0) {
-        // Try to fetch the reason for revert.
-        assembly {
-          let response_size := mload(response)
-          revert(add(32, response), response_size)
-        }
-      } else {
-        string memory responseInStr = abi.decode(response, (string));
-        revert(responseInStr);
-      }
-    }
-
-    // Fallback check.
-    require(success, "callFn failed");
+    require(success, string(response));
   }
 }
