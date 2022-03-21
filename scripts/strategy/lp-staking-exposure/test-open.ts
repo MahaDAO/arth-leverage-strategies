@@ -5,22 +5,36 @@ async function main() {
   // We get the contract to deploy
   const instance = await ethers.getContractAt(
     "LPExpsoure",
-    "0xd95b2262D084E1847c961b89361B8d9cD6db6aEf"
+    "0xc6757d9CB44ADEd7E19772BEDEb5814fAc7dEEc6"
   );
 
-  await registerStrategy(instance.address, "0x62354a97E4886b2bD452Cb37d0291339dF05eAD9");
+  // await registerStrategy(instance.address, "0x62354a97E4886b2bD452Cb37d0291339dF05eAD9");
   await approve(
-    "0x54406a69B4c629E4d5711140Faec3221672c71A1",
+    "0x54406a69B4c629E4d5711140Faec3221672c71A1", // dai
     "3000000000000000000000000",
     instance.address
   );
   await approve(
-    "0x3467D9Fea78e9D82728aa6C3011F881ad7300a1e",
+    "0x3467D9Fea78e9D82728aa6C3011F881ad7300a1e", // maha
     "3000000000000000000000000",
     instance.address
   );
+  // await approve(
+  //   "0x8BFE2131a7Cb2072269f53624fd38EaCA6543309", // arth
+  //   "3000000000000000000000000",
+  //   instance.address
+  // );
 
   await wait(10 * 1000);
+
+  console.log(
+    (
+      await instance.estimateAmountToFlashloanBuy([
+        "1000000000000000000000",
+        "1000000000000000000000"
+      ])
+    ).toString()
+  );
 
   const tx = await instance.openPosition(
     ["1000000000000000000000", "1000000000000000000000"], // uint256[] memory borrowedCollateral,
@@ -38,7 +52,6 @@ async function main() {
     "0x0000000000000000000000000000000000000000" // address frontEndTag
   );
 
-  console.log(tx);
   console.log("open", tx.hash);
 }
 

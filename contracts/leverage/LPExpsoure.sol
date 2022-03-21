@@ -70,10 +70,6 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
     me = address(this);
   }
 
-  function getAccount(address who) public view returns (LeverageAccount) {
-    return accountRegistry.accounts(who);
-  }
-
   function openPosition(
     uint256[] memory borrowedCollateral,
     uint256[] memory principalCollateral,
@@ -102,8 +98,7 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
       frontEndTag
     );
 
-    arth.approve(address(flashLoan), flashloanAmount);
-    flashLoan.flashLoan(address(this), flashloanAmount, flashloanData);
+    flashLoan.flashLoan(address(this), flashloanAmount.mul(103).div(100), flashloanData);
     _flush(msg.sender);
   }
 
@@ -120,7 +115,7 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
     );
 
     // need to make this MEV resistant
-    uint256 flashloanAmount = troveManager.getTroveDebt(address(getAccount(msg.sender)));
+    uint256 flashloanAmount = troveManager.getTroveDebt(msg.sender);
     arth.approve(address(flashLoan), flashloanAmount);
     flashLoan.flashLoan(address(this), flashloanAmount, flashloanData);
     _flush(msg.sender);
@@ -151,7 +146,7 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
         (address, uint256, uint256, uint256[], uint256[], uint256[], address, address, address)
       );
 
-    // // open or close the loan position
+    // open or close the loan position
     if (action == 0) {
       _onFlashloanOpenPosition(
         who,
@@ -165,7 +160,7 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
         frontEndTag
       );
     } else _onFlashloanClosePosition(who, flashloanAmount);
-    require(arth.balanceOf(me) >= flashloanAmount, "FlashMinter: Can't payback flashloan");
+
     return keccak256("FlashMinter.onFlashLoan");
   }
 
@@ -180,22 +175,20 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
     address lowerHint,
     address frontEndTag
   ) internal {
-    LeverageAccount acct = getAccount(who);
-
     // 1: sell arth for collateral
     _sellCollateralForARTH(borrowedCollateral);
 
     // 2. LP all the collateral
     // 3. Stake and tokenize
     // 4: send the collateral to the leverage account
-    uint256 collateralAmount = _lpAndStake(acct);
+    uint256 collateralAmount = _lpAndStake();
 
     // 5: open loan using the collateral
     openLoan(
-      acct,
+      LeverageAccount(who),
       borrowerOperations,
       maxBorrowingFee, // borrowing fee
-      flashloanAmount.add(10 * 1e18), // debt + liquidation reserve
+      flashloanAmount, // debt + liquidation reserve
       collateralAmount, // collateral
       upperHint,
       lowerHint,
@@ -205,8 +198,6 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
     );
 
     // send the arth back to the flash loan contract to payback the flashloan
-    uint256 arthBal = arth.balanceOf(me);
-    require(false, uint2str(arthBal));
 
     // over here we will have a open loan with collateral and leverage account would've
     // send us back the minted arth
@@ -214,6 +205,8 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
 
     // 7. check if we met the min leverage conditions
     // require(troveManager.getTroveDebt(address(acct)) >= minExposure, "min exposure not met");
+    arth.approve(address(flashLoan), flashloanAmount);
+    require(arth.balanceOf(me) >= flashloanAmount, uint2str(arth.balanceOf(me)));
   }
 
   function _sellCollateralForARTH(uint256[] memory borrowedCollateral) internal {
@@ -229,7 +222,7 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
     }
   }
 
-  function _lpAndStake(LeverageAccount acct) internal returns (uint256) {
+  function _lpAndStake() internal returns (uint256) {
     // 2. LP all the collateral
     maha.approve(address(uniswapRouter), maha.balanceOf(me));
     dai.approve(address(uniswapRouter), dai.balanceOf(me));
@@ -251,14 +244,14 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
     mahaDaiWrapper.deposit(collateralAmount);
 
     // 4: send the collateral to the leverage account
-    if (collateralAmount > 0) mahaDaiWrapper.transfer(address(acct), collateralAmount);
+    // if (collateralAmount > 0) mahaDaiWrapper.transfer(msg.sender, collateralAmount);
     return collateralAmount;
   }
 
   function _onFlashloanClosePosition(address who, uint256 flashloanAmount) internal {
-    LeverageAccount acct = getAccount(who);
-    // // 1. send the flashloaned arth to the account
-    arth.transfer(address(acct), flashloanAmount);
+    // LeverageAccount acct = getAccount(who);
+    // // // 1. send the flashloaned arth to the account
+    // arth.transfer(address(acct), flashloanAmount);
     // // 2. use the flashloan'd ARTH to payback the debt and close the loan
     // closeLoan(acct, controller, borrowerOperations, flashloanAmount, arth, wmatic);
     // // 3. get the collateral and swap back to arth to back the loan

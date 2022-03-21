@@ -175,18 +175,15 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
 
     // 3: open loan using the collateral
     uint256 totalCollateralAmount = wmatic.balanceOf(address(acct));
-    openLoan(
-      acct,
-      borrowerOperations,
-      maxBorrowingFee, // borrowing fee
-      flashloanAmount.add(10 * 1e18), // debt + liquidation reserve
-      totalCollateralAmount, // collateral
-      upperHint,
-      lowerHint,
-      frontEndTag,
-      arth,
-      wmatic
-    );
+    // openLoan(
+    //   borrowerOperations,
+    //   maxBorrowingFee, // borrowing fee
+    //   flashloanAmount.add(10 * 1e18), // debt + liquidation reserve
+    //   totalCollateralAmount, // collateral
+    //   upperHint,
+    //   lowerHint,
+    //   frontEndTag
+    // );
 
     // over here we will have a open loan with collateral and leverage account would've
     // send us back the minted arth
