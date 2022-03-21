@@ -120,7 +120,6 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
     );
 
     // need to make this MEV resistant
-
     uint256 flashloanAmount = troveManager.getTroveDebt(address(getAccount(msg.sender)));
     arth.approve(address(flashLoan), flashloanAmount);
     flashLoan.flashLoan(address(this), flashloanAmount, flashloanData);
