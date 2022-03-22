@@ -17,28 +17,6 @@ abstract contract TroveHelpers {
   bytes4 private constant OPEN_LOAN_SELECTOR =
     bytes4(keccak256("openTrove(uint256,uint256,uint256,address,address,address)"));
 
-  function uint2str(uint256 _i) internal pure returns (string memory _uintAsString) {
-    if (_i == 0) {
-      return "0";
-    }
-    uint256 j = _i;
-    uint256 len;
-    while (j != 0) {
-      len++;
-      j /= 10;
-    }
-    bytes memory bstr = new bytes(len);
-    uint256 k = len;
-    while (_i != 0) {
-      k = k - 1;
-      uint8 temp = (48 + uint8(_i - (_i / 10) * 10));
-      bytes1 b1 = bytes1(temp);
-      bstr[k] = b1;
-      _i /= 10;
-    }
-    return string(bstr);
-  }
-
   function openLoan(
     LeverageAccount acct,
     address borrowerOperations,
@@ -65,11 +43,11 @@ abstract contract TroveHelpers {
     approveTokenViaAccount(acct, tokenB, borrowerOperations, collateralAmount);
 
     // open loan using the user's proxy
-    callFn(borrowerOperations, openLoanData);
+    acct.callFn(borrowerOperations, openLoanData);
 
     // // send the arth back to the flash loan contract to payback the flashloan
-    // uint256 arthBal = arth.balanceOf(address(this));
-    // if (arthBal > 0) transferTokenViaAccount(acct, arth, address(this), arthBal);
+    uint256 arthBal = arth.balanceOf(address(this));
+    if (arthBal > 0) transferTokenViaAccount(acct, arth, address(this), arthBal);
   }
 
   function closeLoan(
@@ -105,7 +83,7 @@ abstract contract TroveHelpers {
   ) internal {
     // send tokens back to the contract
     bytes memory transferData = abi.encodeWithSignature("transfer(address,uint256)", who, amount);
-    callFn(address(token), transferData);
+    acct.callFn(address(token), transferData);
   }
 
   function approveTokenViaAccount(
@@ -116,7 +94,7 @@ abstract contract TroveHelpers {
   ) internal {
     // send tokens back to the contract
     bytes memory transferData = abi.encodeWithSignature("approve(address,uint256)", who, amount);
-    callFn(address(token), transferData);
+    acct.callFn(address(token), transferData);
   }
 
   function callFn(address target, bytes memory signature) public {

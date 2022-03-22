@@ -5,7 +5,7 @@ async function main() {
   // We get the contract to deploy
   const instance = await ethers.getContractAt(
     "LPExpsoure",
-    "0xc6757d9CB44ADEd7E19772BEDEb5814fAc7dEEc6"
+    "0x552497681302bAa29Bb68aA657Cfd3A7040335dE"
   );
 
   // await registerStrategy(instance.address, "0x62354a97E4886b2bD452Cb37d0291339dF05eAD9");
@@ -29,10 +29,7 @@ async function main() {
 
   console.log(
     (
-      await instance.estimateAmountToFlashloanBuy([
-        "1000000000000000000000",
-        "1000000000000000000000"
-      ])
+      await instance.estimateAmountToFlashloanBuy(["100000000000000000000", "100000000000000000000"])
     ).toString()
   );
 

@@ -19,7 +19,6 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
   using SafeMath for uint256;
 
   address public borrowerOperations;
-  address public controller;
   ITroveManager public troveManager;
 
   IERC20 public immutable arth;
@@ -43,7 +42,6 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
     address _dai,
     address _uniswapRouter,
     address _borrowerOperations,
-    address _controller,
     address _wrapper,
     address _accountRegistry,
     address _troveManager
@@ -57,7 +55,6 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
     borrowerOperations = _borrowerOperations;
     troveManager = ITroveManager(_troveManager);
     accountRegistry = LeverageAccountRegistry(_accountRegistry);
-    controller = _controller;
 
     uniswapFactory = IUniswapV2Factory(uniswapRouter.factory());
 
@@ -68,6 +65,10 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
     mahaDaiWrapper = IERC20Wrapper(_wrapper);
 
     me = address(this);
+  }
+
+  function getAccount(address who) public view returns (LeverageAccount) {
+    return accountRegistry.accounts(who);
   }
 
   function openPosition(
@@ -175,17 +176,19 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
     address lowerHint,
     address frontEndTag
   ) internal {
+    LeverageAccount acct = getAccount(who);
+
     // 1: sell arth for collateral
     _sellCollateralForARTH(borrowedCollateral);
 
     // 2. LP all the collateral
     // 3. Stake and tokenize
     // 4: send the collateral to the leverage account
-    uint256 collateralAmount = _lpAndStake();
+    uint256 collateralAmount = _lpAndStake(acct);
 
     // 5: open loan using the collateral
     openLoan(
-      LeverageAccount(who),
+      acct,
       borrowerOperations,
       maxBorrowingFee, // borrowing fee
       flashloanAmount, // debt + liquidation reserve
@@ -205,8 +208,6 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
 
     // 7. check if we met the min leverage conditions
     // require(troveManager.getTroveDebt(address(acct)) >= minExposure, "min exposure not met");
-    arth.approve(address(flashLoan), flashloanAmount);
-    require(arth.balanceOf(me) >= flashloanAmount, uint2str(arth.balanceOf(me)));
   }
 
   function _sellCollateralForARTH(uint256[] memory borrowedCollateral) internal {
@@ -222,7 +223,7 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
     }
   }
 
-  function _lpAndStake() internal returns (uint256) {
+  function _lpAndStake(LeverageAccount acct) internal returns (uint256) {
     // 2. LP all the collateral
     maha.approve(address(uniswapRouter), maha.balanceOf(me));
     dai.approve(address(uniswapRouter), dai.balanceOf(me));
@@ -244,7 +245,7 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
     mahaDaiWrapper.deposit(collateralAmount);
 
     // 4: send the collateral to the leverage account
-    // if (collateralAmount > 0) mahaDaiWrapper.transfer(msg.sender, collateralAmount);
+    if (collateralAmount > 0) mahaDaiWrapper.transfer(address(acct), collateralAmount);
     return collateralAmount;
   }
 
