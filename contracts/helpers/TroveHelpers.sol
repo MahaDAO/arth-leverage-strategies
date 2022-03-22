@@ -46,7 +46,7 @@ abstract contract TroveHelpers {
     acct.callFn(borrowerOperations, openLoanData);
 
     // // send the arth back to the flash loan contract to payback the flashloan
-    uint256 arthBal = arth.balanceOf(address(this));
+    uint256 arthBal = arth.balanceOf(address(acct));
     if (arthBal > 0) transferTokenViaAccount(acct, arth, address(this), arthBal);
   }
 
@@ -56,7 +56,7 @@ abstract contract TroveHelpers {
     address borrowerOperations,
     uint256 availableARTH,
     IERC20 arth,
-    IERC20 wmatic
+    IERC20 tokenB
   ) internal {
     bytes memory closeLoanData = abi.encodeWithSignature("closeTrove()");
 
@@ -64,15 +64,15 @@ abstract contract TroveHelpers {
     if (controller != address(0)) approveTokenViaAccount(acct, arth, controller, availableARTH);
 
     // close loan using the user's account
-    callFn(borrowerOperations, closeLoanData);
+    acct.callFn(borrowerOperations, closeLoanData);
 
     // send the arth back to the flash loan contract to payback the flashloan
     uint256 arthBal = arth.balanceOf(address(acct));
     if (arthBal > 0) transferTokenViaAccount(acct, arth, address(this), arthBal);
 
     // send the collateral back to the flash loan contract to payback the flashloan
-    uint256 collBal = wmatic.balanceOf(address(acct));
-    if (collBal > 0) transferTokenViaAccount(acct, wmatic, address(this), collBal);
+    uint256 collBal = tokenB.balanceOf(address(acct));
+    if (collBal > 0) transferTokenViaAccount(acct, tokenB, address(this), collBal);
   }
 
   function transferTokenViaAccount(
@@ -95,10 +95,5 @@ abstract contract TroveHelpers {
     // send tokens back to the contract
     bytes memory transferData = abi.encodeWithSignature("approve(address,uint256)", who, amount);
     acct.callFn(address(token), transferData);
-  }
-
-  function callFn(address target, bytes memory signature) public {
-    (bool success, bytes memory response) = target.call(signature);
-    require(success, string(response));
   }
 }

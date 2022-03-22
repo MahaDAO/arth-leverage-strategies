@@ -19,6 +19,8 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
   using SafeMath for uint256;
 
   address public borrowerOperations;
+  address public controller;
+
   ITroveManager public troveManager;
 
   IERC20 public immutable arth;
@@ -38,6 +40,7 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
   constructor(
     address _flashloan,
     address _arth,
+    address _controller,
     address _maha,
     address _dai,
     address _uniswapRouter,
@@ -48,6 +51,8 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
   ) UniswapV2Helpers(_uniswapRouter) {
     flashLoan = IFlashLoan(_flashloan);
 
+    controller = _controller;
+
     arth = IERC20(_arth);
     maha = IERC20(_maha);
     dai = IERC20(_dai);
@@ -55,7 +60,6 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
     borrowerOperations = _borrowerOperations;
     troveManager = ITroveManager(_troveManager);
     accountRegistry = LeverageAccountRegistry(_accountRegistry);
-
     uniswapFactory = IUniswapV2Factory(uniswapRouter.factory());
 
     arthDai = IERC20(uniswapFactory.getPair(_arth, _dai));
@@ -191,7 +195,7 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
       acct,
       borrowerOperations,
       maxBorrowingFee, // borrowing fee
-      flashloanAmount, // debt + liquidation reserve
+      flashloanAmount.add(10 + 1e18), // debt + liquidation reserve
       collateralAmount, // collateral
       upperHint,
       lowerHint,
@@ -208,6 +212,47 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
 
     // 7. check if we met the min leverage conditions
     // require(troveManager.getTroveDebt(address(acct)) >= minExposure, "min exposure not met");
+    arth.approve(address(flashLoan), flashloanAmount);
+    require(arth.balanceOf(me) >= flashloanAmount, uint2str(arth.balanceOf(me)));
+  }
+
+  function _onFlashloanClosePosition(address who, uint256 flashloanAmount) internal {
+    LeverageAccount acct = getAccount(who);
+
+    // 1. send the flashloaned arth to the account
+    arth.transfer(address(acct), flashloanAmount);
+
+    // 2. use the flashloan'd ARTH to payback the debt and close the loan
+    closeLoan(acct, controller, borrowerOperations, flashloanAmount, arth, mahaDaiWrapper);
+
+    // 3. get the collateral and swap back to arth to back the loan
+    uint256 totalCollateralAmount = mahaDaiWrapper.balanceOf(address(this));
+    uint256 arthBal = arth.balanceOf(address(this));
+    uint256 pendingArth = flashloanAmount.sub(arthBal);
+    // _buyExactARTH(pendingArth, totalCollateralAmount, address(this));
+    // // 4. payback the loan..
+  }
+
+  function uint2str(uint256 _i) internal pure returns (string memory _uintAsString) {
+    if (_i == 0) {
+      return "0";
+    }
+    uint256 j = _i;
+    uint256 len;
+    while (j != 0) {
+      len++;
+      j /= 10;
+    }
+    bytes memory bstr = new bytes(len);
+    uint256 k = len;
+    while (_i != 0) {
+      k = k - 1;
+      uint8 temp = (48 + uint8(_i - (_i / 10) * 10));
+      bytes1 b1 = bytes1(temp);
+      bstr[k] = b1;
+      _i /= 10;
+    }
+    return string(bstr);
   }
 
   function _sellCollateralForARTH(uint256[] memory borrowedCollateral) internal {
@@ -220,6 +265,19 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
     if (borrowedCollateral[1] > 0) {
       uint256 sell1 = estimateARTHtoSell(arth, dai, borrowedCollateral[1]);
       _sellARTHForExact(arth, dai, borrowedCollateral[1], sell1, me);
+    }
+  }
+
+  function _buyCollateralForARTH(uint256[] memory borrowedCollateral) internal {
+    // 1: sell arth for collateral
+    if (borrowedCollateral[0] > 0) {
+      uint256 sell0 = estimateARTHtoBuy(arth, maha, borrowedCollateral[0]);
+      _buyExactARTH(arth, maha, borrowedCollateral[0], sell0, me);
+    }
+
+    if (borrowedCollateral[1] > 0) {
+      uint256 sell1 = estimateARTHtoBuy(arth, dai, borrowedCollateral[1]);
+      _buyExactARTH(arth, dai, borrowedCollateral[1], sell1, me);
     }
   }
 
@@ -247,20 +305,6 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
     // 4: send the collateral to the leverage account
     if (collateralAmount > 0) mahaDaiWrapper.transfer(address(acct), collateralAmount);
     return collateralAmount;
-  }
-
-  function _onFlashloanClosePosition(address who, uint256 flashloanAmount) internal {
-    // LeverageAccount acct = getAccount(who);
-    // // // 1. send the flashloaned arth to the account
-    // arth.transfer(address(acct), flashloanAmount);
-    // // 2. use the flashloan'd ARTH to payback the debt and close the loan
-    // closeLoan(acct, controller, borrowerOperations, flashloanAmount, arth, wmatic);
-    // // 3. get the collateral and swap back to arth to back the loan
-    // uint256 totalCollateralAmount = wmatic.balanceOf(address(this));
-    // uint256 arthBal = arth.balanceOf(address(this));
-    // uint256 pendingArth = flashloanAmount.sub(arthBal);
-    // _buyExactARTH(pendingArth, totalCollateralAmount, address(this));
-    // // 4. payback the loan..
   }
 
   function estimateAmountToFlashloanBuy(uint256[] memory borrowedCollateral)

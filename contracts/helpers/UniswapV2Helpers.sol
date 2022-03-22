@@ -92,7 +92,7 @@ contract UniswapV2Helpers {
 
   function estimateARTHtoBuy(
     IERC20 arth,
-    address tokenB,
+    IERC20 tokenB,
     uint256 arthNeeded
   ) public view returns (uint256 maticToSell) {
     if (arthNeeded == 0) return 0;

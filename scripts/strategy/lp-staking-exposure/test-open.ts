@@ -5,10 +5,10 @@ async function main() {
   // We get the contract to deploy
   const instance = await ethers.getContractAt(
     "LPExpsoure",
-    "0x552497681302bAa29Bb68aA657Cfd3A7040335dE"
+    "0x59167234cd6dDd1f574D75fB69b546ab7fa853d0"
   );
 
-  // await registerStrategy(instance.address, "0x62354a97E4886b2bD452Cb37d0291339dF05eAD9");
+  await registerStrategy(instance.address, "0xc377A2e1EE61Dd1A1e4512De3Bf813477691A008");
   await approve(
     "0x54406a69B4c629E4d5711140Faec3221672c71A1", // dai
     "3000000000000000000000000",
@@ -34,7 +34,7 @@ async function main() {
   );
 
   const tx = await instance.openPosition(
-    ["1000000000000000000000", "1000000000000000000000"], // uint256[] memory borrowedCollateral,
+    ["100000000000000000000", "100000000000000000000"], // uint256[] memory borrowedCollateral,
     ["1000000000000000000000", "1000000000000000000000"], // uint256[] memory principalCollateral,
     ["2000000000000000000000", "2000000000000000000000"], // uint256[] memory minExposure,
     "15000000000000000", // uint256 maxBorrowingFee,
