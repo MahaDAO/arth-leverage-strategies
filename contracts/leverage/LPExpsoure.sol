@@ -15,7 +15,7 @@ import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {TroveHelpers} from "../helpers/TroveHelpers.sol";
 import {UniswapV2Helpers} from "../helpers/UniswapV2Helpers.sol";
 
-contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
+contract LPExpsoure is IFlashBorrower, ILeverageStrategy, TroveHelpers, UniswapV2Helpers {
   using SafeMath for uint256;
 
   address public borrowerOperations;
@@ -36,7 +36,6 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
   IERC20Wrapper public mahaDaiWrapper;
 
   address private me;
-  uint256 private MAX_UINT256 = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
 
   constructor(
     address _flashloan,
@@ -79,8 +78,13 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
   function openPosition(
     uint256[] memory borrowedCollateral,
     uint256[] memory principalCollateral,
-    uint256 minExpectedCollateralRatio
-  ) external {
+    uint256 minExpectedCollateralRatio,
+    uint256 maxBorrowingFee
+  ) external override {
+    // take the principal
+    maha.transferFrom(msg.sender, address(this), principalCollateral[0]);
+    dai.transferFrom(msg.sender, address(this), principalCollateral[1]);
+
     // estimate how much we should flashloan based on how much we want to borrow
     uint256 flashloanAmount = estimateAmountToFlashloanBuy(borrowedCollateral);
 
@@ -88,6 +92,7 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
       msg.sender,
       uint256(0), // action = 0 -> open loan
       minExpectedCollateralRatio,
+      maxBorrowingFee,
       borrowedCollateral,
       principalCollateral
     );
@@ -96,10 +101,11 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
     _flush(msg.sender);
   }
 
-  function closePosition(uint256[] memory minExpectedCollateral) external {
+  function closePosition(uint256[] memory minExpectedCollateral) external override {
     bytes memory flashloanData = abi.encode(
       msg.sender,
       uint256(1), // action = 0 -> close loan
+      uint256(0),
       uint256(0),
       minExpectedCollateral,
       minExpectedCollateral
@@ -107,7 +113,7 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
 
     // need to make this MEV resistant
     uint256 flashloanAmount = troveManager.getTroveDebt(address(getAccount(msg.sender)));
-    flashLoan.flashLoan(address(this), flashloanAmount, flashloanData);
+    flashLoan.flashLoan(address(this), flashloanAmount.add(10e18), flashloanData);
     _flush(msg.sender);
   }
 
@@ -125,9 +131,10 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
       address who,
       uint256 action,
       uint256 minExpectedCollateralRatio,
+      uint256 maxBorrowingFee,
       uint256[] memory borrowedCollateral,
       uint256[] memory principalCollateralOrMinCollateral
-    ) = abi.decode(data, (address, uint256, uint256, uint256[], uint256[]));
+    ) = abi.decode(data, (address, uint256, uint256, uint256, uint256[], uint256[]));
 
     // open or close the loan position
     if (action == 0) {
@@ -136,7 +143,8 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
         flashloanAmount,
         borrowedCollateral,
         principalCollateralOrMinCollateral,
-        minExpectedCollateralRatio
+        minExpectedCollateralRatio,
+        maxBorrowingFee
       );
     } else _onFlashloanClosePosition(who, flashloanAmount, principalCollateralOrMinCollateral);
 
@@ -148,12 +156,9 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
     uint256 flashloanAmount,
     uint256[] memory borrowedCollateral,
     uint256[] memory principalCollateral,
-    uint256 minExpectedCollateralRatio
+    uint256 minExpectedCollateralRatio,
+    uint256 maxBorrowingFee
   ) internal {
-    // take the principal
-    maha.transferFrom(msg.sender, address(this), principalCollateral[0]);
-    dai.transferFrom(msg.sender, address(this), principalCollateral[1]);
-
     LeverageAccount acct = getAccount(who);
 
     // 1: sell arth for collateral
@@ -168,7 +173,7 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
     openLoan(
       acct,
       borrowerOperations,
-      MAX_UINT256, // maxBorrowingFee, // borrowing fee
+      maxBorrowingFee, // borrowing fee
       flashloanAmount, // debt + liquidation reserve
       collateralAmount, // collateral
       address(0), // upperHint,
@@ -178,14 +183,10 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
       mahaDaiWrapper
     );
 
-    // send the arth back to the flash loan contract to payback the flashloan
-
-    // over here we will have a open loan with collateral and leverage account would've
-    // send us back the minted arth
-    // 6. payback the loan..
-
-    // 7. check if we met the min leverage conditions
+    // 6. check if we met the min leverage conditions
     // require(troveManager.getTroveDebt(address(acct)) >= minExpectedCollateralRation, "min cr not met");
+
+    // 7. payback the loan..
     arth.approve(address(flashLoan), flashloanAmount);
     require(arth.balanceOf(me) >= flashloanAmount, uint2str(arth.balanceOf(me)));
   }
@@ -212,6 +213,7 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
 
     // 4. payback the loan..
     arth.approve(address(flashLoan), flashloanAmount);
+    require(arth.balanceOf(me) >= flashloanAmount, uint2str(arth.balanceOf(me)));
   }
 
   function uint2str(uint256 _i) internal pure returns (string memory _uintAsString) {
@@ -287,7 +289,7 @@ contract LPExpsoure is IFlashBorrower, TroveHelpers, UniswapV2Helpers {
     return collateralAmount;
   }
 
-  function _unStakeAndWithdrawLP() internal returns (uint256) {
+  function _unStakeAndWithdrawLP() internal {
     // 1. unstake and un-tokenize
     uint256 collateralAmount = mahaDaiWrapper.balanceOf(me);
     mahaDaiWrapper.withdraw(collateralAmount);

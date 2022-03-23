@@ -61,7 +61,7 @@ abstract contract TroveHelpers {
     bytes memory closeLoanData = abi.encodeWithSignature("closeTrove()");
 
     // approve spending
-    if (controller != address(0)) approveTokenViaAccount(acct, arth, controller, availableARTH);
+    approveTokenViaAccount(acct, arth, controller, availableARTH);
 
     // close loan using the user's account
     acct.callFn(borrowerOperations, closeLoanData);
