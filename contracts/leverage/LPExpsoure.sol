@@ -3,13 +3,14 @@
 pragma solidity ^0.8.0;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Wrapper} from "../interfaces/IERC20Wrapper.sol";
 import {IFlashBorrower} from "../interfaces/IFlashBorrower.sol";
 import {IFlashLoan} from "../interfaces/IFlashLoan.sol";
-import {ITroveManager} from "../interfaces/ITroveManager.sol";
 import {ILeverageStrategy} from "../interfaces/ILeverageStrategy.sol";
-import {IUniswapV2Router02} from "../interfaces/IUniswapV2Router02.sol";
-import {IERC20Wrapper} from "../interfaces/IERC20Wrapper.sol";
+import {IPriceFeed} from "../interfaces/IPriceFeed.sol";
+import {ITroveManager} from "../interfaces/ITroveManager.sol";
 import {IUniswapV2Factory} from "../interfaces/IUniswapV2Factory.sol";
+import {IUniswapV2Router02} from "../interfaces/IUniswapV2Router02.sol";
 import {LeverageAccount, LeverageAccountRegistry} from "../account/LeverageAccountRegistry.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {TroveHelpers} from "../helpers/TroveHelpers.sol";
@@ -22,6 +23,7 @@ contract LPExpsoure is IFlashBorrower, ILeverageStrategy, TroveHelpers, UniswapV
   address public controller;
 
   ITroveManager public troveManager;
+  IPriceFeed public priceFeed;
 
   IERC20 public immutable arth;
   IERC20 public immutable maha;
@@ -47,26 +49,25 @@ contract LPExpsoure is IFlashBorrower, ILeverageStrategy, TroveHelpers, UniswapV
     address _borrowerOperations,
     address _wrapper,
     address _accountRegistry,
-    address _troveManager
+    address _troveManager,
+    address _priceFeed
   ) UniswapV2Helpers(_uniswapRouter) {
-    flashLoan = IFlashLoan(_flashloan);
-
-    controller = _controller;
-
-    arth = IERC20(_arth);
-    maha = IERC20(_maha);
-    dai = IERC20(_dai);
-    uniswapRouter = IUniswapV2Router02(_uniswapRouter);
-    borrowerOperations = _borrowerOperations;
-    troveManager = ITroveManager(_troveManager);
     accountRegistry = LeverageAccountRegistry(_accountRegistry);
-    uniswapFactory = IUniswapV2Factory(uniswapRouter.factory());
+    arth = IERC20(_arth);
+    borrowerOperations = _borrowerOperations;
+    controller = _controller;
+    dai = IERC20(_dai);
+    flashLoan = IFlashLoan(_flashloan);
+    maha = IERC20(_maha);
+    mahaDaiWrapper = IERC20Wrapper(_wrapper);
+    priceFeed = IPriceFeed(_priceFeed);
+    troveManager = ITroveManager(_troveManager);
+    uniswapRouter = IUniswapV2Router02(_uniswapRouter);
 
+    uniswapFactory = IUniswapV2Factory(uniswapRouter.factory());
     arthDai = IERC20(uniswapFactory.getPair(_arth, _dai));
     arthMaha = IERC20(uniswapFactory.getPair(_arth, _maha));
     mahaDai = IERC20(uniswapFactory.getPair(_dai, _maha));
-
-    mahaDaiWrapper = IERC20Wrapper(_wrapper);
 
     me = address(this);
   }
@@ -133,7 +134,7 @@ contract LPExpsoure is IFlashBorrower, ILeverageStrategy, TroveHelpers, UniswapV
       uint256 minExpectedCollateralRatio,
       uint256 maxBorrowingFee,
       uint256[] memory borrowedCollateral,
-      uint256[] memory principalCollateralOrMinCollateral
+      uint256[] memory minCollateral
     ) = abi.decode(data, (address, uint256, uint256, uint256, uint256[], uint256[]));
 
     // open or close the loan position
@@ -142,11 +143,10 @@ contract LPExpsoure is IFlashBorrower, ILeverageStrategy, TroveHelpers, UniswapV
         who,
         flashloanAmount,
         borrowedCollateral,
-        principalCollateralOrMinCollateral,
         minExpectedCollateralRatio,
         maxBorrowingFee
       );
-    } else _onFlashloanClosePosition(who, flashloanAmount, principalCollateralOrMinCollateral);
+    } else _onFlashloanClosePosition(who, flashloanAmount, minCollateral);
 
     return keccak256("FlashMinter.onFlashLoan");
   }
@@ -155,7 +155,6 @@ contract LPExpsoure is IFlashBorrower, ILeverageStrategy, TroveHelpers, UniswapV
     address who,
     uint256 flashloanAmount,
     uint256[] memory borrowedCollateral,
-    uint256[] memory principalCollateral,
     uint256 minExpectedCollateralRatio,
     uint256 maxBorrowingFee
   ) internal {
@@ -184,11 +183,11 @@ contract LPExpsoure is IFlashBorrower, ILeverageStrategy, TroveHelpers, UniswapV
     );
 
     // 6. check if we met the min leverage conditions
-    // require(troveManager.getTroveDebt(address(acct)) >= minExpectedCollateralRation, "min cr not met");
+    require(_getTroveCR(address(acct)) >= minExpectedCollateralRatio, "min cr not met");
 
     // 7. payback the loan..
     arth.approve(address(flashLoan), flashloanAmount);
-    require(arth.balanceOf(me) >= flashloanAmount, uint2str(arth.balanceOf(me)));
+    require(arth.balanceOf(me) >= flashloanAmount, "not enough arth for flashload");
   }
 
   function _onFlashloanClosePosition(
@@ -213,29 +212,7 @@ contract LPExpsoure is IFlashBorrower, ILeverageStrategy, TroveHelpers, UniswapV
 
     // 4. payback the loan..
     arth.approve(address(flashLoan), flashloanAmount);
-    require(arth.balanceOf(me) >= flashloanAmount, uint2str(arth.balanceOf(me)));
-  }
-
-  function uint2str(uint256 _i) internal pure returns (string memory _uintAsString) {
-    if (_i == 0) {
-      return "0";
-    }
-    uint256 j = _i;
-    uint256 len;
-    while (j != 0) {
-      len++;
-      j /= 10;
-    }
-    bytes memory bstr = new bytes(len);
-    uint256 k = len;
-    while (_i != 0) {
-      k = k - 1;
-      uint8 temp = (48 + uint8(_i - (_i / 10) * 10));
-      bytes1 b1 = bytes1(temp);
-      bstr[k] = b1;
-      _i /= 10;
-    }
-    return string(bstr);
+    require(arth.balanceOf(me) >= flashloanAmount, "not enough arth for flashload");
   }
 
   function _sellCollateralForARTH(uint256[] memory borrowedCollateral) internal {
@@ -315,6 +292,17 @@ contract LPExpsoure is IFlashBorrower, ILeverageStrategy, TroveHelpers, UniswapV
     return
       estimateARTHtoSell(arth, maha, borrowedCollateral[0]) +
       estimateARTHtoSell(arth, dai, borrowedCollateral[1]);
+  }
+
+  function _getTroveCR(address who) internal returns (uint256) {
+    uint256 price = priceFeed.fetchPrice();
+    return getTroveCR(who, price);
+  }
+
+  function getTroveCR(address who, uint256 price) public view returns (uint256) {
+    uint256 debt = troveManager.getTroveDebt(who);
+    uint256 coll = troveManager.getTroveColl(who);
+    return coll.mul(price).div(debt);
   }
 
   function _flush(address to) internal {
