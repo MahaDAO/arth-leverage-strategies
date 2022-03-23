@@ -50,6 +50,31 @@ contract UniswapV2Helpers {
     return amountsOut[amountsOut.length - 1];
   }
 
+  function _buyARTHForExact(
+    IERC20 arth,
+    IERC20 tokenB,
+    uint256 amountIn,
+    uint256 amountOutMin,
+    address to
+  ) internal returns (uint256) {
+    if (amountIn == 0) return 0;
+    tokenB.approve(address(uniswapRouter), amountIn);
+
+    address[] memory path = new address[](2);
+    path[0] = address(tokenB);
+    path[1] = address(arth);
+
+    uint256[] memory amountsOut = uniswapRouter.swapExactTokensForTokens(
+      amountIn,
+      amountOutMin,
+      path,
+      to,
+      block.timestamp
+    );
+
+    return amountsOut[amountsOut.length - 1];
+  }
+
   function _buyExactARTH(
     IERC20 arth,
     IERC20 tokenB,

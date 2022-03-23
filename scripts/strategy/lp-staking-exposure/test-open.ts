@@ -36,7 +36,7 @@ async function main() {
   const tx = await instance.openPosition(
     ["100000000000000000000", "100000000000000000000"], // uint256[] memory borrowedCollateral,
     ["1000000000000000000000", "1000000000000000000000"], // uint256[] memory principalCollateral,
-    ["2000000000000000000000", "2000000000000000000000"], // uint256[] memory minExposure,
+    ["2000000000000000000000", "200000000 0000000000000"], // uint256[] memory minExposure,
     "15000000000000000", // uint256 maxBorrowingFee,
 
     // "400000000000000000000", // uint256 borrowedCollateral,
@@ -56,7 +56,7 @@ const registerStrategy = async (strategy: string, acct: string) => {
   const account = await ethers.getContractAt("LeverageAccount", acct);
 
   // call the transfer fn on behalf of the account
-  const tx = await account.approveStrategy(strategy);
+  const tx = await account.s(strategy);
   console.log("registerStrategy", tx.hash);
 };
 
