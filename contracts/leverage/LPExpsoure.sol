@@ -15,6 +15,7 @@ import {LeverageAccount, LeverageAccountRegistry} from "../account/LeverageAccou
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {TroveHelpers} from "../helpers/TroveHelpers.sol";
 import {UniswapV2Helpers} from "../helpers/UniswapV2Helpers.sol";
+import { IPrincipalCollateralRecorder } from "../interfaces/IPrincipalCollateralRecorder.sol";
 
 contract LPExpsoure is IFlashBorrower, ILeverageStrategy, TroveHelpers, UniswapV2Helpers {
   using SafeMath for uint256;
@@ -24,12 +25,12 @@ contract LPExpsoure is IFlashBorrower, ILeverageStrategy, TroveHelpers, UniswapV
 
   ITroveManager public troveManager;
   IPriceFeed public priceFeed;
-
   IERC20 public immutable arth;
   IERC20 public immutable maha;
   IERC20 public immutable dai;
   IFlashLoan public flashLoan;
   LeverageAccountRegistry public accountRegistry;
+  IPrincipalCollateralRecorder public principalCollateralRecorder;
 
   IERC20 public arthMaha;
   IERC20 public arthDai;
@@ -38,6 +39,9 @@ contract LPExpsoure is IFlashBorrower, ILeverageStrategy, TroveHelpers, UniswapV
   IERC20Wrapper public mahaDaiWrapper;
 
   address private me;
+
+  bytes4 private constant PRINCIPAL_COLLATERAL_SELECTOR =
+    bytes4(keccak256("recordPrincipalCollateral(string,address,address,address,uint256,uint256,uint256)"));
 
   constructor(
     address _flashloan,
@@ -88,6 +92,19 @@ contract LPExpsoure is IFlashBorrower, ILeverageStrategy, TroveHelpers, UniswapV
 
     // estimate how much we should flashloan based on how much we want to borrow
     uint256 flashloanAmount = estimateAmountToFlashloanBuy(borrowedCollateral);
+
+    LeverageAccount acct = getAccount(msg.sender);
+    bytes memory principalCollateralData = abi.encodeWithSelector(
+      PRINCIPAL_COLLATERAL_SELECTOR,
+      "MAHA/DAI LP Exposure",
+      address(maha),
+      address(dai),
+      address(0),
+      principalCollateral[0],
+      principalCollateral[1],
+      0
+    );
+    acct.callFn(address(principalCollateralRecorder), principalCollateralData);
 
     bytes memory flashloanData = abi.encode(
       msg.sender,
