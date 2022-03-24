@@ -63,13 +63,13 @@ abstract contract WStakingRewards is FeeBase, ERC20, ReentrancyGuard, IERC20Wrap
   }
 
   function withdraw(uint256 amount) external override nonReentrant returns (bool) {
+    _burn(msg.sender, amount);
     staking.withdraw(amount);
     staking.getReward();
     underlying.safeTransfer(msg.sender, amount);
 
     // tax and send the earnings
     uint256 earnings = amount.mul(staking.rewardPerToken()).div(1e18);
-    _burn(msg.sender, amount);
     address referrer = referralMapping[msg.sender];
 
     if (earnings > 0) {
