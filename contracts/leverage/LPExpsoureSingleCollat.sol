@@ -9,6 +9,7 @@ import {IFlashLoan} from "../interfaces/IFlashLoan.sol";
 import {ILeverageStrategy} from "../interfaces/ILeverageStrategy.sol";
 import {IPriceFeed} from "../interfaces/IPriceFeed.sol";
 import {ITroveManager} from "../interfaces/ITroveManager.sol";
+import {IUniswapV2Pair} from "../interfaces/IUniswapV2Pair.sol";
 import {IUniswapV2Factory} from "../interfaces/IUniswapV2Factory.sol";
 import {IUniswapV2Router02} from "../interfaces/IUniswapV2Router02.sol";
 import {LeverageAccount, LeverageAccountRegistry} from "../account/LeverageAccountRegistry.sol";
@@ -16,7 +17,12 @@ import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {TroveHelpers} from "../helpers/TroveHelpers.sol";
 import {UniswapV2Helpers} from "../helpers/UniswapV2Helpers.sol";
 
-contract LPExpsoure is IFlashBorrower, ILeverageStrategy, TroveHelpers, UniswapV2Helpers {
+contract LPExpsoureSingleCollat is
+  IFlashBorrower,
+  ILeverageStrategy,
+  TroveHelpers,
+  UniswapV2Helpers
+{
   using SafeMath for uint256;
 
   address public borrowerOperations;
@@ -27,13 +33,15 @@ contract LPExpsoure is IFlashBorrower, ILeverageStrategy, TroveHelpers, UniswapV
 
   IERC20 public arth;
   IERC20 public maha;
-  IERC20 public dai;
   IERC20 public dQuick;
+  IERC20 public dai;
 
   IFlashLoan public flashLoan;
   LeverageAccountRegistry public accountRegistry;
 
-  IERC20 public mahaDai;
+  IUniswapV2Pair public arthMaha;
+  IUniswapV2Pair public arthDai;
+  IUniswapV2Pair public mahaDai;
 
   IERC20Wrapper public mahaDaiWrapper;
 
@@ -47,7 +55,7 @@ contract LPExpsoure is IFlashBorrower, ILeverageStrategy, TroveHelpers, UniswapV
     address _dQuick,
     address _uniswapRouter,
     address _borrowerOperations,
-    address _wrapper,
+    address _mahaDaiWrapper,
     address _accountRegistry,
     address _troveManager,
     address _priceFeed
@@ -59,15 +67,14 @@ contract LPExpsoure is IFlashBorrower, ILeverageStrategy, TroveHelpers, UniswapV
     flashLoan = IFlashLoan(_flashloan);
     maha = IERC20(_maha);
     dQuick = IERC20(_dQuick);
-
-    mahaDaiWrapper = IERC20Wrapper(_wrapper);
+    mahaDaiWrapper = IERC20Wrapper(_mahaDaiWrapper);
     priceFeed = IPriceFeed(_priceFeed);
     troveManager = ITroveManager(_troveManager);
     uniswapRouter = IUniswapV2Router02(_uniswapRouter);
 
     arth = troveManager.lusdToken();
     uniswapFactory = IUniswapV2Factory(uniswapRouter.factory());
-    mahaDai = IERC20(uniswapFactory.getPair(_dai, _maha));
+    mahaDai = IUniswapV2Pair(uniswapFactory.getPair(_dai, _maha));
 
     me = address(this);
   }
@@ -84,7 +91,6 @@ contract LPExpsoure is IFlashBorrower, ILeverageStrategy, TroveHelpers, UniswapV
   ) external override {
     // take the principal
     maha.transferFrom(msg.sender, address(this), principalCollateral[0]);
-    dai.transferFrom(msg.sender, address(this), principalCollateral[1]);
 
     // estimate how much we should flashloan based on how much we want to borrow
     uint256 flashloanAmount = estimateAmountToFlashloanBuy(borrowedCollateral);
@@ -205,10 +211,9 @@ contract LPExpsoure is IFlashBorrower, ILeverageStrategy, TroveHelpers, UniswapV
 
     // 3. get the collateral and swap back to arth to back the loan
     _unStakeAndWithdrawLP();
-    _buyCollateralForARTH(flashloanAmount, minCollateral);
+    _buyCollateralForARTH(minCollateral);
 
     require(maha.balanceOf(me) >= minCollateral[0], "not enough maha");
-    require(dai.balanceOf(me) >= minCollateral[1], "not enough dai");
 
     // 4. payback the loan..
     arth.approve(address(flashLoan), flashloanAmount);
@@ -228,16 +233,13 @@ contract LPExpsoure is IFlashBorrower, ILeverageStrategy, TroveHelpers, UniswapV
     }
   }
 
-  function _buyCollateralForARTH(uint256 minARTH, uint256[] memory minCollateral) internal {
-    uint256 mahaBalance = maha.balanceOf(me);
-    uint256 daiBalance = dai.balanceOf(me);
+  function _buyCollateralForARTH(uint256[] memory minCollateral) internal {
+    uint256 daiToSell = dai.balanceOf(me);
+    uint256 mahaToSell = maha.balanceOf(me).sub(minCollateral[0]);
 
-    uint256 mahaToSell = mahaBalance.sub(minCollateral[0]);
-    uint256 daiToSell = daiBalance.sub(minCollateral[1]);
-
-    // 1: sell arth for collateral; atm we do 50-50
-    if (mahaToSell > 0) _buyExactARTH(arth, maha, minARTH.div(2), mahaToSell, me);
-    if (daiToSell > 0) _buyExactARTH(arth, dai, minARTH.div(2), daiToSell, me);
+    // 1: sell arth for collateral
+    if (daiToSell > 0) _buyARTHForExact(arth, dai, daiToSell, 0, me);
+    if (mahaToSell > 0) _buyARTHForExact(arth, maha, mahaToSell, 0, me);
   }
 
   function _lpAndStake(LeverageAccount acct) internal returns (uint256) {
@@ -292,6 +294,46 @@ contract LPExpsoure is IFlashBorrower, ILeverageStrategy, TroveHelpers, UniswapV
     return
       estimateARTHtoSell(arth, maha, borrowedCollateral[0]) +
       estimateARTHtoSell(arth, dai, borrowedCollateral[1]);
+  }
+
+  function estimateBorrowableAndCR(
+    uint256[] memory principalCollateral,
+    uint256 prinicpalPrice,
+    uint256 collatPrice,
+    uint256 leverageE6 // leverage in 1e6
+  ) public pure returns (uint256[] memory, uint256) {
+    uint256[] memory borrowable = new uint256[](2);
+
+    uint256 principalCollateralGMU = principalCollateral[0].mul(prinicpalPrice);
+    uint256 leverageGMU = principalCollateralGMU.mul(leverageE6).div(1e6);
+    uint256 tobuyGMU = leverageGMU.sub(principalCollateralGMU);
+
+    uint256 coll = leverageGMU;
+    uint256 debt = 0;
+
+    uint256 cr = coll.mul(collatPrice).div(debt);
+
+    return (borrowable, cr);
+  }
+
+  function estimateAmountToFlashloanSell(uint256[] memory exposure, uint256[] memory minCollateral)
+    public
+    view
+    returns (uint256)
+  {
+    uint256 mahaToSell = exposure[0].sub(minCollateral[0]);
+    uint256 daiToSell = exposure[1];
+
+    return estimateARTHtoSell(arth, maha, mahaToSell) + estimateARTHtoSell(arth, dai, daiToSell);
+  }
+
+  function lpToTokenAmounts(uint256 amount) public view returns (uint256, uint256) {
+    (uint256 tokenA, uint256 tokenB, ) = mahaDai.getReserves();
+
+    uint256 totalSupply = maha.totalSupply();
+    uint256 percentage = amount.mul(1e18).div(totalSupply);
+
+    return (tokenA.mul(percentage).div(1e18), tokenB.mul(percentage).div(1e18));
   }
 
   function _getTroveCR(address who) internal returns (uint256) {

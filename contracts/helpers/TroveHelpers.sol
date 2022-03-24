@@ -32,7 +32,7 @@ abstract contract TroveHelpers {
     bytes memory openLoanData = abi.encodeWithSelector(
       OPEN_LOAN_SELECTOR,
       maxFee,
-      Math.max(debt.mul(101).div(100), 260 * 1e18),
+      Math.max(debt, 260 * 1e18),
       collateralAmount,
       upperHint,
       lowerHint,
