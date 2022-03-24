@@ -68,7 +68,7 @@ abstract contract WStakingRewards is FeeBase, ERC20, ReentrancyGuard, IERC20Wrap
     underlying.safeTransfer(msg.sender, amount);
 
     // tax and send the earnings
-    uint256 earnings = balanceOf(msg.sender).mul(staking.rewardPerToken()).div(1e18);
+    uint256 earnings = amount.mul(staking.rewardPerToken()).div(1e18);
     _burn(msg.sender, amount);
     address referrer = referralMapping[msg.sender];
 
