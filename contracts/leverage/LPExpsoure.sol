@@ -30,7 +30,7 @@ contract LPExpsoure is IFlashBorrower, ILeverageStrategy, TroveHelpers, UniswapV
   IERC20 public immutable dai;
   IFlashLoan public flashLoan;
   LeverageAccountRegistry public accountRegistry;
-  IPrincipalCollateralRecorder public principalCollateralRecorder;
+  address public principalCollateralRecorder;
 
   IERC20 public arthMaha;
   IERC20 public arthDai;
@@ -54,7 +54,7 @@ contract LPExpsoure is IFlashBorrower, ILeverageStrategy, TroveHelpers, UniswapV
     address _wrapper,
     address _accountRegistry,
     address _troveManager,
-    address _priceFeed
+    address[2] memory _priceFeedAndPrincipalRecorder
   ) UniswapV2Helpers(_uniswapRouter) {
     accountRegistry = LeverageAccountRegistry(_accountRegistry);
     arth = IERC20(_arth);
@@ -64,7 +64,7 @@ contract LPExpsoure is IFlashBorrower, ILeverageStrategy, TroveHelpers, UniswapV
     flashLoan = IFlashLoan(_flashloan);
     maha = IERC20(_maha);
     mahaDaiWrapper = IERC20Wrapper(_wrapper);
-    priceFeed = IPriceFeed(_priceFeed);
+    priceFeed = IPriceFeed(_priceFeedAndPrincipalRecorder[0]);
     troveManager = ITroveManager(_troveManager);
     uniswapRouter = IUniswapV2Router02(_uniswapRouter);
 
@@ -73,6 +73,7 @@ contract LPExpsoure is IFlashBorrower, ILeverageStrategy, TroveHelpers, UniswapV
     arthMaha = IERC20(uniswapFactory.getPair(_arth, _maha));
     mahaDai = IERC20(uniswapFactory.getPair(_dai, _maha));
 
+    principalCollateralRecorder = _priceFeedAndPrincipalRecorder[1];
     me = address(this);
   }
 
