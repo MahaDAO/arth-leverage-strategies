@@ -98,7 +98,7 @@ contract LPExpsoure is IFlashBorrower, ILeverageStrategy, TroveHelpers, UniswapV
       principalCollateral
     );
 
-    flashLoan.flashLoan(address(this), flashloanAmount.mul(103).div(100), flashloanData);
+    flashLoan.flashLoan(address(this), flashloanAmount, flashloanData);
     _flush(msg.sender);
   }
 
