@@ -19,6 +19,8 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
 
   address public borrowerOperations;
   address public controller;
+  address public principalCollateralRecorder;
+
   ITroveManager public troveManager;
 
   IERC20 public immutable arth;
@@ -29,6 +31,9 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
   IUniswapV2Router02 public immutable uniswapRouter;
 
   address private me;
+
+  bytes4 private constant PRINCIPAL_COLLATERAL_SELECTOR =
+    bytes4(keccak256("recordPrincipalCollateral(string,address,address,address,uint256,uint256,uint256)"));
 
   event Where(address who, uint256 line);
 
@@ -41,7 +46,8 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
     address _borrowerOperations,
     address _controller,
     address _accountRegistry,
-    address _troveManager
+    address _troveManager,
+    address _principalCollateralRecorder
   ) {
     flashLoan = IFlashLoan(_flashloan);
 
@@ -53,6 +59,7 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
     troveManager = ITroveManager(_troveManager);
     accountRegistry = LeverageAccountRegistry(_accountRegistry);
     controller = _controller;
+    principalCollateralRecorder = _principalCollateralRecorder;
 
     me = address(this);
   }
@@ -75,6 +82,19 @@ contract WMaticExposure is IFlashBorrower, TroveHelpers {
 
     // estimate how much we should flashloan based on how much we want to borrow
     uint256 flashloanAmount = estimateARTHtoSell(borrowedCollateral);
+
+    LeverageAccount acct = getAccount(msg.sender);
+    bytes memory principalCollateralData = abi.encodeWithSelector(
+      PRINCIPAL_COLLATERAL_SELECTOR,
+      "MAHA/DAI LP Exposure",
+      address(wmatic),
+      address(0),
+      address(0),
+      principalCollateral,
+      0,
+      0
+    );
+    acct.callFn(address(principalCollateralRecorder), principalCollateralData);
 
     bytes memory flashloanData = abi.encode(
       msg.sender,
