@@ -9,19 +9,21 @@ import {IFlashLoan} from "../interfaces/IFlashLoan.sol";
 import {ILeverageStrategy} from "../interfaces/ILeverageStrategy.sol";
 import {IPriceFeed} from "../interfaces/IPriceFeed.sol";
 import {ITroveManager} from "../interfaces/ITroveManager.sol";
-import {IUniswapV2Pair} from "../interfaces/IUniswapV2Pair.sol";
 import {IUniswapV2Factory} from "../interfaces/IUniswapV2Factory.sol";
 import {IUniswapV2Router02} from "../interfaces/IUniswapV2Router02.sol";
 import {LeverageAccount, LeverageAccountRegistry} from "../account/LeverageAccountRegistry.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {TroveHelpers} from "../helpers/TroveHelpers.sol";
+import {EllipsisHelpers} from "../helpers/EllipsisHelpers.sol";
 import {UniswapV2Helpers} from "../helpers/UniswapV2Helpers.sol";
+import {IPrincipalCollateralRecorder} from "../interfaces/IPrincipalCollateralRecorder.sol";
 
 contract LPExpsoureSingleCollat is
   IFlashBorrower,
   ILeverageStrategy,
   TroveHelpers,
-  UniswapV2Helpers
+  UniswapV2Helpers,
+  EllipsisHelpers
 {
   using SafeMath for uint256;
 
@@ -32,51 +34,65 @@ contract LPExpsoureSingleCollat is
   IPriceFeed public priceFeed;
 
   IERC20 public arth;
-  IERC20 public maha;
-  IERC20 public dQuick;
-  IERC20 public dai;
+  IERC20 public busd;
+  IERC20 public usdc;
+  IERC20 public rewardToken;
 
   IFlashLoan public flashLoan;
   LeverageAccountRegistry public accountRegistry;
+  address public recorder;
 
-  IUniswapV2Pair public arthMaha;
-  IUniswapV2Pair public arthDai;
-  IUniswapV2Pair public mahaDai;
+  IERC20 public lp;
 
-  IERC20Wrapper public mahaDaiWrapper;
+  IERC20Wrapper public arthUsd;
+  IERC20Wrapper public stakingWrapper;
 
   address private me;
+
+  bytes4 private constant RECORD_PRINCIPAL_SELECTOR =
+    bytes4(keccak256("recordPrincipalCollateral(string,uint256,uint256,uint256)"));
 
   constructor(
     address _flashloan,
     address _controller,
-    address _maha,
-    address _dai,
-    address _dQuick,
-    address _uniswapRouter,
-    address _borrowerOperations,
-    address _mahaDaiWrapper,
+    address _usdc,
+    address _busd,
+    address _rewardToken,
+    address _ellipsisRouter,
+    address _elp,
+    address _epool,
+    address _stakingWrapper,
     address _accountRegistry,
-    address _troveManager,
-    address _priceFeed
-  ) UniswapV2Helpers(_uniswapRouter) {
+    address _uniswapRouter
+  ) EllipsisHelpers(_ellipsisRouter, _elp, _epool) UniswapV2Helpers(_uniswapRouter) {
     accountRegistry = LeverageAccountRegistry(_accountRegistry);
-    borrowerOperations = _borrowerOperations;
+
     controller = _controller;
-    dai = IERC20(_dai);
+    busd = IERC20(_busd);
     flashLoan = IFlashLoan(_flashloan);
-    maha = IERC20(_maha);
-    dQuick = IERC20(_dQuick);
-    mahaDaiWrapper = IERC20Wrapper(_mahaDaiWrapper);
-    priceFeed = IPriceFeed(_priceFeed);
+    usdc = IERC20(_usdc);
+    rewardToken = IERC20(_rewardToken);
+    stakingWrapper = IERC20Wrapper(_stakingWrapper);
+
+    me = address(this);
+
+    uniswapFactory = IUniswapV2Factory(uniswapRouter.factory());
+    lp = IERC20(uniswapFactory.getPair(_usdc, _busd));
+  }
+
+  function init(
+    address _borrowerOperations,
+    address _troveManager,
+    address _priceFeed,
+    address _recorder
+  ) public {
+    borrowerOperations = _borrowerOperations;
     troveManager = ITroveManager(_troveManager);
-    uniswapRouter = IUniswapV2Router02(_uniswapRouter);
 
     arth = troveManager.lusdToken();
     uniswapFactory = IUniswapV2Factory(uniswapRouter.factory());
-    mahaDai = IUniswapV2Pair(uniswapFactory.getPair(_dai, _maha));
-
-    me = address(this);
+    priceFeed = IPriceFeed(_priceFeed);
+    recorder = _recorder;
   }
 
   function getAccount(address who) public view returns (LeverageAccount) {
@@ -90,10 +106,20 @@ contract LPExpsoureSingleCollat is
     uint256 maxBorrowingFee
   ) external override {
     // take the principal
-    maha.transferFrom(msg.sender, address(this), principalCollateral[0]);
+    usdc.transferFrom(msg.sender, address(this), principalCollateral[0]);
 
     // estimate how much we should flashloan based on how much we want to borrow
     uint256 flashloanAmount = estimateAmountToFlashloanBuy(borrowedCollateral);
+
+    LeverageAccount acct = getAccount(msg.sender);
+    bytes memory principalCollateralData = abi.encodeWithSelector(
+      RECORD_PRINCIPAL_SELECTOR,
+      "BUSD-USDC-ALP-S",
+      principalCollateral[0],
+      0,
+      0
+    );
+    acct.callFn(recorder, principalCollateralData);
 
     bytes memory flashloanData = abi.encode(
       msg.sender,
@@ -104,7 +130,7 @@ contract LPExpsoureSingleCollat is
       principalCollateral
     );
 
-    flashLoan.flashLoan(address(this), flashloanAmount.mul(103).div(100), flashloanData);
+    flashLoan.flashLoan(address(this), flashloanAmount, flashloanData);
     _flush(msg.sender);
   }
 
@@ -185,7 +211,7 @@ contract LPExpsoureSingleCollat is
       address(0), // lowerHint,
       address(0), // frontEndTag,
       arth,
-      mahaDaiWrapper
+      stakingWrapper
     );
 
     // 6. check if we met the min leverage conditions
@@ -207,51 +233,30 @@ contract LPExpsoureSingleCollat is
     arth.transfer(address(acct), flashloanAmount);
 
     // 2. use the flashloan'd ARTH to payback the debt and close the loan
-    closeLoan(acct, controller, borrowerOperations, flashloanAmount, arth, mahaDaiWrapper);
+    closeLoan(acct, controller, borrowerOperations, flashloanAmount, arth, stakingWrapper);
 
     // 3. get the collateral and swap back to arth to back the loan
     _unStakeAndWithdrawLP();
-    _buyCollateralForARTH(minCollateral);
+    _buyCollateralForARTH(flashloanAmount, minCollateral);
 
-    require(maha.balanceOf(me) >= minCollateral[0], "not enough maha");
+    require(usdc.balanceOf(me) >= minCollateral[0], "not enough usdc");
+    require(busd.balanceOf(me) >= minCollateral[1], "not enough busd");
 
     // 4. payback the loan..
     arth.approve(address(flashLoan), flashloanAmount);
     require(arth.balanceOf(me) >= flashloanAmount, "not enough arth for flashload");
   }
 
-  function _sellCollateralForARTH(uint256[] memory borrowedCollateral) internal {
-    // 1: sell arth for collateral
-    if (borrowedCollateral[0] > 0) {
-      uint256 sell0 = estimateARTHtoSell(arth, maha, borrowedCollateral[0]);
-      _sellARTHForExact(arth, maha, borrowedCollateral[0], sell0, me);
-    }
-
-    if (borrowedCollateral[1] > 0) {
-      uint256 sell1 = estimateARTHtoSell(arth, dai, borrowedCollateral[1]);
-      _sellARTHForExact(arth, dai, borrowedCollateral[1], sell1, me);
-    }
-  }
-
-  function _buyCollateralForARTH(uint256[] memory minCollateral) internal {
-    uint256 daiToSell = dai.balanceOf(me);
-    uint256 mahaToSell = maha.balanceOf(me).sub(minCollateral[0]);
-
-    // 1: sell arth for collateral
-    if (daiToSell > 0) _buyARTHForExact(arth, dai, daiToSell, 0, me);
-    if (mahaToSell > 0) _buyARTHForExact(arth, maha, mahaToSell, 0, me);
-  }
-
   function _lpAndStake(LeverageAccount acct) internal returns (uint256) {
     // 2. LP all the collateral
-    maha.approve(address(uniswapRouter), maha.balanceOf(me));
-    dai.approve(address(uniswapRouter), dai.balanceOf(me));
+    usdc.approve(address(uniswapRouter), usdc.balanceOf(me));
+    busd.approve(address(uniswapRouter), busd.balanceOf(me));
 
     uniswapRouter.addLiquidity(
-      address(maha),
-      address(dai),
-      maha.balanceOf(me),
-      dai.balanceOf(me),
+      address(usdc),
+      address(busd),
+      usdc.balanceOf(me),
+      busd.balanceOf(me),
       0,
       0,
       me,
@@ -259,30 +264,54 @@ contract LPExpsoureSingleCollat is
     );
 
     // 3. Stake and tokenize
-    uint256 collateralAmount = mahaDai.balanceOf(me);
-    mahaDai.approve(address(mahaDaiWrapper), collateralAmount);
-    mahaDaiWrapper.deposit(collateralAmount);
+    uint256 collateralAmount = lp.balanceOf(me);
+    lp.approve(address(stakingWrapper), collateralAmount);
+    stakingWrapper.deposit(collateralAmount);
 
     // 4: send the collateral to the leverage account
-    if (collateralAmount > 0) mahaDaiWrapper.transfer(address(acct), collateralAmount);
+    if (collateralAmount > 0) stakingWrapper.transfer(address(acct), collateralAmount);
     return collateralAmount;
   }
 
   function _unStakeAndWithdrawLP() internal {
     // 1. unstake and un-tokenize
-    uint256 collateralAmount = mahaDaiWrapper.balanceOf(me);
-    mahaDaiWrapper.withdraw(collateralAmount);
+    uint256 collateralAmount = stakingWrapper.balanceOf(me);
+    stakingWrapper.withdraw(collateralAmount);
 
     // 2. remove from LP
-    mahaDai.approve(address(uniswapRouter), mahaDai.balanceOf(me));
+    lp.approve(address(uniswapRouter), lp.balanceOf(me));
     uniswapRouter.removeLiquidity(
-      address(maha),
-      address(dai),
-      mahaDai.balanceOf(me),
+      address(usdc),
+      address(busd),
+      lp.balanceOf(me),
       0, // amountAMin
       0, // amountBMin
       me,
       block.timestamp
+    );
+  }
+
+  function _sellCollateralForARTH(uint256[] memory borrowedCollateral) internal {
+    _buyARTHusdForExact(
+      arthUsd,
+      busd,
+      usdc,
+      usdc,
+      borrowedCollateral[0], // busd
+      borrowedCollateral[1], // usdc amountCIn, amountOutMin, to);
+      0, // usdt
+      0
+    );
+  }
+
+  function _buyCollateralForARTH(uint256 amountToSell, uint256[] memory minCollateral) internal {
+    _sellARTHusdForExact(
+      arth,
+      arthUsd,
+      amountToSell,
+      minCollateral[0], // busd
+      minCollateral[1], // usdc
+      0 // usdt
     );
   }
 
@@ -292,48 +321,12 @@ contract LPExpsoureSingleCollat is
     returns (uint256)
   {
     return
-      estimateARTHtoSell(arth, maha, borrowedCollateral[0]) +
-      estimateARTHtoSell(arth, dai, borrowedCollateral[1]);
-  }
-
-  function estimateBorrowableAndCR(
-    uint256[] memory principalCollateral,
-    uint256 prinicpalPrice,
-    uint256 collatPrice,
-    uint256 leverageE6 // leverage in 1e6
-  ) public pure returns (uint256[] memory, uint256) {
-    uint256[] memory borrowable = new uint256[](2);
-
-    uint256 principalCollateralGMU = principalCollateral[0].mul(prinicpalPrice);
-    uint256 leverageGMU = principalCollateralGMU.mul(leverageE6).div(1e6);
-    uint256 tobuyGMU = leverageGMU.sub(principalCollateralGMU);
-
-    uint256 coll = leverageGMU;
-    uint256 debt = 0;
-
-    uint256 cr = coll.mul(collatPrice).div(debt);
-
-    return (borrowable, cr);
-  }
-
-  function estimateAmountToFlashloanSell(uint256[] memory exposure, uint256[] memory minCollateral)
-    public
-    view
-    returns (uint256)
-  {
-    uint256 mahaToSell = exposure[0].sub(minCollateral[0]);
-    uint256 daiToSell = exposure[1];
-
-    return estimateARTHtoSell(arth, maha, mahaToSell) + estimateARTHtoSell(arth, dai, daiToSell);
-  }
-
-  function lpToTokenAmounts(uint256 amount) public view returns (uint256, uint256) {
-    (uint256 tokenA, uint256 tokenB, ) = mahaDai.getReserves();
-
-    uint256 totalSupply = maha.totalSupply();
-    uint256 percentage = amount.mul(1e18).div(totalSupply);
-
-    return (tokenA.mul(percentage).div(1e18), tokenB.mul(percentage).div(1e18));
+      estimateARTHusdtoBuy(
+        address(busd),
+        address(usdc),
+        borrowedCollateral[0],
+        borrowedCollateral[1]
+      );
   }
 
   function _getTroveCR(address who) internal returns (uint256) {
@@ -349,8 +342,8 @@ contract LPExpsoureSingleCollat is
 
   function _flush(address to) internal {
     if (arth.balanceOf(me) > 0) arth.transfer(to, arth.balanceOf(me));
-    if (maha.balanceOf(me) > 0) maha.transfer(to, maha.balanceOf(me));
-    if (dai.balanceOf(me) > 0) dai.transfer(to, dai.balanceOf(me));
-    if (dQuick.balanceOf(me) > 0) dQuick.transfer(to, dQuick.balanceOf(me));
+    if (usdc.balanceOf(me) > 0) usdc.transfer(to, usdc.balanceOf(me));
+    if (busd.balanceOf(me) > 0) busd.transfer(to, busd.balanceOf(me));
+    if (rewardToken.balanceOf(me) > 0) rewardToken.transfer(to, rewardToken.balanceOf(me));
   }
 }

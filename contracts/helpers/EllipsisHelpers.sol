@@ -6,7 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Wrapper} from "../interfaces/IERC20Wrapper.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
-interface CurveRouter {
+interface EllipsisRouter {
   function get_virtual_price() external view returns (uint256);
 
   function remove_liquidity(
@@ -31,16 +31,16 @@ contract EllipsisHelpers {
 
   address public pool;
   IERC20 public elp;
-  CurveRouter public curveRouter;
+  EllipsisRouter public ellipsisRouter;
 
   constructor(
-    address _router,
+    address _ellipsisRouter,
     address _elp,
     address _pool
   ) {
     pool = _pool;
     elp = IERC20(_elp);
-    curveRouter = CurveRouter(_router);
+    ellipsisRouter = EllipsisRouter(_ellipsisRouter);
   }
 
   function _sellARTHusdForExact(
@@ -54,19 +54,19 @@ contract EllipsisHelpers {
     arth.approve(address(arthUsd), arth.balanceOf(address(this)));
     arthUsd.deposit(arth.balanceOf(address(this)));
 
-    arthUsd.approve(address(curveRouter), amountInMax);
+    arthUsd.approve(address(ellipsisRouter), amountInMax);
 
     uint256[] memory depositAmounts = new uint256[](4);
     depositAmounts[0] = amountInMax;
-    curveRouter.add_liquidity(pool, depositAmounts, 0);
+    ellipsisRouter.add_liquidity(pool, depositAmounts, 0);
 
-    elp.approve(address(curveRouter), elp.balanceOf(address(this)));
+    elp.approve(address(ellipsisRouter), elp.balanceOf(address(this)));
 
     uint256[] memory withdrawAmounts = new uint256[](4);
     withdrawAmounts[1] = amountAOut;
     withdrawAmounts[2] = amountBOut;
     withdrawAmounts[3] = amountCOut;
-    curveRouter.remove_liquidity(pool, elp.balanceOf(address(this)), withdrawAmounts);
+    ellipsisRouter.remove_liquidity(pool, elp.balanceOf(address(this)), withdrawAmounts);
   }
 
   function _buyARTHusdForExact(
@@ -79,20 +79,20 @@ contract EllipsisHelpers {
     uint256 amountCIn,
     uint256 amountOutMin
   ) internal {
-    tokenA.approve(address(curveRouter), amountAIn);
-    tokenB.approve(address(curveRouter), amountBIn);
-    tokenC.approve(address(curveRouter), amountCIn);
+    tokenA.approve(address(ellipsisRouter), amountAIn);
+    tokenB.approve(address(ellipsisRouter), amountBIn);
+    tokenC.approve(address(ellipsisRouter), amountCIn);
 
     uint256[] memory depositAmounts = new uint256[](4);
     depositAmounts[0] = amountAIn;
     depositAmounts[1] = amountBIn;
     depositAmounts[2] = amountCIn;
-    curveRouter.add_liquidity(pool, depositAmounts, 0);
+    ellipsisRouter.add_liquidity(pool, depositAmounts, 0);
 
-    elp.approve(address(curveRouter), elp.balanceOf(address(this)));
+    elp.approve(address(ellipsisRouter), elp.balanceOf(address(this)));
     uint256[] memory withdrawAmounts = new uint256[](4);
     withdrawAmounts[0] = amountOutMin;
-    curveRouter.remove_liquidity(pool, elp.balanceOf(address(this)), withdrawAmounts);
+    ellipsisRouter.remove_liquidity(pool, elp.balanceOf(address(this)), withdrawAmounts);
 
     arthUsd.withdraw(arthUsd.balanceOf(address(this)));
   }
