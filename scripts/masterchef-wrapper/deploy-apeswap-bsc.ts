@@ -18,7 +18,7 @@ async function main() {
   ];
 
   // We get the contract to deploy
-  const WApeSwapV2 = await ethers.getContractFactory("WApeSwapV2");
+  const WApeSwapV2 = await ethers.getContractFactory("WApeSwapV1");
   const instance = await WApeSwapV2.deploy(
     String(constructorArguments[0]),
     String(constructorArguments[1]),
@@ -32,7 +32,7 @@ async function main() {
   );
 
   await instance.deployed();
-  console.log("WApeSwapV2 deployed to:", instance.address);
+  console.log("WApeSwapV1 deployed to:", instance.address);
 
   await wait(60 * 1000);
 
