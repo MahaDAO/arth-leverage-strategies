@@ -36,11 +36,11 @@ contract WQuickswap is WStakingRewards {
   }
 
   /// @dev pending rewards
-  function accumulatedRewards() external view override returns (uint256) {
+  function accumulatedRewards() external view virtual override returns (uint256) {
     return 0;
   }
 
-  function accumulatedRewardsFor(address _user) external view override returns (uint256) {
+  function accumulatedRewardsFor(address _user) external view virtual override returns (uint256) {
     return 0;
   }
 }

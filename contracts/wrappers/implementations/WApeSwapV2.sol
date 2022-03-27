@@ -7,7 +7,7 @@ import {IMasterChefV2} from "../../interfaces/IMasterChefV2.sol";
 import {WMasterChefV2} from "../WMasterChefV2.sol";
 
 interface IMiniApeV2 is IMasterChefV2 {
-  function pendingBanana(uint256 _pid, address _user) external view returns (uint256);
+  function pendingCake(uint256 _pid, address _user) external view returns (uint256);
 }
 
 contract WApeSwapV2 is WMasterChefV2 {
@@ -38,6 +38,6 @@ contract WApeSwapV2 is WMasterChefV2 {
   {}
 
   function _accumulatedRewards() internal view override returns (uint256) {
-    return IMiniApeV2(address(chef)).pendingBanana(pid, address(this)).add(rewardTokenBalance());
+    return IMiniApeV2(address(chef)).pendingCake(pid, address(this)).add(rewardTokenBalance());
   }
 }

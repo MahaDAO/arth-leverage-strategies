@@ -3,18 +3,18 @@ import { wait } from "../utils";
 
 async function main() {
   const constructorArguments = [
-    "DAI-USDC Staked APE-LP", // string memory _name,
-    "DAIUSDC-ALP-S", // string memory _symbol,
+    "BUSD-USDT Staked APE-LP", // string memory _name,
+    "BUSDUSDT-ALP-S", // string memory _symbol,
 
-    "0x54aff400858Dcac39797a81894D9920f16972D1D", // address _chef,
+    "0x5c8D727b265DBAfaba67E050f2f739cAeEB4A6F9", // address _chef,
 
-    "0x5", // addresss _pid,
-    "0x5b13B583D4317aB15186Ed660A1E4C65C10da659", // address _lpToken
-    "0x5d47baba0d66083c52009271faf3f50dcc01023c", // address _rewardToken
+    "34", // addresss _pid,
+    "0x2e707261d086687470b515b320478eb1c88d49bb", // address _lpToken
+    "0x603c7f932ed1fc6575303d8fb018fdcbb0f39a95", // address _rewardToken
 
-    "0xc4e65254bb14dd5a99259247b0b9760722dc2a7f", // address _rewardDestination
-    "0x0", // uint256 _rewardFee
-    "0xa1bc5163FADAbE25880897C95d3701ed388A2AA0" // address _governance
+    "0x9a66fC7a20f21fB72d9f229984109246e9c9F4a5", // address _rewardDestination
+    "0", // uint256 _rewardFee - 0%
+    "0x9a66fC7a20f21fB72d9f229984109246e9c9F4a5" // address _governance
   ];
 
   // We get the contract to deploy

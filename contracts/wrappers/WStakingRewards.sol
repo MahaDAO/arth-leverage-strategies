@@ -91,11 +91,11 @@ abstract contract WStakingRewards is FeeBase, ERC20, ReentrancyGuard, IERC20Wrap
     return true;
   }
 
-  function accumulatedRewards() external view override returns (uint256) {
+  function accumulatedRewards() external view virtual override returns (uint256) {
     return _accumulatedRewards();
   }
 
-  function accumulatedRewardsFor(address _user) external view override returns (uint256) {
+  function accumulatedRewardsFor(address _user) external view virtual override returns (uint256) {
     return _accumulatedRewardsFor(_user);
   }
 
@@ -112,6 +112,6 @@ abstract contract WStakingRewards is FeeBase, ERC20, ReentrancyGuard, IERC20Wrap
   }
 
   function _accumulatedRewards() internal view virtual returns (uint256) {
-    return staking.earned().add(rewardToken.balanceOf(me));
+    return staking.earned(me).add(rewardToken.balanceOf(me));
   }
 }
