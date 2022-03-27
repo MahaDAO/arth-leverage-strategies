@@ -20,6 +20,8 @@ abstract contract WStakingRewards is FeeBase, ERC20, ReentrancyGuard, IERC20Wrap
 
   uint256 private constant MAX_UINT256 = type(uint128).max;
 
+  mapping (address => address) public referralMapping;
+
   constructor(
     string memory _name,
     string memory _symbol,
@@ -40,11 +42,24 @@ abstract contract WStakingRewards is FeeBase, ERC20, ReentrancyGuard, IERC20Wrap
     _transferOwnership(_governance);
   }
 
-  function deposit(uint256 amount) external override nonReentrant returns (bool) {
-    underlying.safeTransferFrom(msg.sender, address(this), amount);
+  function _depositFor(address account, uint256 amount) internal returns (bool) {
+    underlying.safeTransferFrom(account, address(this), amount);
     staking.stake(amount);
-    _mint(msg.sender, amount);
+    _mint(account, amount);
     return true;
+  }
+
+  function deposit(uint256 amount) external override nonReentrant returns (bool) {
+    return _depositFor(msg.sender, amount);
+  }
+
+  function depositWithReference(uint256 amount, address referrer) external nonReentrant returns (bool) {
+    require(
+      referralMapping[msg.sender] == address(0) || referralMapping[msg.sender] == referrer, 
+      "Referrer already present"
+    );
+    if (referralMapping[msg.sender] == address(0))  referralMapping[msg.sender] = referrer;
+    return _depositFor(msg.sender, amount);
   }
 
   function withdraw(uint256 amount) external override nonReentrant returns (bool) {
@@ -54,8 +69,18 @@ abstract contract WStakingRewards is FeeBase, ERC20, ReentrancyGuard, IERC20Wrap
     underlying.safeTransfer(msg.sender, amount);
 
     // tax and send the earnings
-    uint256 earnings = rewardToken.balanceOf(address(this));
-    if (earnings > 0) _chargeFeeAndTransfer(rewardToken, earnings, msg.sender);
+    uint256 earnings = amount.mul(staking.rewardPerToken()).div(1e18);
+    address referrer = referralMapping[msg.sender];
+
+    if (earnings > 0) {
+      uint256 referrerEarning = 0;
+      if (referrer != address(0)) {
+        referrerEarning = earnings.mul(10).div(100);
+        rewardToken.safeTransfer(referrer, referrerEarning);
+      }
+
+      _chargeFeeAndTransfer(rewardToken, earnings.sub(referrerEarning), msg.sender);
+    }
     return true;
   }
 }
