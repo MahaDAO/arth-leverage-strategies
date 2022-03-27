@@ -20,7 +20,6 @@ abstract contract WStakingRewards is FeeBase, ERC20, ReentrancyGuard, IERC20Wrap
 
   uint256 private constant MAX_UINT256 = type(uint128).max;
 
-  mapping(address => address) public referralMapping;
   address private me;
 
   constructor(
@@ -70,18 +69,7 @@ abstract contract WStakingRewards is FeeBase, ERC20, ReentrancyGuard, IERC20Wrap
 
     // tax and send the earnings
     uint256 earnings = _accumulatedRewardsForAmount(amount);
-    address referrer = referralMapping[msg.sender];
-
-    if (earnings > 0) {
-      // check if there are any referrals
-      uint256 referrerEarning = 0;
-      if (referrer != address(0)) {
-        referrerEarning = earnings.mul(10).div(100);
-        rewardToken.safeTransfer(referrer, referrerEarning);
-      }
-
-      _chargeFeeAndTransfer(rewardToken, earnings.sub(referrerEarning), msg.sender);
-    }
+    _chargeFeeAndTransfer(rewardToken, earnings, msg.sender);
 
     // burn the stake and send back the underlying
     _burn(msg.sender, amount);

@@ -79,23 +79,12 @@ abstract contract WMasterChefV2 is FeeBase, ERC20, ReentrancyGuard, IERC20Wrappe
 
     // calculate accumulated rewards
     uint256 earnings = _accumulatedRewardsForAmount(amount);
-    address referrer = referralMapping[msg.sender];
 
     // withdraw and send the lp token back
     _burn(msg.sender, amount);
     chef.withdraw(pid, amount, msg.sender);
 
-    if (earnings > 0) {
-      // check if there are any referrals
-      uint256 referrerEarning = 0;
-      if (referrer != address(0)) {
-        referrerEarning = earnings.mul(10).div(100);
-        rewardToken.safeTransfer(referrer, referrerEarning);
-      }
-
-      _chargeFeeAndTransfer(rewardToken, earnings.sub(referrerEarning), msg.sender);
-    }
-
+    _chargeFeeAndTransfer(rewardToken, earnings, msg.sender);
     return true;
   }
 

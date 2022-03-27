@@ -18,7 +18,6 @@ abstract contract WMasterChef is FeeBase, ERC20, ReentrancyGuard, IERC20Wrapper 
   IMasterChef public chef; // Sushiswap masterChef
   IERC20 public rewardToken; // reward token
   IERC20 public lpToken; // Sushi token
-  mapping(address => address) public referralMapping;
 
   uint256 private constant MAX_UINT256 = type(uint128).max;
   address private me;
@@ -77,23 +76,13 @@ abstract contract WMasterChef is FeeBase, ERC20, ReentrancyGuard, IERC20Wrapper 
   function withdraw(uint256 amount) external override nonReentrant returns (bool) {
     // calculate accumulated rewards
     uint256 earnings = _accumulatedRewardsForAmount(amount);
-    address referrer = referralMapping[msg.sender];
 
     // withdraw and send the lp token back
     _burn(msg.sender, amount);
     chef.withdraw(pid, amount);
     lpToken.safeTransfer(msg.sender, amount);
 
-    if (earnings > 0) {
-      // check if there are any referrals
-      uint256 referrerEarning = 0;
-      if (referrer != address(0)) {
-        referrerEarning = earnings.mul(10).div(100);
-        rewardToken.safeTransfer(referrer, referrerEarning);
-      }
-
-      _chargeFeeAndTransfer(rewardToken, earnings.sub(referrerEarning), msg.sender);
-    }
+    _chargeFeeAndTransfer(rewardToken, earnings, msg.sender);
 
     return true;
   }

@@ -15,11 +15,17 @@ contract FeeBase is Ownable {
 
   uint256 public pct100 = 100000000000;
   uint256 public rewardFeeRate = 500000000; // 0.5% in 10^9
+  uint256 public referralFeeRate = 5000000000; // 5% in 10^9
   address public rewardFeeDestination;
 
+  mapping(address => address) public referralMapping;
+
+  event ReferralFeeChanged(uint256 _old, uint256 _new);
   event RewardFeeChanged(uint256 _old, uint256 _new);
   event RewardAddressChanged(address _old, address _new);
   event RewardFeeCharged(uint256 initialAmount, uint256 feeAmount, address feeDestination);
+
+  event ReferralFeeCharged(uint256 initialAmount, uint256 feeAmount, address feeDestination);
 
   function setRewardFeeRate(uint256 _new) external onlyOwner {
     _setRewardFeeRate(_new);
@@ -27,6 +33,10 @@ contract FeeBase is Ownable {
 
   function setRewardFeeAddress(address _new) external onlyOwner {
     _setRewardFeeAddress(_new);
+  }
+
+  function setReferralFeeRate(uint256 _new) external onlyOwner {
+    _setReferralFeeRate(_new);
   }
 
   function _setRewardFeeAddress(address _new) internal {
@@ -42,19 +52,41 @@ contract FeeBase is Ownable {
     rewardFeeRate = _new;
   }
 
+  function _setReferralFeeRate(uint256 _new) internal {
+    require(_new >= 0, "fee is not >= 0%");
+    require(_new <= pct100, "fee is not <= 100%");
+
+    emit ReferralFeeChanged(referralFeeRate, _new);
+    referralFeeRate = _new;
+  }
+
   function _chargeFeeAndTransfer(
     IERC20 token,
-    uint256 amount,
-    address dest
+    uint256 earnings,
+    address who
   ) internal {
-    uint256 feeToCharge = amount.mul(rewardFeeRate).div(pct100);
-    uint256 remainderToSend = amount.sub(feeToCharge);
+    if (earnings == 0) return;
 
-    if (feeToCharge > 0 && rewardFeeDestination != address(0)) {
-      token.safeTransfer(rewardFeeDestination, feeToCharge);
-      emit RewardFeeCharged(amount, feeToCharge, rewardFeeDestination);
+    uint256 feeToCharge = earnings.mul(rewardFeeRate).div(pct100);
+    uint256 remainderToSend = earnings.sub(feeToCharge);
+
+    // check and pay out for referrals
+    address referrer = referralMapping[who];
+    if (referrer != address(0)) {
+      uint256 referrerEarning = remainderToSend.mul(referralFeeRate).div(pct100);
+      token.safeTransfer(referrer, referrerEarning);
+      emit ReferralFeeCharged(remainderToSend, referrerEarning, referrer);
+
+      remainderToSend = remainderToSend.sub(referrerEarning);
     }
 
-    token.safeTransfer(dest, remainderToSend);
+    // send the remainder back to the user
+    token.safeTransfer(who, remainderToSend);
+
+    // pay out fees to governance
+    if (feeToCharge > 0 && rewardFeeDestination != address(0)) {
+      token.safeTransfer(rewardFeeDestination, feeToCharge);
+      emit RewardFeeCharged(earnings, feeToCharge, rewardFeeDestination);
+    }
   }
 }
