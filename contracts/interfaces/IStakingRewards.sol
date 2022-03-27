@@ -9,5 +9,7 @@ interface IStakingRewards {
 
   function withdraw(uint256 amount) external;
 
+  function earned(address who) external view returns (uint256);
+
   function getReward() external;
 }
