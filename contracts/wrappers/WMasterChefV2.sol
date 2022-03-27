@@ -18,7 +18,6 @@ abstract contract WMasterChefV2 is FeeBase, ERC20, ReentrancyGuard, IERC20Wrappe
   IMasterChefV2 public chef; // Sushiswap masterChef
   IERC20 public rewardToken; // reward token
   IERC20 public lpToken; // Sushi token
-  mapping(address => address) public referralMapping;
 
   uint256 private constant MAX_UINT256 = type(uint128).max;
   address private me;
