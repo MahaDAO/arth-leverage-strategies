@@ -18,8 +18,10 @@ abstract contract WMasterChef is FeeBase, ERC20, ReentrancyGuard, IERC20Wrapper 
   IMasterChef public chef; // Sushiswap masterChef
   IERC20 public rewardToken; // reward token
   IERC20 public lpToken; // Sushi token
+  mapping(address => address) public referralMapping;
 
   uint256 private constant MAX_UINT256 = type(uint128).max;
+  address private me;
 
   constructor(
     string memory _name,
@@ -41,34 +43,58 @@ abstract contract WMasterChef is FeeBase, ERC20, ReentrancyGuard, IERC20Wrapper 
     _setRewardFeeAddress(_rewardDestination);
     _setRewardFeeRate(_rewardFeeRate);
     _transferOwnership(_governance);
+
+    me = address(this);
   }
 
-  /// @dev Mint ERC20 token
-  /// @param amount Token amount to wrap
-  function deposit(uint256 amount) external override nonReentrant returns (bool) {
+  function _depositFor(address account, uint256 amount) internal returns (bool) {
     // take the LP tokens
-    lpToken.safeTransferFrom(msg.sender, address(this), amount);
+    lpToken.safeTransferFrom(account, me, amount);
 
     // stake into the masterchef contract
     lpToken.safeIncreaseAllowance(address(chef), amount);
     chef.deposit(pid, amount);
 
-    _mint(msg.sender, amount);
+    _mint(account, amount);
     return true;
+  }
+
+  function deposit(uint256 amount) external override nonReentrant returns (bool) {
+    return _depositFor(msg.sender, amount);
+  }
+
+  function depositWithReferral(uint256 amount, address referrer)
+    external
+    nonReentrant
+    returns (bool)
+  {
+    referralMapping[msg.sender] = referrer;
+    return _depositFor(msg.sender, amount);
   }
 
   /// @dev Burn ERC20 token to redeem LP ERC20 token back plus SUSHI rewards.
   /// @param amount Token amount to burn
   function withdraw(uint256 amount) external override nonReentrant returns (bool) {
-    _burn(msg.sender, amount);
+    // calculate accumulated rewards
+    uint256 earnings = _accumulatedRewardsForAmount(amount);
+    address referrer = referralMapping[msg.sender];
 
     // withdraw and send the lp token back
+    _burn(msg.sender, amount);
     chef.withdraw(pid, amount);
     lpToken.safeTransfer(msg.sender, amount);
 
-    // tax and send the earnings
-    uint256 earnings = rewardToken.balanceOf(address(this));
-    if (earnings > 0) _chargeFeeAndTransfer(rewardToken, earnings, msg.sender);
+    if (earnings > 0) {
+      // check if there are any referrals
+      uint256 referrerEarning = 0;
+      if (referrer != address(0)) {
+        referrerEarning = earnings.mul(10).div(100);
+        rewardToken.safeTransfer(referrer, referrerEarning);
+      }
+
+      _chargeFeeAndTransfer(rewardToken, earnings.sub(referrerEarning), msg.sender);
+    }
+
     return true;
   }
 
@@ -90,10 +116,13 @@ abstract contract WMasterChef is FeeBase, ERC20, ReentrancyGuard, IERC20Wrapper 
   }
 
   function _accumulatedRewardsFor(address _user) internal view returns (uint256) {
-    uint256 accRewards = _accumulatedRewards();
     uint256 bal = balanceOf(_user);
-    uint256 total = totalSupply();
+    return _accumulatedRewardsForAmount(bal);
+  }
 
+  function _accumulatedRewardsForAmount(uint256 bal) internal view returns (uint256) {
+    uint256 accRewards = _accumulatedRewards();
+    uint256 total = totalSupply();
     uint256 perc = bal.mul(1e18).div(total);
     return accRewards.mul(perc).div(1e18);
   }

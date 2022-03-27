@@ -32,7 +32,7 @@ async function main() {
   );
 
   await instance.deployed();
-  console.log("WStakingRewards deployed to:", instance.address);
+  console.log("WApeSwapV2 deployed to:", instance.address);
 
   await wait(60 * 1000);
 
