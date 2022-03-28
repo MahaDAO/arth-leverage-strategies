@@ -9,12 +9,16 @@ import {IUniswapV2Pair} from "../interfaces/IUniswapV2Pair.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
+interface IERC20WithDeciamls is IERC20 {
+  function decimals() external view returns (uint256);
+}
+
 contract ChainlinkLPOracle is IPriceFeed {
   using SafeMath for uint256;
 
   IUniswapV2Pair public lp;
-  IERC20 public tokenA;
-  IERC20 public tokenB;
+  IERC20WithDeciamls public tokenA;
+  IERC20WithDeciamls public tokenB;
 
   AggregatorV3Interface public tokenAoracle;
   AggregatorV3Interface public tokenBoracle;
@@ -41,12 +45,12 @@ contract ChainlinkLPOracle is IPriceFeed {
     tokenBoracle = AggregatorV3Interface(_tokenBoracle);
     gmuOracle = IOracle(_gmuOracle);
 
-    tokenA = IERC20(lp.token0());
-    tokenB = IERC20(lp.token1());
+    tokenA = IERC20WithDeciamls(lp.token0());
+    tokenB = IERC20WithDeciamls(lp.token1());
   }
 
   function priceFor(uint256 amount) external view returns (uint256) {
-    return amount.mul(_fetchPrice());
+    return amount.mul(_fetchPrice()).div(1e18);
   }
 
   function fetchPrice() external view override returns (uint256) {
@@ -54,19 +58,38 @@ contract ChainlinkLPOracle is IPriceFeed {
   }
 
   function _fetchPrice() internal view returns (uint256) {
-    uint256 tokenAprice = _fetchChainlinkPrice(tokenAoracle);
-    uint256 tokenBprice = _fetchChainlinkPrice(tokenBoracle);
-
     uint256 totalSupply = lp.totalSupply();
-    uint256 totalTokenAGMU = tokenAprice.mul(tokenA.balanceOf(address(lp)));
-    uint256 totalTokenBGMU = tokenBprice.mul(tokenB.balanceOf(address(lp)));
+    return totalGMUInLP().mul(1e18).div(totalSupply);
+  }
 
-    uint256 valueOf1lpTokenE18 = (totalTokenAGMU.add(totalTokenBGMU)).div(totalSupply);
-    return valueOf1lpTokenE18;
+  function totalGMUInLP() public view returns (uint256) {
+    uint256 totalTokenAGMU = tokenAGMUInLP();
+    uint256 totalTokenBGMU = tokenBGMUInLP();
+    return totalTokenAGMU.add(totalTokenBGMU);
+  }
+
+  function tokenAGMUInLP() public view returns (uint256) {
+    uint256 price = tokenAGMUPrice();
+    uint256 bal = _scalePriceByDigits(tokenA.balanceOf(address(lp)), tokenA.decimals());
+    return price.mul(bal).div(1e18);
+  }
+
+  function tokenBGMUInLP() public view returns (uint256) {
+    uint256 price = tokenBGMUPrice();
+    uint256 bal = _scalePriceByDigits(tokenB.balanceOf(address(lp)), tokenB.decimals());
+    return price.mul(bal).div(1e18);
+  }
+
+  function tokenAGMUPrice() public view returns (uint256) {
+    return _fetchWithChainlink(tokenAoracle);
+  }
+
+  function tokenBGMUPrice() public view returns (uint256) {
+    return _fetchWithChainlink(tokenBoracle);
   }
 
   function _fetchWithChainlink(AggregatorV3Interface agg) internal view returns (uint256) {
-    uint256 gmuPrice = _fetchGMUPrice();
+    uint256 gmuPrice = fetchGMUPrice();
     uint256 chainlinkPrice = _fetchChainlinkPrice(agg);
     return (chainlinkPrice.mul(10**TARGET_DIGITS).div(gmuPrice));
   }
@@ -88,10 +111,9 @@ contract ChainlinkLPOracle is IPriceFeed {
     return price;
   }
 
-  function _fetchGMUPrice() internal view returns (uint256) {
+  function fetchGMUPrice() public view returns (uint256) {
     uint256 gmuPrice = gmuOracle.getPrice();
     uint256 gmuPricePrecision = gmuOracle.getDecimalPercision();
-
     return _scalePriceByDigits(gmuPrice, gmuPricePrecision);
   }
 
