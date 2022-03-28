@@ -7,9 +7,10 @@ async function main() {
   const recorder = await PrincipalCollateralRecorder.deploy();
 
   await recorder.deployed();
-  console.log("LeverageAccountFactory deployed to:", recorder.address);
+  console.log("PrincipalCollateralRecorder deployed to:", recorder.address);
 
-  await wait(30 * 1000); // wait for a minute
+  await wait(60 * 1000); // wait for a minute
+
   await hre.run("verify:verify", { address: recorder.address });
 }
 
