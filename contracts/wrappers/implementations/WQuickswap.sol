@@ -34,13 +34,4 @@ contract WQuickswap is WStakingRewards {
   {
     // do nothing
   }
-
-  /// @dev pending rewards
-  function accumulatedRewards() external view virtual override returns (uint256) {
-    return 0;
-  }
-
-  function accumulatedRewardsFor(address _user) external view virtual override returns (uint256) {
-    return 0;
-  }
 }
