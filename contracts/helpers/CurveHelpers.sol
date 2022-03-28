@@ -26,7 +26,7 @@ interface IERC20WithDeciamls is IERC20 {
   function decimals() external view returns (uint256);
 }
 
-contract EllipsisHelpers {
+contract CurveHelpers {
   using SafeMath for uint256;
 
   address public pool;

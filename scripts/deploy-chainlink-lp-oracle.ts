@@ -1,11 +1,10 @@
 import hre, { ethers } from "hardhat";
 import { wait } from "./utils";
-// const hre = require("hardhat");
 
 async function main() {
   const constructorArguments = [
     "0xfE4A8cc5b5B2366C1B58Bea3858e81843581b2F7", // address _tokenAoracle,
-    "0x0A6513e40db6EB1b165753AD52E80663aeA50545", // address _tokenBoracle,
+    "0x51597f405303c4377e36123cbc172b13269ea163", // address _tokenBoracle,
     "0xbe5514e856a4eb971653bcc74475b26b56763fd0", // address _gmuOracle,
     "0x2cf7252e74036d1da831d11089d326296e64a728" // address _lp
   ];
