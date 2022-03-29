@@ -81,7 +81,6 @@ contract QuickSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy, C
     address _borrowerOperations,
     address _troveManager,
     address _priceFeed,
-    address _arthUsd,
     address _recorder,
     address _stakingWrapper,
     address _accountRegistry
@@ -91,7 +90,6 @@ contract QuickSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy, C
     troveManager = ITroveManager(_troveManager);
     uniswapFactory = IUniswapV2Factory(uniswapRouter.factory());
     priceFeed = IPriceFeed(_priceFeed);
-    arthUsd = IERC20Wrapper(_arthUsd);
     stakingWrapper = IERC20Wrapper(_stakingWrapper);
     accountRegistry = LeverageAccountRegistry(_accountRegistry);
 
@@ -102,24 +100,6 @@ contract QuickSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy, C
     return accountRegistry.accounts(who);
   }
 
-  function test(
-    uint256 amount,
-    uint256 amountInMax,
-    uint256[] memory borrowedCollateral
-  ) public {
-    arth.transferFrom(msg.sender, me, amount);
-
-    _sellARTHusdForExact(
-      arth,
-      arthUsd,
-      amountInMax,
-      borrowedCollateral[0], // usdc
-      borrowedCollateral[1] // usdt
-    );
-
-    _flush(msg.sender);
-  }
-
   function openPosition(
     uint256[] memory finalExposure,
     uint256[] memory principalCollateral,
@@ -128,6 +108,8 @@ contract QuickSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy, C
   ) external override {
     // take the principal
     usdc.transferFrom(msg.sender, address(this), principalCollateral[0]);
+
+    // todo swap excess
 
     // estimate how much we should flashloan based on how much we want to borrow
     uint256 flashloanAmount = estimateAmountToFlashloanBuy(finalExposure, principalCollateral);
@@ -156,18 +138,18 @@ contract QuickSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy, C
   }
 
   function closePosition(uint256[] memory minExpectedCollateral) external override {
-    //   bytes memory flashloanData = abi.encode(
-    //     msg.sender,
-    //     uint256(1), // action = 0 -> close loan
-    //     uint256(0),
-    //     uint256(0),
-    //     minExpectedCollateral,
-    //     minExpectedCollateral
-    //   );
-    //   // need to make this MEV resistant
-    //   uint256 flashloanAmount = troveManager.getTroveDebt(address(getAccount(msg.sender)));
-    //   flashLoan.flashLoan(address(this), flashloanAmount.add(10e18), flashloanData);
-    //   _flush(msg.sender);
+    bytes memory flashloanData = abi.encode(
+      msg.sender,
+      uint256(1), // action = 0 -> close loan
+      uint256(0),
+      uint256(0),
+      minExpectedCollateral,
+      minExpectedCollateral
+    );
+    // need to make this MEV resistant
+    uint256 flashloanAmount = troveManager.getTroveDebt(address(getAccount(msg.sender)));
+    flashLoan.flashLoan(address(this), flashloanAmount.add(5e18), flashloanData);
+    _flush(msg.sender);
   }
 
   function onFlashLoan(
@@ -185,8 +167,8 @@ contract QuickSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy, C
       uint256 action,
       uint256 minExpectedCollateralRatio,
       uint256 maxBorrowingFee,
-      uint256[] memory borrowedCollateral,
-      uint256[] memory minCollateral
+      uint256[] memory finalExposure,
+      uint256[] memory minCollateralOrPrincipalCollateral
     ) = abi.decode(data, (address, uint256, uint256, uint256, uint256[], uint256[]));
 
     // open or close the loan position
@@ -194,12 +176,12 @@ contract QuickSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy, C
       _onFlashloanOpenPosition(
         who,
         flashloanAmount,
-        borrowedCollateral,
+        finalExposure,
+        minCollateralOrPrincipalCollateral,
         minExpectedCollateralRatio,
         maxBorrowingFee
       );
-    }
-    // else _onFlashloanClosePosition(who, flashloanAmount, minCollateral);
+    } else _onFlashloanClosePosition(who, flashloanAmount, minCollateralOrPrincipalCollateral);
 
     return keccak256("FlashMinter.onFlashLoan");
   }
@@ -208,6 +190,7 @@ contract QuickSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy, C
     address who,
     uint256 flashloanAmount,
     uint256[] memory finalExposure,
+    uint256[] memory principalCollateral,
     uint256 minExpectedCollateralRatio,
     uint256 maxBorrowingFee
   ) internal {
@@ -218,63 +201,15 @@ contract QuickSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy, C
       arth,
       arthUsd,
       flashloanAmount,
-      finalExposure[0], // usdc
+      0, // usdc
       finalExposure[1] // usdt
     );
 
     // 2. LP all the collateral
     // 3. Stake and tokenize
     // 4: Send the collateral to the leverage account
-    uint256 collateralAmount = _lpAndStake(acct);
+    //  = _lpAndStake(acct);
 
-    // 5: open loan using the collateral
-    openLoan(
-      acct,
-      borrowerOperations,
-      maxBorrowingFee, // borrowing fee
-      flashloanAmount, // debt + liquidation reserve
-      collateralAmount, // collateral
-      address(0), // upperHint,
-      address(0), // lowerHint,
-      address(0), // frontEndTag,
-      arth,
-      stakingWrapper
-    );
-
-    // 6. check if we met the min leverage conditions
-    require(_getTroveCR(address(acct)) >= minExpectedCollateralRatio, "min cr not met");
-
-    // 7. payback the loan..
-    arth.approve(address(flashLoan), flashloanAmount);
-    require(arth.balanceOf(me) >= flashloanAmount, "not enough arth for flashload");
-  }
-
-  // function _onFlashloanClosePosition(
-  //   address who,
-  //   uint256 flashloanAmount,
-  //   uint256[] memory minCollateral
-  // ) internal {
-  //   LeverageAccount acct = getAccount(who);
-
-  //   // 1. send the flashloaned arth to the account
-  //   arth.transfer(address(acct), flashloanAmount);
-
-  //   // 2. use the flashloan'd ARTH to payback the debt and close the loan
-  //   closeLoan(acct, controller, borrowerOperations, flashloanAmount, arth, stakingWrapper);
-
-  //   // 3. get the collateral and swap back to arth to back the loan
-  //   _unStakeAndWithdrawLP();
-  //   _buyCollateralForARTH(flashloanAmount, minCollateral);
-
-  //   require(usdc.balanceOf(me) >= minCollateral[0], "not enough usdc");
-  //   require(usdt.balanceOf(me) >= minCollateral[1], "not enough usdt");
-
-  //   // 4. payback the loan..
-  //   arth.approve(address(flashLoan), flashloanAmount);
-  //   require(arth.balanceOf(me) >= flashloanAmount, "not enough arth for flashload");
-  // }
-
-  function _lpAndStake(LeverageAccount acct) internal returns (uint256) {
     // 2. LP all the collateral
     usdc.approve(address(uniswapRouter), usdc.balanceOf(me));
     usdt.approve(address(uniswapRouter), usdt.balanceOf(me));
@@ -296,37 +231,71 @@ contract QuickSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy, C
     stakingWrapper.deposit(collateralAmount);
 
     // 4: send the collateral to the leverage account
-    if (collateralAmount > 0) stakingWrapper.transfer(address(acct), collateralAmount);
-    return collateralAmount;
+    stakingWrapper.transfer(address(acct), collateralAmount);
+
+    // 5: open loan using the collateral
+    openLoan(
+      acct,
+      borrowerOperations,
+      maxBorrowingFee, // borrowing fee
+      flashloanAmount, // debt + liquidation reserve
+      collateralAmount, // collateral
+      address(0), // upperHint,
+      address(0), // lowerHint,
+      address(0), // frontEndTag,
+      arth,
+      stakingWrapper
+    );
+
+    // require(false, uint2str(arth.balanceOf(me)));
+
+    // 6. check if we met the min leverage conditions
+    require(_getTroveCR(address(acct)) >= minExpectedCollateralRatio, "min cr not met");
+
+    // 7. payback the loan..
+    arth.approve(address(flashLoan), flashloanAmount);
+    require(arth.balanceOf(me) >= flashloanAmount, "not enough arth for flashloan");
   }
 
-  // function _unStakeAndWithdrawLP() internal {
-  //   // 1. unstake and un-tokenize
-  //   uint256 collateralAmount = stakingWrapper.balanceOf(me);
-  //   stakingWrapper.withdraw(collateralAmount);
+  function _onFlashloanClosePosition(
+    address who,
+    uint256 flashloanAmount,
+    uint256[] memory minCollateral
+  ) internal {
+    LeverageAccount acct = getAccount(who);
 
-  //   // 2. remove from LP
-  //   lp.approve(address(uniswapRouter), lp.balanceOf(me));
-  //   uniswapRouter.removeLiquidity(
-  //     address(usdc),
-  //     address(usdt),
-  //     lp.balanceOf(me),
-  //     0, // amountAMin
-  //     0, // amountBMin
-  //     me,
-  //     block.timestamp
-  //   );
-  // }
+    // 1. send the flashloaned arth to the account
+    arth.transfer(address(acct), flashloanAmount);
 
-  function _buyCollateralForARTH(uint256 amountToSell, uint256[] memory minCollateral) internal {
-    // _sellARTHusdForExact(
-    //   arth,
-    //   arthUsd,
-    //   amountToSell,
-    //   minCollateral[0], // busd
-    //   minCollateral[1], // usdc
-    //   0 // usdt
-    // );
+    // 2. use the flashloan'd ARTH to payback the debt and close the loan
+    closeLoan(acct, controller, borrowerOperations, flashloanAmount, arth, stakingWrapper);
+
+    // 3. get the collateral and swap back to arth to back the loan
+    // 4. unstake and un-tokenize
+    uint256 collateralAmount = stakingWrapper.balanceOf(me);
+    stakingWrapper.withdraw(collateralAmount);
+
+    // 5. remove from LP
+    lp.approve(address(uniswapRouter), lp.balanceOf(me));
+    uniswapRouter.removeLiquidity(
+      address(usdc),
+      address(usdt),
+      lp.balanceOf(me),
+      0, // amountAMin
+      0, // amountBMin
+      me,
+      block.timestamp
+    );
+
+    // require(false, uint2str(usdc.balanceOf(me)));
+    _buyARTHusdFromExact(arthUsd, usdc, usdt, minCollateral[0], minCollateral[1], flashloanAmount);
+
+    // require(usdc.balanceOf(me) >= minCollateral[0], "not enough usdc");
+    // require(usdt.balanceOf(me) >= minCollateral[1], "not enough usdt");
+
+    // 4. payback the loan..
+    arth.approve(address(flashLoan), flashloanAmount);
+    require(arth.balanceOf(me) >= flashloanAmount, "not enough arth for flashload");
   }
 
   function estimateAmountToFlashloanBuy(
@@ -342,10 +311,6 @@ contract QuickSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy, C
 
   function _getTroveCR(address who) internal returns (uint256) {
     uint256 price = priceFeed.fetchPrice();
-    return getTroveCR(who, price);
-  }
-
-  function getTroveCR(address who, uint256 price) public view returns (uint256) {
     uint256 debt = troveManager.getTroveDebt(who);
     uint256 coll = troveManager.getTroveColl(who);
     return coll.mul(price).div(debt);
@@ -358,4 +323,26 @@ contract QuickSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy, C
     if (usdt.balanceOf(me) > 0) usdt.transfer(to, usdt.balanceOf(me));
     // if (rewardToken.balanceOf(me) > 0) rewardToken.transfer(to, rewardToken.balanceOf(me));
   }
+
+  // function uint2str(uint256 _i) internal pure returns (string memory _uintAsString) {
+  //   if (_i == 0) {
+  //     return "0";
+  //   }
+  //   uint256 j = _i;
+  //   uint256 len;
+  //   while (j != 0) {
+  //     len++;
+  //     j /= 10;
+  //   }
+  //   bytes memory bstr = new bytes(len);
+  //   uint256 k = len;
+  //   while (_i != 0) {
+  //     k = k - 1;
+  //     uint8 temp = (48 + uint8(_i - (_i / 10) * 10));
+  //     bytes1 b1 = bytes1(temp);
+  //     bstr[k] = b1;
+  //     _i /= 10;
+  //   }
+  //   return string(bstr);
+  // }
 }

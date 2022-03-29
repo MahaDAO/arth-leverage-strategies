@@ -75,7 +75,7 @@ contract CurveHelpers {
         address(clp),
         0,
         3,
-        arthUsd.balanceOf(address(this)).div(2),
+        arthUsd.balanceOf(address(this)), //.div(2),
         amountUSDTOut,
         address(this),
         true

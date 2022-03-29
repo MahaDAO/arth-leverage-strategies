@@ -36,7 +36,7 @@ const config: HardhatUserConfig = {
     },
     polygon: {
       gasPrice: 75000000000,
-      url: "https://rpc-mainnet.maticvigil.com",
+      url: "https://polygon-rpc.com/",
       chainId: 137,
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : []
     },

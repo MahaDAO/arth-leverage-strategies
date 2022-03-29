@@ -5,21 +5,18 @@ async function main() {
   // We get the contract to deploy
   const instance = await ethers.getContractAt(
     "QuickSwapExposure",
-    "0xfF2b1B8826A6E4EbA73d48844FBCc735a6160C96"
+    "0xFfEC018583152aB5f056c5323f1f68b701bF1Bc5"
   );
 
-  // await registerStrategy(instance.address, "0xFc74c53c1d31d30ca685DE93feDD2FB1BB3DA440");
+  await registerStrategy(instance.address, "0xFc74c53c1d31d30ca685DE93feDD2FB1BB3DA440");
   // await approve(
   //   "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
   //   "3000000000000000000000000",
   //   instance.address
   // );
 
-  const tx = await instance.openPosition(
-    ["75000000", "75000000"], // uint256 finalExposure,
-    ["75000000", "0"], // uint256 principalCollateral,
-    0,
-    10
+  const tx = await instance.closePosition(
+    ["0", "0"] // uint256 minExpectedCollateral,
   );
 
   // console.log(tx);
