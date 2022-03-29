@@ -3,7 +3,8 @@
 pragma solidity ^0.8.0;
 
 import {IERC20, IERC20WithDecimals} from "../interfaces/IERC20WithDecimals.sol";
-import {IEllipsisSwap} from "../interfaces/IEllipsisSwap.sol";
+import {IZapDepositor} from "../interfaces/IZapDepositor.sol";
+import {IStableSwap} from "../interfaces/IStableSwap.sol";
 import {IERC20Wrapper} from "../interfaces/IERC20Wrapper.sol";
 import {IEllipsisRouter} from "../interfaces/IEllipsisRouter.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
@@ -11,19 +12,20 @@ import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 contract EllipsisARTHRouter is IEllipsisRouter {
   using SafeMath for uint256;
 
-  address public pool;
   IERC20WithDecimals public lp;
-  IEllipsisSwap public ellipsisSwap;
+  IZapDepositor public zap;
+  address public pool;
 
   IERC20Wrapper public arthUsd;
-
   IERC20WithDecimals public arth;
   IERC20WithDecimals public usdc;
   IERC20WithDecimals public usdt;
   IERC20WithDecimals public busd;
 
+  address private me;
+
   constructor(
-    address _ellipsisSwap,
+    address _zap,
     address _lp,
     address _pool,
     address _arth,
@@ -33,63 +35,92 @@ contract EllipsisARTHRouter is IEllipsisRouter {
     address _busd
   ) {
     pool = _pool;
-    ellipsisSwap = IEllipsisSwap(_ellipsisSwap);
 
     arthUsd = IERC20Wrapper(_arthUsd);
+    zap = IZapDepositor(_zap);
 
     lp = IERC20WithDecimals(_lp);
     arth = IERC20WithDecimals(_arth);
     usdc = IERC20WithDecimals(_usdc);
     usdt = IERC20WithDecimals(_usdt);
     busd = IERC20WithDecimals(_busd);
+
+    me = address(this);
   }
 
   function sellARTHForExact(
     uint256 amountArthInMax,
     uint256 amountUSDTOut,
     uint256 amountUSDCOut,
-    uint256 amountBUSDOut
+    uint256 amountBUSDOut,
+    address to,
+    uint256 deadline
   ) external override {
-    arth.approve(address(arthUsd), arth.balanceOf(address(this)));
-    arthUsd.deposit(arth.balanceOf(address(this)));
+    arth.transferFrom(msg.sender, me, amountArthInMax);
+    arth.approve(address(arthUsd), amountArthInMax);
+    arthUsd.deposit(amountArthInMax);
 
-    arthUsd.approve(address(ellipsisSwap), amountArthInMax);
+    arthUsd.approve(address(zap), amountArthInMax);
 
     uint256[] memory depositAmounts = new uint256[](4);
     depositAmounts[0] = amountArthInMax;
-    ellipsisSwap.add_liquidity(pool, depositAmounts, 0);
 
-    lp.approve(address(ellipsisSwap), lp.balanceOf(address(this)));
+    uint256 expectedIn = calc_token_amount(depositAmounts, true).mul(990).div(1000); // 1% slippage
+    zap.add_liquidity(pool, depositAmounts, expectedIn);
 
-    uint256[] memory withdrawAmounts = new uint256[](4);
-    withdrawAmounts[1] = amountBUSDOut;
-    withdrawAmounts[2] = amountUSDCOut;
-    withdrawAmounts[3] = amountUSDTOut;
-    ellipsisSwap.remove_liquidity(pool, lp.balanceOf(address(this)), withdrawAmounts);
+    // lp.approve(address(pool), lp.balanceOf(address(this)));
+
+    // uint256[] memory withdrawAmounts = new uint256[](4);
+    // withdrawAmounts[1] = amountBUSDOut;
+    // withdrawAmounts[2] = amountUSDCOut;
+    // withdrawAmounts[3] = amountUSDTOut;
+
+    // uint256 expectedOut = pool.calc_token_amount(withdrawAmounts, false).mul(1010).div(1000); // 1% slippage
+    // pool.remove_liquidity_imbalance(withdrawAmounts, expectedOut);
+
+    require(block.timestamp <= deadline, "swap deadline expired");
+
+    _flush(to);
   }
 
   function buyARTHForExact(
     uint256 amountUSDTIn,
     uint256 amountUSDCIn,
     uint256 amountBUSDIn,
-    uint256 amountARTHOutMin
+    uint256 amountARTHOutMin,
+    address to,
+    uint256 deadline
   ) external override {
-    usdc.approve(address(ellipsisSwap), amountUSDTIn);
-    usdt.approve(address(ellipsisSwap), amountUSDCIn);
-    busd.approve(address(ellipsisSwap), amountBUSDIn);
+    usdc.transferFrom(msg.sender, me, amountUSDTIn);
+    usdt.transferFrom(msg.sender, me, amountUSDCIn);
+    busd.transferFrom(msg.sender, me, amountBUSDIn);
+
+    usdc.approve(address(zap), amountUSDTIn);
+    usdt.approve(address(zap), amountUSDCIn);
+    busd.approve(address(zap), amountBUSDIn);
 
     uint256[] memory depositAmounts = new uint256[](4);
     depositAmounts[0] = amountBUSDIn;
     depositAmounts[1] = amountUSDCIn;
     depositAmounts[2] = amountUSDTIn;
-    ellipsisSwap.add_liquidity(pool, depositAmounts, 0);
 
-    lp.approve(address(ellipsisSwap), lp.balanceOf(address(this)));
-    uint256[] memory withdrawAmounts = new uint256[](4);
+    uint256 expectedIn = calc_token_amount(depositAmounts, false).mul(1010).div(1000); // 1% slippage
+    zap.add_liquidity(pool, depositAmounts, expectedIn);
+
+    lp.approve(address(zap), lp.balanceOf(address(this)));
+
+    uint256[4] memory withdrawAmounts = new uint256[](4);
     withdrawAmounts[0] = amountARTHOutMin;
-    ellipsisSwap.remove_liquidity(pool, lp.balanceOf(address(this)), withdrawAmounts);
+
+    uint256 expectedOut = calc_token_amount(withdrawAmounts, false).mul(1010).div(1000); // 1% slippage
+    zap.remove_liquidity_imbalance(pool, withdrawAmounts, expectedOut);
 
     arthUsd.withdraw(arthUsd.balanceOf(address(this)));
+
+    require(arthUsd.balanceOf(me) >= amountARTHOutMin, "not enough arth out");
+    require(block.timestamp <= deadline, "swap deadline expired");
+
+    _flush(to);
   }
 
   function estimateARTHtoSell(
@@ -98,9 +129,11 @@ contract EllipsisARTHRouter is IEllipsisRouter {
     uint256 busdNeeded
   ) external view override returns (uint256) {
     // todo this is a hack; need to do it properly
-    uint256 arthUsdAmount = _scalePriceByDigits(usdcNeeded, usdc.decimals(), 18) +
-      _scalePriceByDigits(usdtNeeded, usdt.decimals(), 18) +
-      _scalePriceByDigits(busdNeeded, busd.decimals(), 18);
+    IStableSwap swap = IStableSwap(pool);
+
+    uint256 arthUsdAmount = swap.get_dy_underlying(1, 0, busdNeeded) +
+      swap.get_dy_underlying(2, 0, usdcNeeded) +
+      swap.get_dy_underlying(3, 0, usdtNeeded);
 
     // todo: need to divide by GMU
     return arthUsdAmount.div(2);
@@ -111,29 +144,34 @@ contract EllipsisARTHRouter is IEllipsisRouter {
     uint256 usdtToSell,
     uint256 busdToSell
   ) external view override returns (uint256) {
+    IStableSwap swap = IStableSwap(pool);
+
     // todo this is a hack; need to do it properly
-    uint256 arthUsdAmount = _scalePriceByDigits(usdcToSell, usdc.decimals(), 18) +
-      _scalePriceByDigits(usdtToSell, usdt.decimals(), 18) +
-      _scalePriceByDigits(busdToSell, busd.decimals(), 18);
+    uint256 arthUsdAmount = swap.get_dy_underlying(0, 1, usdcToSell) +
+      swap.get_dy_underlying(0, 2, usdtToSell) +
+      swap.get_dy_underlying(0, 3, busdToSell);
 
     // todo: need to divide by GMU
     return arthUsdAmount.div(2);
   }
 
-  function _scalePriceByDigits(
-    uint256 _price,
-    uint256 _answerDigits,
-    uint256 _targetDigits
-  ) internal pure returns (uint256) {
-    // Convert the price returned by the oracle to an 18-digit decimal for use.
-    uint256 price;
-    if (_answerDigits >= _targetDigits) {
-      // Scale the returned price value down to Liquity's target precision
-      price = _price.div(10**(_answerDigits - _targetDigits));
-    } else if (_answerDigits < _targetDigits) {
-      // Scale the returned price value up to Liquity's target precision
-      price = _price.mul(10**(_targetDigits - _answerDigits));
-    }
-    return price;
+  function calc_token_amount(uint256[] memory amounts, bool isDeposit)
+    public
+    view
+    returns (uint256)
+  {
+    return zap.calc_token_amount(pool, amounts, isDeposit);
+  }
+
+  function calc_withdraw_one_coin(uint256 burnAmount, int128 i) public view returns (uint256) {
+    return zap.calc_withdraw_one_coin(pool, burnAmount, i);
+  }
+
+  function _flush(address to) internal {
+    if (arth.balanceOf(me) > 0) arth.transfer(to, arth.balanceOf(me));
+    if (usdc.balanceOf(me) > 0) usdc.transfer(to, usdc.balanceOf(me));
+    if (usdt.balanceOf(me) > 0) usdt.transfer(to, usdt.balanceOf(me));
+    if (busd.balanceOf(me) > 0) busd.transfer(to, busd.balanceOf(me));
+    if (lp.balanceOf(me) > 0) lp.transfer(to, lp.balanceOf(me));
   }
 }

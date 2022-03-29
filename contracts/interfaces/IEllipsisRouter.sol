@@ -6,14 +6,18 @@ interface IEllipsisRouter {
     uint256 amountArthInMax,
     uint256 amountUSDTOut,
     uint256 amountUSDCOut,
-    uint256 amountBUSDOut
+    uint256 amountBUSDOut,
+    address to,
+    uint256 deadline
   ) external;
 
   function buyARTHForExact(
     uint256 amountUSDTIn,
     uint256 amountUSDCIn,
     uint256 amountBUSDIn,
-    uint256 amountARTHOutMin
+    uint256 amountARTHOutMin,
+    address to,
+    uint256 deadline
   ) external;
 
   function estimateARTHtoSell(
