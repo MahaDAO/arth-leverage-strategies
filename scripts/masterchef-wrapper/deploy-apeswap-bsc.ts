@@ -12,7 +12,7 @@ async function main() {
     "0x2e707261d086687470b515b320478eb1c88d49bb", // address _lpToken
     "0x603c7f932ed1fc6575303d8fb018fdcbb0f39a95", // address _rewardToken
 
-    "0x9a66fC7a20f21fB72d9f229984109246e9c9F4a5", // address _rewardDestination
+    "0x382e9f09ec39bd2b8ef6b962572e7715ecbcf4ea", // address _rewardDestination
     "0", // uint256 _rewardFee - 0%
     "0x9a66fC7a20f21fB72d9f229984109246e9c9F4a5" // address _governance
   ];

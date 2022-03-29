@@ -1,18 +1,19 @@
+import { toUtf8CodePoints } from "ethers/lib/utils";
 import hre, { ethers } from "hardhat";
 import { wait } from "./utils";
 // const hre = require("hardhat");
 
 async function main() {
   const constructorArguments = [
-    "0xfE4A8cc5b5B2366C1B58Bea3858e81843581b2F7", // address _tokenAoracle,
-    "0x0A6513e40db6EB1b165753AD52E80663aeA50545", // address _tokenBoracle,
-    "0xbe5514e856a4eb971653bcc74475b26b56763fd0", // address _gmuOracle,
-    "0x2cf7252e74036d1da831d11089d326296e64a728" // address _lp
+    "0xB97Ad0E74fa7d920791E90258A6E2085088b4320", // address _tokenAoracle,
+    "0xcBb98864Ef56E9042e7d2efef76141f15731B82f", // address _tokenBoracle,
+    "0xdD465B9c68750a02c307744a749954B1F9787efb", // address _gmuOracle,
+    "0x2e707261d086687470b515b320478eb1c88d49bb" // address _lp
   ];
 
   // We get the contract to deploy
-  const ArthUSDWrapper = await ethers.getContractFactory("ChainlinkLPOracle");
-  const instance = await ArthUSDWrapper.deploy(
+  const ChainlinkLPOracle = await ethers.getContractFactory("ChainlinkLPOracle");
+  const instance = await ChainlinkLPOracle.deploy(
     String(constructorArguments[0]),
     String(constructorArguments[1]),
     String(constructorArguments[2]),
@@ -21,7 +22,6 @@ async function main() {
 
   await instance.deployed();
   console.log("ChainlinkLPOracle deployed to:", instance.address);
-
   await wait(15 * 1000);
 
   await hre.run("verify:verify", {
