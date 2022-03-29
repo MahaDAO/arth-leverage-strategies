@@ -8,10 +8,19 @@ contract PrincipalCollateralRecorder is IPrincipalCollateralRecorder {
   // Leverage acc => strategy name => amounts.
   mapping(address => mapping(string => PrinciaplCollateralData)) public principalAmounts;
 
+  struct PrinciaplCollateralData {
+    string name;
+    uint256 amount0;
+    uint256 amount1;
+    uint256 amount2;
+  }
+
   event PrincipalCollateralRecorded(
     address account,
     string strategy,
-    PrinciaplCollateralData data,
+    uint256 amount0,
+    uint256 amount1,
+    uint256 amount2,
     uint256 timestamp
   );
 
@@ -29,6 +38,6 @@ contract PrincipalCollateralRecorder is IPrincipalCollateralRecorder {
     });
 
     principalAmounts[msg.sender][name] = data;
-    emit PrincipalCollateralRecorded(msg.sender, name, data, block.timestamp);
+    emit PrincipalCollateralRecorded(msg.sender, name, amount0, amount1, amount2, block.timestamp);
   }
 }

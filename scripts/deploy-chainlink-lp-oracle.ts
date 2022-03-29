@@ -1,7 +1,6 @@
 import { toUtf8CodePoints } from "ethers/lib/utils";
 import hre, { ethers } from "hardhat";
 import { wait } from "./utils";
-// const hre = require("hardhat");
 
 async function main() {
   const constructorArguments = [

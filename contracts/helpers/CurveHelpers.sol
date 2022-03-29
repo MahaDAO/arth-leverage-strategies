@@ -20,26 +20,30 @@ interface CurveRouter {
     uint256[] memory _deposit_amounts,
     uint256 min_mint_amount
   ) external;
+
+  function exchange_underlying(
+    address _pool,
+    int128 _i,
+    int128 _j,
+    uint256 _dx,
+    uint256 _min_dy,
+    address _receiver,
+    bool _use_underlying
+  ) external;
 }
 
 interface IERC20WithDeciamls is IERC20 {
   function decimals() external view returns (uint256);
 }
 
-contract EllipsisHelpers {
+contract CurveHelpers {
   using SafeMath for uint256;
 
-  address public pool;
-  IERC20 public elp;
   CurveRouter public curveRouter;
+  IERC20 public clp;
 
-  constructor(
-    address _router,
-    address _elp,
-    address _pool
-  ) {
-    pool = _pool;
-    elp = IERC20(_elp);
+  constructor(address _router, address _clp) {
+    clp = IERC20(_clp);
     curveRouter = CurveRouter(_router);
   }
 
@@ -47,80 +51,99 @@ contract EllipsisHelpers {
     IERC20 arth,
     IERC20Wrapper arthUsd,
     uint256 amountInMax,
-    uint256 amountAOut,
-    uint256 amountBOut,
-    uint256 amountCOut
+    uint256 amountUSDCOut,
+    uint256 amountUSDTOut
   ) internal {
-    arth.approve(address(arthUsd), arth.balanceOf(address(this)));
-    arthUsd.deposit(arth.balanceOf(address(this)));
+    arth.approve(address(arthUsd), amountInMax);
 
-    arthUsd.approve(address(curveRouter), amountInMax);
+    arthUsd.deposit(amountInMax);
+    arthUsd.approve(address(curveRouter), arthUsd.balanceOf(address(this)));
 
-    uint256[] memory depositAmounts = new uint256[](4);
-    depositAmounts[0] = amountInMax;
-    curveRouter.add_liquidity(pool, depositAmounts, 0);
+    if (amountUSDCOut > 0)
+      curveRouter.exchange_underlying(
+        address(clp),
+        0,
+        2,
+        arthUsd.balanceOf(address(this)).div(2),
+        amountUSDCOut,
+        address(this),
+        true
+      );
 
-    elp.approve(address(curveRouter), elp.balanceOf(address(this)));
-
-    uint256[] memory withdrawAmounts = new uint256[](4);
-    withdrawAmounts[1] = amountAOut;
-    withdrawAmounts[2] = amountBOut;
-    withdrawAmounts[3] = amountCOut;
-    curveRouter.remove_liquidity(pool, elp.balanceOf(address(this)), withdrawAmounts);
+    if (amountUSDTOut > 0)
+      curveRouter.exchange_underlying(
+        address(clp),
+        0,
+        3,
+        arthUsd.balanceOf(address(this)), //.div(2),
+        amountUSDTOut,
+        address(this),
+        true
+      );
   }
 
-  function _buyARTHusdForExact(
+  function _buyARTHusdFromExact(
     IERC20Wrapper arthUsd,
-    IERC20 tokenA,
-    IERC20 tokenB,
-    IERC20 tokenC,
-    uint256 amountAIn,
-    uint256 amountBIn,
-    uint256 amountCIn,
+    IERC20 usdc,
+    IERC20 usdt,
+    uint256 amountUSDCInMax,
+    uint256 amountUSDTInMax,
     uint256 amountOutMin
   ) internal {
-    tokenA.approve(address(curveRouter), amountAIn);
-    tokenB.approve(address(curveRouter), amountBIn);
-    tokenC.approve(address(curveRouter), amountCIn);
+    usdc.approve(address(curveRouter), amountUSDCInMax);
+    usdt.approve(address(curveRouter), amountUSDTInMax);
 
-    uint256[] memory depositAmounts = new uint256[](4);
-    depositAmounts[0] = amountAIn;
-    depositAmounts[1] = amountBIn;
-    depositAmounts[2] = amountCIn;
-    curveRouter.add_liquidity(pool, depositAmounts, 0);
+    curveRouter.exchange_underlying(
+      address(clp),
+      2,
+      0,
+      amountUSDCInMax,
+      amountOutMin.div(2),
+      address(this),
+      true
+    );
 
-    elp.approve(address(curveRouter), elp.balanceOf(address(this)));
-    uint256[] memory withdrawAmounts = new uint256[](4);
-    withdrawAmounts[0] = amountOutMin;
-    curveRouter.remove_liquidity(pool, elp.balanceOf(address(this)), withdrawAmounts);
+    curveRouter.exchange_underlying(
+      address(clp),
+      3,
+      0,
+      amountUSDTInMax,
+      amountOutMin.div(2),
+      address(this),
+      true
+    );
 
     arthUsd.withdraw(arthUsd.balanceOf(address(this)));
   }
 
-  function estimateARTHusdtoSell(
-    address tokenA,
-    address tokenB,
-    uint256 tokenANeeded,
-    uint256 tokenBNeeded
+  function estimateARTHtoSell(
+    address usdc,
+    address usdt,
+    uint256 usdcNeeded,
+    uint256 usdtNeeded
   ) public view returns (uint256 arthToSell) {
     uint256 arthUsdAmount = _scalePriceByDigits(
-      tokenANeeded,
-      IERC20WithDeciamls(tokenA).decimals(),
+      usdcNeeded,
+      IERC20WithDeciamls(usdc).decimals(),
       18
-    ) + _scalePriceByDigits(tokenBNeeded, IERC20WithDeciamls(tokenB).decimals(), 18);
+    ) + _scalePriceByDigits(usdtNeeded, IERC20WithDeciamls(usdt).decimals(), 18);
 
     return arthUsdAmount.div(2);
   }
 
-  function estimateARTHusdtoBuy(
-    address tokenA,
-    address tokenB,
-    uint256 tokenANeeded,
-    uint256 tokenBNeeded
+  function estimateARTHtoBuy(
+    address usdc,
+    address usdt,
+    uint256 usdcNeeded,
+    uint256 usdtNeeded
   ) public view returns (uint256 maticToSell) {
-    return
-      _scalePriceByDigits(tokenANeeded, IERC20WithDeciamls(tokenA).decimals(), 18) +
-      _scalePriceByDigits(tokenBNeeded, IERC20WithDeciamls(tokenB).decimals(), 18);
+    uint256 arthUsdAmount = _scalePriceByDigits(
+      usdcNeeded,
+      IERC20WithDeciamls(usdc).decimals(),
+      18
+    ) + _scalePriceByDigits(usdtNeeded, IERC20WithDeciamls(usdt).decimals(), 18);
+
+    return arthUsdAmount.div(2);
   }
 
   function _scalePriceByDigits(
