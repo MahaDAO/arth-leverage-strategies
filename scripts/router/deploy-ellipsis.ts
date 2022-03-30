@@ -29,7 +29,7 @@ async function main() {
   await instance.deployed();
   console.log("EllipsisARTHRouter deployed to:", instance.address);
 
-  await wait(15 * 1000);
+  await wait(30 * 1000);
 
   await hre.run("verify:verify", {
     address: instance.address,

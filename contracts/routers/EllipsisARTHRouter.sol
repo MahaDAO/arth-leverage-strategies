@@ -86,22 +86,22 @@ contract EllipsisARTHRouter is IEllipsisRouter {
   }
 
   function buyARTHForExact(
-    uint256 amountUSDTIn,
-    uint256 amountUSDCIn,
     uint256 amountBUSDIn,
+    uint256 amountUSDCIn,
+    uint256 amountUSDTIn,
     uint256 amountARTHOutMin,
     address to,
     uint256 deadline
   ) external override {
     IStableSwap swap = IStableSwap(pool);
 
-    if (amountUSDTIn > 0) usdc.transferFrom(msg.sender, me, amountUSDTIn);
-    if (amountUSDCIn > 0) usdt.transferFrom(msg.sender, me, amountUSDCIn);
     if (amountBUSDIn > 0) busd.transferFrom(msg.sender, me, amountBUSDIn);
+    if (amountUSDCIn > 0) usdc.transferFrom(msg.sender, me, amountUSDCIn);
+    if (amountUSDTIn > 0) usdt.transferFrom(msg.sender, me, amountUSDTIn);
 
-    usdc.approve(pool, amountUSDTIn);
-    usdt.approve(pool, amountUSDCIn);
     busd.approve(pool, amountBUSDIn);
+    usdc.approve(pool, amountUSDCIn);
+    usdt.approve(pool, amountUSDTIn);
 
     if (amountBUSDIn > 0) {
       uint256 arthUsdAmount = swap.get_dy_underlying(1, 0, amountBUSDIn);
@@ -116,7 +116,7 @@ contract EllipsisARTHRouter is IEllipsisRouter {
       swap.exchange_underlying(3, 0, amountUSDTIn, arthUsdAmount.mul(99).div(100), me);
     }
 
-    arthUsd.withdraw(arthUsd.balanceOf(me));
+    arthUsd.withdraw(arthUsd.balanceOf(me).div(2));
 
     require(arth.balanceOf(me) >= amountARTHOutMin, "not enough arth out");
     require(block.timestamp <= deadline, "swap deadline expired");
@@ -160,6 +160,5 @@ contract EllipsisARTHRouter is IEllipsisRouter {
     if (usdc.balanceOf(me) > 0) usdc.transfer(to, usdc.balanceOf(me));
     if (usdt.balanceOf(me) > 0) usdt.transfer(to, usdt.balanceOf(me));
     if (busd.balanceOf(me) > 0) busd.transfer(to, busd.balanceOf(me));
-    if (lp.balanceOf(me) > 0) lp.transfer(to, lp.balanceOf(me));
   }
 }

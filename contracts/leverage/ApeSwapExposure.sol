@@ -8,22 +8,18 @@ import {IFlashBorrower} from "../interfaces/IFlashBorrower.sol";
 import {IFlashLoan} from "../interfaces/IFlashLoan.sol";
 import {ILeverageStrategy} from "../interfaces/ILeverageStrategy.sol";
 import {IPriceFeed} from "../interfaces/IPriceFeed.sol";
-import {IEllipsisRouter} from "../interfaces/IEllipsisRouter.sol";
 import {ITroveManager} from "../interfaces/ITroveManager.sol";
 import {IUniswapV2Factory} from "../interfaces/IUniswapV2Factory.sol";
 import {IUniswapV2Router02} from "../interfaces/IUniswapV2Router02.sol";
 import {LeverageAccount, LeverageAccountRegistry} from "../account/LeverageAccountRegistry.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {TroveHelpers} from "../helpers/TroveHelpers.sol";
-import {UniswapV2Helpers} from "../helpers/UniswapV2Helpers.sol";
 import {IPrincipalCollateralRecorder} from "../interfaces/IPrincipalCollateralRecorder.sol";
+import {IUniswapV2Router02} from "../interfaces/IUniswapV2Router02.sol";
+import {IUniswapV2Factory} from "../interfaces/IUniswapV2Factory.sol";
+import {IEllipsisRouter} from "../interfaces/IEllipsisRouter.sol";
 
-contract LPExpsoureSingleCollat is
-  IFlashBorrower,
-  ILeverageStrategy,
-  TroveHelpers,
-  UniswapV2Helpers
-{
+contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
   using SafeMath for uint256;
 
   address public borrowerOperations;
@@ -45,7 +41,10 @@ contract LPExpsoureSingleCollat is
 
   IERC20Wrapper public arthUsd;
   IERC20Wrapper public stakingWrapper;
-  IEllipsisRouter ellipsis;
+
+  IEllipsisRouter public ellipsis;
+  IUniswapV2Router02 public apeswapRouter;
+  IUniswapV2Factory public apeswapFactory;
 
   address private me;
 
@@ -54,43 +53,45 @@ contract LPExpsoureSingleCollat is
 
   constructor(
     address _flashloan,
-    address _controller,
+    address _arth,
     address _usdc,
     address _busd,
     address _rewardToken,
     address _ellipsisRouter,
-    address _stakingWrapper,
-    address _accountRegistry,
+    address _arthUsd,
     address _uniswapRouter
-  ) UniswapV2Helpers(_uniswapRouter) {
+  ) {
     ellipsis = IEllipsisRouter(_ellipsisRouter);
-    accountRegistry = LeverageAccountRegistry(_accountRegistry);
 
-    controller = _controller;
     busd = IERC20(_busd);
-    flashLoan = IFlashLoan(_flashloan);
+    arth = IERC20(_arth);
     usdc = IERC20(_usdc);
     rewardToken = IERC20(_rewardToken);
-    stakingWrapper = IERC20Wrapper(_stakingWrapper);
+    flashLoan = IFlashLoan(_flashloan);
+    arthUsd = IERC20Wrapper(_arthUsd);
 
     me = address(this);
 
-    uniswapFactory = IUniswapV2Factory(uniswapRouter.factory());
-    lp = IERC20(uniswapFactory.getPair(_usdc, _busd));
+    apeswapRouter = IUniswapV2Router02(_uniswapRouter);
+    apeswapFactory = IUniswapV2Factory(apeswapRouter.factory());
+    lp = IERC20(apeswapFactory.getPair(_usdc, _busd));
   }
 
   function init(
     address _borrowerOperations,
     address _troveManager,
     address _priceFeed,
-    address _recorder
+    address _recorder,
+    address _stakingWrapper,
+    address _accountRegistry
   ) public {
+    require(borrowerOperations == address(0), "already initialized");
     borrowerOperations = _borrowerOperations;
     troveManager = ITroveManager(_troveManager);
-
-    arth = troveManager.lusdToken();
-    uniswapFactory = IUniswapV2Factory(uniswapRouter.factory());
     priceFeed = IPriceFeed(_priceFeed);
+    stakingWrapper = IERC20Wrapper(_stakingWrapper);
+    accountRegistry = LeverageAccountRegistry(_accountRegistry);
+
     recorder = _recorder;
   }
 
@@ -99,16 +100,20 @@ contract LPExpsoureSingleCollat is
   }
 
   function openPosition(
-    uint256[] memory borrowedCollateral,
+    uint256[] memory finalExposure,
     uint256[] memory principalCollateral,
     uint256 minExpectedCollateralRatio,
     uint256 maxBorrowingFee
   ) external override {
     // take the principal
-    usdc.transferFrom(msg.sender, address(this), principalCollateral[0]);
+    busd.transferFrom(msg.sender, address(this), principalCollateral[0]);
+
+    // todo swap excess
 
     // estimate how much we should flashloan based on how much we want to borrow
-    uint256 flashloanAmount = estimateAmountToFlashloanBuy(borrowedCollateral);
+    uint256 flashloanAmount = estimateAmountToFlashloanBuy(finalExposure, principalCollateral)
+      .mul(102)
+      .div(100);
 
     // LeverageAccount acct = getAccount(msg.sender);
     // bytes memory principalCollateralData = abi.encodeWithSelector(
@@ -125,7 +130,7 @@ contract LPExpsoureSingleCollat is
       uint256(0), // action = 0 -> open loan
       minExpectedCollateralRatio,
       maxBorrowingFee,
-      borrowedCollateral,
+      finalExposure,
       principalCollateral
     );
 
@@ -142,10 +147,9 @@ contract LPExpsoureSingleCollat is
       minExpectedCollateral,
       minExpectedCollateral
     );
-
     // need to make this MEV resistant
     uint256 flashloanAmount = troveManager.getTroveDebt(address(getAccount(msg.sender)));
-    flashLoan.flashLoan(address(this), flashloanAmount.add(10e18), flashloanData);
+    flashLoan.flashLoan(address(this), flashloanAmount.add(5e18), flashloanData);
     _flush(msg.sender);
   }
 
@@ -164,8 +168,8 @@ contract LPExpsoureSingleCollat is
       uint256 action,
       uint256 minExpectedCollateralRatio,
       uint256 maxBorrowingFee,
-      uint256[] memory borrowedCollateral,
-      uint256[] memory minCollateral
+      uint256[] memory finalExposure,
+      uint256[] memory minCollateralOrPrincipalCollateral
     ) = abi.decode(data, (address, uint256, uint256, uint256, uint256[], uint256[]));
 
     // open or close the loan position
@@ -173,11 +177,12 @@ contract LPExpsoureSingleCollat is
       _onFlashloanOpenPosition(
         who,
         flashloanAmount,
-        borrowedCollateral,
+        finalExposure,
+        minCollateralOrPrincipalCollateral,
         minExpectedCollateralRatio,
         maxBorrowingFee
       );
-    } else _onFlashloanClosePosition(who, flashloanAmount, minCollateral);
+    } else _onFlashloanClosePosition(who, flashloanAmount, minCollateralOrPrincipalCollateral);
 
     return keccak256("FlashMinter.onFlashLoan");
   }
@@ -185,73 +190,29 @@ contract LPExpsoureSingleCollat is
   function _onFlashloanOpenPosition(
     address who,
     uint256 flashloanAmount,
-    uint256[] memory borrowedCollateral,
+    uint256[] memory finalExposure,
+    uint256[] memory principalCollateral,
     uint256 minExpectedCollateralRatio,
     uint256 maxBorrowingFee
   ) internal {
     LeverageAccount acct = getAccount(who);
 
     // 1: sell arth for collateral
-    _sellCollateralForARTH(borrowedCollateral);
-
-    // 2. LP all the collateral
-    // 3. Stake and tokenize
-    // 4: send the collateral to the leverage account
-    uint256 collateralAmount = _lpAndStake(acct);
-
-    // 5: open loan using the collateral
-    openLoan(
-      acct,
-      borrowerOperations,
-      maxBorrowingFee, // borrowing fee
-      flashloanAmount, // debt + liquidation reserve
-      collateralAmount, // collateral
-      address(0), // upperHint,
-      address(0), // lowerHint,
-      address(0), // frontEndTag,
-      arth,
-      stakingWrapper
+    arth.approve(address(ellipsis), flashloanAmount);
+    ellipsis.sellARTHForExact(
+      flashloanAmount,
+      finalExposure[0].sub(principalCollateral[0]), // amountBUSDOut,
+      finalExposure[1], // amountUSDCOut,
+      0, // amountUSDTOut,
+      me,
+      block.timestamp
     );
 
-    // 6. check if we met the min leverage conditions
-    require(_getTroveCR(address(acct)) >= minExpectedCollateralRatio, "min cr not met");
-
-    // 7. payback the loan..
-    arth.approve(address(flashLoan), flashloanAmount);
-    require(arth.balanceOf(me) >= flashloanAmount, "not enough arth for flashload");
-  }
-
-  function _onFlashloanClosePosition(
-    address who,
-    uint256 flashloanAmount,
-    uint256[] memory minCollateral
-  ) internal {
-    LeverageAccount acct = getAccount(who);
-
-    // 1. send the flashloaned arth to the account
-    arth.transfer(address(acct), flashloanAmount);
-
-    // 2. use the flashloan'd ARTH to payback the debt and close the loan
-    closeLoan(acct, controller, borrowerOperations, flashloanAmount, arth, stakingWrapper);
-
-    // 3. get the collateral and swap back to arth to back the loan
-    _unStakeAndWithdrawLP();
-    _buyCollateralForARTH(flashloanAmount, minCollateral);
-
-    require(usdc.balanceOf(me) >= minCollateral[0], "not enough usdc");
-    require(busd.balanceOf(me) >= minCollateral[1], "not enough busd");
-
-    // 4. payback the loan..
-    arth.approve(address(flashLoan), flashloanAmount);
-    require(arth.balanceOf(me) >= flashloanAmount, "not enough arth for flashload");
-  }
-
-  function _lpAndStake(LeverageAccount acct) internal returns (uint256) {
     // 2. LP all the collateral
-    usdc.approve(address(uniswapRouter), usdc.balanceOf(me));
-    busd.approve(address(uniswapRouter), busd.balanceOf(me));
+    usdc.approve(address(apeswapRouter), usdc.balanceOf(me));
+    busd.approve(address(apeswapRouter), busd.balanceOf(me));
 
-    uniswapRouter.addLiquidity(
+    apeswapRouter.addLiquidity(
       address(usdc),
       address(busd),
       usdc.balanceOf(me),
@@ -268,18 +229,53 @@ contract LPExpsoureSingleCollat is
     stakingWrapper.deposit(collateralAmount);
 
     // 4: send the collateral to the leverage account
-    if (collateralAmount > 0) stakingWrapper.transfer(address(acct), collateralAmount);
-    return collateralAmount;
+    stakingWrapper.transfer(address(acct), collateralAmount);
+
+    // 5: open loan using the collateral
+    openLoan(
+      acct,
+      borrowerOperations,
+      maxBorrowingFee, // borrowing fee
+      flashloanAmount, // debt + liquidation reserve
+      collateralAmount, // collateral
+      address(0), // upperHint,
+      address(0), // lowerHint,
+      address(0), // frontEndTag,
+      arth,
+      stakingWrapper
+    );
+
+    // require(false, uint2str(arth.balanceOf(me)));
+
+    // 6. check if we met the min leverage conditions
+    require(_getTroveCR(address(acct)) >= minExpectedCollateralRatio, "min cr not met");
+
+    // 7. payback the loan..
+    arth.approve(address(flashLoan), flashloanAmount);
+    require(arth.balanceOf(me) >= flashloanAmount, "not enough arth for flashloan");
   }
 
-  function _unStakeAndWithdrawLP() internal {
-    // 1. unstake and un-tokenize
+  function _onFlashloanClosePosition(
+    address who,
+    uint256 flashloanAmount,
+    uint256[] memory minCollateral
+  ) internal {
+    LeverageAccount acct = getAccount(who);
+
+    // 1. send the flashloaned arth to the account
+    arth.transfer(address(acct), flashloanAmount);
+
+    // 2. use the flashloan'd ARTH to payback the debt and close the loan
+    closeLoan(acct, controller, borrowerOperations, flashloanAmount, arth, stakingWrapper);
+
+    // 3. get the collateral and swap back to arth to back the loan
+    // 4. unstake and un-tokenize
     uint256 collateralAmount = stakingWrapper.balanceOf(me);
     stakingWrapper.withdraw(collateralAmount);
 
-    // 2. remove from LP
-    lp.approve(address(uniswapRouter), lp.balanceOf(me));
-    uniswapRouter.removeLiquidity(
+    // 5. remove from LP
+    lp.approve(address(apeswapRouter), lp.balanceOf(me));
+    apeswapRouter.removeLiquidity(
       address(usdc),
       address(busd),
       lp.balanceOf(me),
@@ -288,52 +284,32 @@ contract LPExpsoureSingleCollat is
       me,
       block.timestamp
     );
+
+    // require(false, uint2str(usdc.balanceOf(me)));
+    // _buyARTHusdFromExact(arthUsd, usdc, busd, minCollateral[0], minCollateral[1], flashloanAmount);
+
+    // require(usdc.balanceOf(me) >= minCollateral[0], "not enough usdc");
+    // require(busd.balanceOf(me) >= minCollateral[1], "not enough busd");
+
+    // 4. payback the loan..
+    arth.approve(address(flashLoan), flashloanAmount);
+    require(arth.balanceOf(me) >= flashloanAmount, "not enough arth for flashload");
   }
 
-  function _sellCollateralForARTH(uint256[] memory borrowedCollateral) internal {
-    // _buyARTHusdForExact(
-    //   arthUsd,
-    //   busd,
-    //   usdc,
-    //   usdc,
-    //   borrowedCollateral[0], // busd
-    //   borrowedCollateral[1], // usdc amountCIn, amountOutMin, to);
-    //   0, // usdt
-    //   0
-    // );
-  }
-
-  function _buyCollateralForARTH(uint256 amountToSell, uint256[] memory minCollateral) internal {
-    // _sellARTHusdForExact(
-    //   arth,
-    //   arthUsd,
-    //   amountToSell,
-    //   minCollateral[0], // busd
-    //   minCollateral[1], // usdc
-    //   0 // usdt
-    // );
-  }
-
-  function estimateAmountToFlashloanBuy(uint256[] memory borrowedCollateral)
-    public
-    view
-    returns (uint256)
-  {
-    return 0;
-    // estimateARTHusdtoBuy(
-    //   address(busd),
-    //   address(usdc),
-    //   borrowedCollateral[0],
-    //   borrowedCollateral[1]
-    // );
+  function estimateAmountToFlashloanBuy(
+    uint256[] memory finalExposure,
+    uint256[] memory principalCollateral
+  ) public view returns (uint256) {
+    return
+      ellipsis
+      // we have some busd
+        .estimateARTHtoBuy(finalExposure[0].sub(principalCollateral[0]), finalExposure[1], 0)
+        .mul(101)
+        .div(100); // 1% slippage
   }
 
   function _getTroveCR(address who) internal returns (uint256) {
     uint256 price = priceFeed.fetchPrice();
-    return getTroveCR(who, price);
-  }
-
-  function getTroveCR(address who, uint256 price) public view returns (uint256) {
     uint256 debt = troveManager.getTroveDebt(who);
     uint256 coll = troveManager.getTroveColl(who);
     return coll.mul(price).div(debt);
@@ -341,8 +317,31 @@ contract LPExpsoureSingleCollat is
 
   function _flush(address to) internal {
     if (arth.balanceOf(me) > 0) arth.transfer(to, arth.balanceOf(me));
+    if (arthUsd.balanceOf(me) > 0) arthUsd.transfer(to, arthUsd.balanceOf(me));
     if (usdc.balanceOf(me) > 0) usdc.transfer(to, usdc.balanceOf(me));
     if (busd.balanceOf(me) > 0) busd.transfer(to, busd.balanceOf(me));
     if (rewardToken.balanceOf(me) > 0) rewardToken.transfer(to, rewardToken.balanceOf(me));
   }
+
+  // function uint2str(uint256 _i) internal pure returns (string memory _uintAsString) {
+  //   if (_i == 0) {
+  //     return "0";
+  //   }
+  //   uint256 j = _i;
+  //   uint256 len;
+  //   while (j != 0) {
+  //     len++;
+  //     j /= 10;
+  //   }
+  //   bytes memory bstr = new bytes(len);
+  //   uint256 k = len;
+  //   while (_i != 0) {
+  //     k = k - 1;
+  //     uint8 temp = (48 + uint8(_i - (_i / 10) * 10));
+  //     bytes1 b1 = bytes1(temp);
+  //     bstr[k] = b1;
+  //     _i /= 10;
+  //   }
+  //   return string(bstr);
+  // }
 }
