@@ -26,13 +26,13 @@ async function main() {
     String(constructorArguments[7])
   );
 
-  // await instance.deployed();
-  // console.log("EllipsisARTHRouter deployed to:", instance.address);
+  await instance.deployed();
+  console.log("EllipsisARTHRouter deployed to:", instance.address);
 
-  // await wait(60 * 1000);
+  await wait(15 * 1000);
 
   await hre.run("verify:verify", {
-    address: "0x410845a2e1c8351A4A88B24b19Da07D31ff6ae85",
+    address: instance.address,
     constructorArguments
   });
 }

@@ -60,23 +60,38 @@ contract EllipsisARTHRouter is IEllipsisRouter {
     arth.approve(address(arthUsd), amountArthInMax);
     arthUsd.deposit(amountArthInMax);
 
-    arthUsd.approve(address(zap), amountArthInMax);
+    uint256 arthUsdAmount = arthUsd.balanceOf(me);
+    arthUsd.approve(address(zap), arthUsdAmount);
 
-    uint256[] memory depositAmounts = new uint256[](4);
-    depositAmounts[0] = amountArthInMax;
-
+    uint256[4] memory depositAmounts = [arthUsdAmount, 0, 0, 0];
     uint256 expectedIn = calc_token_amount(depositAmounts, true).mul(990).div(1000); // 1% slippage
     zap.add_liquidity(pool, depositAmounts, expectedIn);
 
-    // lp.approve(address(pool), lp.balanceOf(address(this)));
+    lp.approve(address(zap), lp.balanceOf(me));
 
-    // uint256[] memory withdrawAmounts = new uint256[](4);
-    // withdrawAmounts[1] = amountBUSDOut;
-    // withdrawAmounts[2] = amountUSDCOut;
-    // withdrawAmounts[3] = amountUSDTOut;
+    uint256[4] memory withdrawAmounts = [amountBUSDOut, amountUSDCOut, amountUSDTOut, 0];
+    uint256 expectedOut = calc_token_amount(withdrawAmounts, false).mul(1010).div(1000); // 1% slippage
+    zap.remove_liquidity_imbalance(pool, withdrawAmounts, expectedOut);
 
-    // uint256 expectedOut = pool.calc_token_amount(withdrawAmounts, false).mul(1010).div(1000); // 1% slippage
-    // pool.remove_liquidity_imbalance(withdrawAmounts, expectedOut);
+    require(block.timestamp <= deadline, "swap deadline expired");
+
+    _flush(to);
+  }
+
+  function test(
+    uint256 amountArthInMax,
+    uint256 amountUSDTOut,
+    uint256 amountUSDCOut,
+    uint256 amountBUSDOut,
+    address to,
+    uint256 deadline
+  ) external {
+    lp.transferFrom(msg.sender, me, amountArthInMax);
+    lp.approve(address(zap), lp.balanceOf(me));
+
+    uint256[4] memory withdrawAmounts = [0, amountBUSDOut, amountUSDCOut, amountUSDTOut];
+    uint256 expectedOut = calc_token_amount(withdrawAmounts, false).mul(1010).div(1000); // 1% slippage
+    zap.remove_liquidity_imbalance(pool, withdrawAmounts, expectedOut);
 
     require(block.timestamp <= deadline, "swap deadline expired");
 
@@ -99,19 +114,13 @@ contract EllipsisARTHRouter is IEllipsisRouter {
     usdt.approve(address(zap), amountUSDCIn);
     busd.approve(address(zap), amountBUSDIn);
 
-    uint256[] memory depositAmounts = new uint256[](4);
-    depositAmounts[0] = amountBUSDIn;
-    depositAmounts[1] = amountUSDCIn;
-    depositAmounts[2] = amountUSDTIn;
-
+    uint256[4] memory depositAmounts = [amountBUSDIn, amountUSDCIn, amountUSDTIn, 0];
     uint256 expectedIn = calc_token_amount(depositAmounts, false).mul(1010).div(1000); // 1% slippage
     zap.add_liquidity(pool, depositAmounts, expectedIn);
 
     lp.approve(address(zap), lp.balanceOf(address(this)));
 
-    uint256[4] memory withdrawAmounts = new uint256[](4);
-    withdrawAmounts[0] = amountARTHOutMin;
-
+    uint256[4] memory withdrawAmounts = [amountARTHOutMin, 0, 0, 0];
     uint256 expectedOut = calc_token_amount(withdrawAmounts, false).mul(1010).div(1000); // 1% slippage
     zap.remove_liquidity_imbalance(pool, withdrawAmounts, expectedOut);
 
@@ -155,7 +164,7 @@ contract EllipsisARTHRouter is IEllipsisRouter {
     return arthUsdAmount.div(2);
   }
 
-  function calc_token_amount(uint256[] memory amounts, bool isDeposit)
+  function calc_token_amount(uint256[4] memory amounts, bool isDeposit)
     public
     view
     returns (uint256)

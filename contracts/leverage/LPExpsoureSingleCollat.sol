@@ -14,7 +14,6 @@ import {IUniswapV2Router02} from "../interfaces/IUniswapV2Router02.sol";
 import {LeverageAccount, LeverageAccountRegistry} from "../account/LeverageAccountRegistry.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {TroveHelpers} from "../helpers/TroveHelpers.sol";
-import {EllipsisHelpers} from "../helpers/EllipsisHelpers.sol";
 import {UniswapV2Helpers} from "../helpers/UniswapV2Helpers.sol";
 import {IPrincipalCollateralRecorder} from "../interfaces/IPrincipalCollateralRecorder.sol";
 
@@ -22,8 +21,7 @@ contract LPExpsoureSingleCollat is
   IFlashBorrower,
   ILeverageStrategy,
   TroveHelpers,
-  UniswapV2Helpers,
-  EllipsisHelpers
+  UniswapV2Helpers
 {
   using SafeMath for uint256;
 
@@ -64,7 +62,7 @@ contract LPExpsoureSingleCollat is
     address _stakingWrapper,
     address _accountRegistry,
     address _uniswapRouter
-  ) EllipsisHelpers(_ellipsisRouter, _elp, _epool) UniswapV2Helpers(_uniswapRouter) {
+  ) UniswapV2Helpers(_uniswapRouter) {
     accountRegistry = LeverageAccountRegistry(_accountRegistry);
 
     controller = _controller;
@@ -292,27 +290,27 @@ contract LPExpsoureSingleCollat is
   }
 
   function _sellCollateralForARTH(uint256[] memory borrowedCollateral) internal {
-    _buyARTHusdForExact(
-      arthUsd,
-      busd,
-      usdc,
-      usdc,
-      borrowedCollateral[0], // busd
-      borrowedCollateral[1], // usdc amountCIn, amountOutMin, to);
-      0, // usdt
-      0
-    );
+    // _buyARTHusdForExact(
+    //   arthUsd,
+    //   busd,
+    //   usdc,
+    //   usdc,
+    //   borrowedCollateral[0], // busd
+    //   borrowedCollateral[1], // usdc amountCIn, amountOutMin, to);
+    //   0, // usdt
+    //   0
+    // );
   }
 
   function _buyCollateralForARTH(uint256 amountToSell, uint256[] memory minCollateral) internal {
-    _sellARTHusdForExact(
-      arth,
-      arthUsd,
-      amountToSell,
-      minCollateral[0], // busd
-      minCollateral[1], // usdc
-      0 // usdt
-    );
+    // _sellARTHusdForExact(
+    //   arth,
+    //   arthUsd,
+    //   amountToSell,
+    //   minCollateral[0], // busd
+    //   minCollateral[1], // usdc
+    //   0 // usdt
+    // );
   }
 
   function estimateAmountToFlashloanBuy(uint256[] memory borrowedCollateral)
@@ -320,13 +318,13 @@ contract LPExpsoureSingleCollat is
     view
     returns (uint256)
   {
-    return
-      estimateARTHusdtoBuy(
-        address(busd),
-        address(usdc),
-        borrowedCollateral[0],
-        borrowedCollateral[1]
-      );
+    return 0;
+    // estimateARTHusdtoBuy(
+    //   address(busd),
+    //   address(usdc),
+    //   borrowedCollateral[0],
+    //   borrowedCollateral[1]
+    // );
   }
 
   function _getTroveCR(address who) internal returns (uint256) {
