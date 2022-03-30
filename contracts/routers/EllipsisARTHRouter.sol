@@ -50,51 +50,38 @@ contract EllipsisARTHRouter is IEllipsisRouter {
 
   function sellARTHForExact(
     uint256 amountArthInMax,
-    uint256 amountUSDTOut,
-    uint256 amountUSDCOut,
     uint256 amountBUSDOut,
+    uint256 amountUSDCOut,
+    uint256 amountUSDTOut,
     address to,
     uint256 deadline
   ) external override {
-    arth.transferFrom(msg.sender, me, amountArthInMax);
-    arth.approve(address(arthUsd), amountArthInMax);
-    arthUsd.deposit(amountArthInMax);
+    IStableSwap swap = IStableSwap(pool);
 
-    uint256 arthUsdAmount = arthUsd.balanceOf(me);
-    arthUsd.approve(address(zap), arthUsdAmount);
+    uint256 totalIn = amountBUSDOut + amountUSDCOut + amountUSDTOut;
+    uint256 totalArthIn = swap.get_dy_underlying(1, 0, totalIn).mul(1010).div(2000);
 
-    uint256[4] memory depositAmounts = [arthUsdAmount, 0, 0, 0];
-    uint256 expectedIn = calc_token_amount(depositAmounts, true).mul(990).div(1000); // 1% slippage
-    zap.add_liquidity(pool, depositAmounts, expectedIn);
+    require(totalArthIn <= amountArthInMax, "not enough arth");
 
-    lp.approve(address(zap), lp.balanceOf(me));
+    arth.transferFrom(msg.sender, me, totalArthIn);
+    arth.approve(address(arthUsd), totalArthIn);
+    arthUsd.deposit(totalArthIn);
+    arthUsd.approve(address(swap), arthUsd.balanceOf(me));
 
-    uint256[4] memory withdrawAmounts = [amountBUSDOut, amountUSDCOut, amountUSDTOut, 0];
-    uint256 expectedOut = calc_token_amount(withdrawAmounts, false).mul(1010).div(1000); // 1% slippage
-    zap.remove_liquidity_imbalance(pool, withdrawAmounts, expectedOut);
-
-    require(block.timestamp <= deadline, "swap deadline expired");
-
-    _flush(to);
-  }
-
-  function test(
-    uint256 amountArthInMax,
-    uint256 amountUSDTOut,
-    uint256 amountUSDCOut,
-    uint256 amountBUSDOut,
-    address to,
-    uint256 deadline
-  ) external {
-    lp.transferFrom(msg.sender, me, amountArthInMax);
-    lp.approve(address(zap), lp.balanceOf(me));
-
-    uint256[4] memory withdrawAmounts = [0, amountBUSDOut, amountUSDCOut, amountUSDTOut];
-    uint256 expectedOut = calc_token_amount(withdrawAmounts, false).mul(1010).div(1000); // 1% slippage
-    zap.remove_liquidity_imbalance(pool, withdrawAmounts, expectedOut);
+    if (amountBUSDOut > 0) {
+      uint256 arthUsdAmount = swap.get_dy_underlying(1, 0, amountBUSDOut);
+      swap.exchange_underlying(0, 1, arthUsdAmount.mul(1010).div(1000), amountBUSDOut, me);
+    }
+    if (amountUSDCOut > 0) {
+      uint256 arthUsdAmount = swap.get_dy_underlying(2, 0, amountUSDCOut);
+      swap.exchange_underlying(0, 2, arthUsdAmount.mul(1010).div(1000), amountUSDCOut, me);
+    }
+    if (amountUSDTOut > 0) {
+      uint256 arthUsdAmount = swap.get_dy_underlying(2, 0, amountUSDTOut);
+      swap.exchange_underlying(0, 2, arthUsdAmount.mul(1010).div(1000), amountUSDTOut, me);
+    }
 
     require(block.timestamp <= deadline, "swap deadline expired");
-
     _flush(to);
   }
 

@@ -3,13 +3,13 @@ import { wait } from "../utils";
 
 async function main() {
   const constructorArguments = [
-    "BUSD-USDT Staked APE-LP", // string memory _name,
-    "BUSDUSDT-ALP-S", // string memory _symbol,
+    "BUSD-USDC Staked APE-LP", // string memory _name,
+    "BUSDUSDC-APE-LP-S", // string memory _symbol,
 
     "0x5c8D727b265DBAfaba67E050f2f739cAeEB4A6F9", // address _chef,
 
-    "34", // addresss _pid,
-    "0x2e707261d086687470b515b320478eb1c88d49bb", // address _lpToken
+    "8", // addresss _pid,
+    "0xc087c78abac4a0e900a327444193dbf9ba69058e", // address _lpToken
     "0x603c7f932ed1fc6575303d8fb018fdcbb0f39a95", // address _rewardToken
 
     "0x382e9f09ec39bd2b8ef6b962572e7715ecbcf4ea", // address _rewardDestination
