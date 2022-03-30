@@ -61,7 +61,7 @@ contract EllipsisARTHRouter is IEllipsisRouter {
     uint256 totalIn = amountBUSDOut + amountUSDCOut + amountUSDTOut;
     uint256 totalArthIn = swap.get_dy_underlying(1, 0, totalIn).mul(1010).div(2000);
 
-    require(totalArthIn <= amountArthInMax, "not enough arth");
+    require(totalArthIn <= amountArthInMax, "not enough expected arth in");
 
     arth.transferFrom(msg.sender, me, totalArthIn);
     arth.approve(address(arthUsd), totalArthIn);
@@ -77,8 +77,8 @@ contract EllipsisARTHRouter is IEllipsisRouter {
       swap.exchange_underlying(0, 2, arthUsdAmount.mul(1010).div(1000), amountUSDCOut, me);
     }
     if (amountUSDTOut > 0) {
-      uint256 arthUsdAmount = swap.get_dy_underlying(2, 0, amountUSDTOut);
-      swap.exchange_underlying(0, 2, arthUsdAmount.mul(1010).div(1000), amountUSDTOut, me);
+      uint256 arthUsdAmount = swap.get_dy_underlying(3, 0, amountUSDTOut);
+      swap.exchange_underlying(0, 3, arthUsdAmount.mul(1010).div(1000), amountUSDTOut, me);
     }
 
     require(block.timestamp <= deadline, "swap deadline expired");
@@ -93,27 +93,32 @@ contract EllipsisARTHRouter is IEllipsisRouter {
     address to,
     uint256 deadline
   ) external override {
-    usdc.transferFrom(msg.sender, me, amountUSDTIn);
-    usdt.transferFrom(msg.sender, me, amountUSDCIn);
-    busd.transferFrom(msg.sender, me, amountBUSDIn);
+    IStableSwap swap = IStableSwap(pool);
 
-    usdc.approve(address(zap), amountUSDTIn);
-    usdt.approve(address(zap), amountUSDCIn);
-    busd.approve(address(zap), amountBUSDIn);
+    if (amountUSDTIn > 0) usdc.transferFrom(msg.sender, me, amountUSDTIn);
+    if (amountUSDCIn > 0) usdt.transferFrom(msg.sender, me, amountUSDCIn);
+    if (amountBUSDIn > 0) busd.transferFrom(msg.sender, me, amountBUSDIn);
 
-    uint256[4] memory depositAmounts = [amountBUSDIn, amountUSDCIn, amountUSDTIn, 0];
-    uint256 expectedIn = calc_token_amount(depositAmounts, false).mul(1010).div(1000); // 1% slippage
-    zap.add_liquidity(pool, depositAmounts, expectedIn);
+    usdc.approve(pool, amountUSDTIn);
+    usdt.approve(pool, amountUSDCIn);
+    busd.approve(pool, amountBUSDIn);
 
-    lp.approve(address(zap), lp.balanceOf(address(this)));
+    if (amountBUSDIn > 0) {
+      uint256 arthUsdAmount = swap.get_dy_underlying(1, 0, amountBUSDIn);
+      swap.exchange_underlying(1, 0, amountBUSDIn, arthUsdAmount.mul(99).div(100), me);
+    }
+    if (amountUSDCIn > 0) {
+      uint256 arthUsdAmount = swap.get_dy_underlying(2, 0, amountUSDCIn);
+      swap.exchange_underlying(2, 0, amountUSDCIn, arthUsdAmount.mul(99).div(100), me);
+    }
+    if (amountUSDTIn > 0) {
+      uint256 arthUsdAmount = swap.get_dy_underlying(3, 0, amountUSDTIn);
+      swap.exchange_underlying(3, 0, amountUSDTIn, arthUsdAmount.mul(99).div(100), me);
+    }
 
-    uint256[4] memory withdrawAmounts = [amountARTHOutMin, 0, 0, 0];
-    uint256 expectedOut = calc_token_amount(withdrawAmounts, false).mul(1010).div(1000); // 1% slippage
-    zap.remove_liquidity_imbalance(pool, withdrawAmounts, expectedOut);
+    arthUsd.withdraw(arthUsd.balanceOf(me));
 
-    arthUsd.withdraw(arthUsd.balanceOf(address(this)));
-
-    require(arthUsd.balanceOf(me) >= amountARTHOutMin, "not enough arth out");
+    require(arth.balanceOf(me) >= amountARTHOutMin, "not enough arth out");
     require(block.timestamp <= deadline, "swap deadline expired");
 
     _flush(to);
@@ -127,12 +132,11 @@ contract EllipsisARTHRouter is IEllipsisRouter {
     // todo this is a hack; need to do it properly
     IStableSwap swap = IStableSwap(pool);
 
-    uint256 arthUsdAmount = swap.get_dy_underlying(1, 0, busdNeeded) +
-      swap.get_dy_underlying(2, 0, usdcNeeded) +
-      swap.get_dy_underlying(3, 0, usdtNeeded);
+    uint256 totalIn = usdcNeeded + usdtNeeded + busdNeeded;
+    uint256 totalArthIn = swap.get_dy_underlying(1, 0, totalIn);
 
     // todo: need to divide by GMU
-    return arthUsdAmount.div(2);
+    return totalArthIn.div(2);
   }
 
   function estimateARTHtoBuy(
@@ -143,28 +147,16 @@ contract EllipsisARTHRouter is IEllipsisRouter {
     IStableSwap swap = IStableSwap(pool);
 
     // todo this is a hack; need to do it properly
-    uint256 arthUsdAmount = swap.get_dy_underlying(0, 1, usdcToSell) +
-      swap.get_dy_underlying(0, 2, usdtToSell) +
-      swap.get_dy_underlying(0, 3, busdToSell);
+    uint256 totalIn = usdcToSell + usdtToSell + busdToSell;
+    uint256 totalArthOut = swap.get_dy_underlying(0, 1, totalIn);
 
     // todo: need to divide by GMU
-    return arthUsdAmount.div(2);
-  }
-
-  function calc_token_amount(uint256[4] memory amounts, bool isDeposit)
-    public
-    view
-    returns (uint256)
-  {
-    return zap.calc_token_amount(pool, amounts, isDeposit);
-  }
-
-  function calc_withdraw_one_coin(uint256 burnAmount, int128 i) public view returns (uint256) {
-    return zap.calc_withdraw_one_coin(pool, burnAmount, i);
+    return totalArthOut.div(2);
   }
 
   function _flush(address to) internal {
     if (arth.balanceOf(me) > 0) arth.transfer(to, arth.balanceOf(me));
+    if (arthUsd.balanceOf(me) > 0) arthUsd.transfer(to, arthUsd.balanceOf(me));
     if (usdc.balanceOf(me) > 0) usdc.transfer(to, usdc.balanceOf(me));
     if (usdt.balanceOf(me) > 0) usdt.transfer(to, usdt.balanceOf(me));
     if (busd.balanceOf(me) > 0) busd.transfer(to, busd.balanceOf(me));
