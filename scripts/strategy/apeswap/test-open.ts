@@ -4,7 +4,7 @@ import { wait } from "../../utils";
 async function main() {
   // We get the contract to deploy
   const instance = await ethers.getContractAt(
-    "QuickSwapExposure",
+    "ApeSwapExposure",
     "0x5a6A250146130D0971AC9AFd547C2885b4de0AdE"
   );
 

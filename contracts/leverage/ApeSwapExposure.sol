@@ -23,7 +23,6 @@ contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
   using SafeMath for uint256;
 
   address public borrowerOperations;
-  address public controller;
 
   ITroveManager public troveManager;
   IPriceFeed public priceFeed;
@@ -147,7 +146,8 @@ contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
       minExpectedCollateral,
       minExpectedCollateral
     );
-    // need to make this MEV resistant
+
+    // todo need to make this MEV resistant
     uint256 flashloanAmount = troveManager.getTroveDebt(address(getAccount(msg.sender)));
     flashLoan.flashLoan(address(this), flashloanAmount.add(5e18), flashloanData);
     _flush(msg.sender);
@@ -266,7 +266,7 @@ contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
     arth.transfer(address(acct), flashloanAmount);
 
     // 2. use the flashloan'd ARTH to payback the debt and close the loan
-    closeLoan(acct, controller, borrowerOperations, flashloanAmount, arth, stakingWrapper);
+    closeLoan(acct, address(0), borrowerOperations, flashloanAmount, arth, stakingWrapper);
 
     // 3. get the collateral and swap back to arth to back the loan
     // 4. unstake and un-tokenize
@@ -285,8 +285,17 @@ contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
       block.timestamp
     );
 
-    // require(false, uint2str(usdc.balanceOf(me)));
-    // _buyARTHusdFromExact(arthUsd, usdc, busd, minCollateral[0], minCollateral[1], flashloanAmount);
+    busd.approve(address(ellipsis), busd.balanceOf(me));
+    usdc.approve(address(ellipsis), usdc.balanceOf(me));
+
+    ellipsis.buyARTHForExact(
+      busd.balanceOf(me).sub(minCollateral[0]),
+      usdc.balanceOf(me).sub(minCollateral[1]),
+      0,
+      flashloanAmount,
+      me,
+      block.timestamp
+    );
 
     // require(usdc.balanceOf(me) >= minCollateral[0], "not enough usdc");
     // require(busd.balanceOf(me) >= minCollateral[1], "not enough busd");
@@ -323,25 +332,25 @@ contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
     if (rewardToken.balanceOf(me) > 0) rewardToken.transfer(to, rewardToken.balanceOf(me));
   }
 
-  // function uint2str(uint256 _i) internal pure returns (string memory _uintAsString) {
-  //   if (_i == 0) {
-  //     return "0";
-  //   }
-  //   uint256 j = _i;
-  //   uint256 len;
-  //   while (j != 0) {
-  //     len++;
-  //     j /= 10;
-  //   }
-  //   bytes memory bstr = new bytes(len);
-  //   uint256 k = len;
-  //   while (_i != 0) {
-  //     k = k - 1;
-  //     uint8 temp = (48 + uint8(_i - (_i / 10) * 10));
-  //     bytes1 b1 = bytes1(temp);
-  //     bstr[k] = b1;
-  //     _i /= 10;
-  //   }
-  //   return string(bstr);
-  // }
+  function uint2str(uint256 _i) internal pure returns (string memory _uintAsString) {
+    if (_i == 0) {
+      return "0";
+    }
+    uint256 j = _i;
+    uint256 len;
+    while (j != 0) {
+      len++;
+      j /= 10;
+    }
+    bytes memory bstr = new bytes(len);
+    uint256 k = len;
+    while (_i != 0) {
+      k = k - 1;
+      uint8 temp = (48 + uint8(_i - (_i / 10) * 10));
+      bytes1 b1 = bytes1(temp);
+      bstr[k] = b1;
+      _i /= 10;
+    }
+    return string(bstr);
+  }
 }
