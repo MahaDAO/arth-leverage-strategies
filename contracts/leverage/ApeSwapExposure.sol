@@ -149,7 +149,7 @@ contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
 
     // todo need to make this MEV resistant
     uint256 flashloanAmount = troveManager.getTroveDebt(address(getAccount(msg.sender)));
-    flashLoan.flashLoan(address(this), flashloanAmount.add(5e18), flashloanData);
+    flashLoan.flashLoan(address(this), flashloanAmount, flashloanData);
     _flush(msg.sender);
   }
 
@@ -232,11 +232,12 @@ contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
     stakingWrapper.transfer(address(acct), collateralAmount);
 
     // 5: open loan using the collateral
+    uint256 debt = flashloanAmount.sub(arth.balanceOf(me));
     openLoan(
       acct,
       borrowerOperations,
       maxBorrowingFee, // borrowing fee
-      flashloanAmount, // debt + liquidation reserve
+      debt, // debt
       collateralAmount, // collateral
       address(0), // upperHint,
       address(0), // lowerHint,
@@ -244,8 +245,6 @@ contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
       arth,
       stakingWrapper
     );
-
-    // require(false, uint2str(arth.balanceOf(me)));
 
     // 6. check if we met the min leverage conditions
     require(_getTroveCR(address(acct)) >= minExpectedCollateralRatio, "min cr not met");
@@ -297,12 +296,26 @@ contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
       block.timestamp
     );
 
-    // require(usdc.balanceOf(me) >= minCollateral[0], "not enough usdc");
-    // require(busd.balanceOf(me) >= minCollateral[1], "not enough busd");
+    require(usdc.balanceOf(me) >= minCollateral[0], "not enough usdc");
+    require(busd.balanceOf(me) >= minCollateral[1], "not enough busd");
 
     // 4. payback the loan..
     arth.approve(address(flashLoan), flashloanAmount);
     require(arth.balanceOf(me) >= flashloanAmount, "not enough arth for flashload");
+  }
+
+  function estimateARTHReturnedFromClose(address who) public view returns (uint256[3] memory) {
+    uint256 flashloanAmount = troveManager.getTroveDebt(address(getAccount(who)));
+    uint256 collatAmount = troveManager.getTroveColl(address(getAccount(who)));
+
+    uint256 percInLP = collatAmount.mul(1e10).div(lp.totalSupply());
+
+    uint256 usdcInCollat = usdc.balanceOf(address(lp)).mul(percInLP).div(1e10);
+    uint256 busdInCollat = busd.balanceOf(address(lp)).mul(percInLP).div(1e10);
+
+    uint256 arthToBuy = ellipsis.estimateARTHtoBuy(busdInCollat, usdcInCollat, 0);
+
+    return [usdcInCollat, busdInCollat, arthToBuy.sub(flashloanAmount)];
   }
 
   function estimateAmountToFlashloanBuy(

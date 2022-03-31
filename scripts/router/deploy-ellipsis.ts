@@ -13,26 +13,26 @@ async function main() {
     "0xe9e7cea3dedca5984780bafc599bd69add087d56" // address _busd
   ];
 
-  // We get the contract to deploy
-  const EllipsisARTHRouter = await ethers.getContractFactory("EllipsisARTHRouter");
-  const instance = await EllipsisARTHRouter.deploy(
-    String(constructorArguments[0]),
-    String(constructorArguments[1]),
-    String(constructorArguments[2]),
-    String(constructorArguments[3]),
-    String(constructorArguments[4]),
-    String(constructorArguments[5]),
-    String(constructorArguments[6]),
-    String(constructorArguments[7])
-  );
+  // // We get the contract to deploy
+  // const EllipsisARTHRouter = await ethers.getContractFactory("EllipsisARTHRouter");
+  // const instance = await EllipsisARTHRouter.deploy(
+  //   String(constructorArguments[0]),
+  //   String(constructorArguments[1]),
+  //   String(constructorArguments[2]),
+  //   String(constructorArguments[3]),
+  //   String(constructorArguments[4]),
+  //   String(constructorArguments[5]),
+  //   String(constructorArguments[6]),
+  //   String(constructorArguments[7])
+  // );
 
-  await instance.deployed();
-  console.log("EllipsisARTHRouter deployed to:", instance.address);
+  // await instance.deployed();
+  // console.log("EllipsisARTHRouter deployed to:", instance.address);
 
-  await wait(30 * 1000);
+  // await wait(30 * 1000);
 
   await hre.run("verify:verify", {
-    address: instance.address,
+    address: "0x241EbCBe76A04c41e3b15cc38F9A5CF59fEddDec",
     constructorArguments
   });
 }

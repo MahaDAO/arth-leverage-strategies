@@ -199,12 +199,14 @@ contract LPExpsoureSingleCollat is
     // 4: send the collateral to the leverage account
     uint256 collateralAmount = _lpAndStake(acct);
 
+    uint256 debt = flashloanAmount.sub(arth.balanceOf(me));
+
     // 5: open loan using the collateral
     openLoan(
       acct,
       borrowerOperations,
       maxBorrowingFee, // borrowing fee
-      flashloanAmount, // debt + liquidation reserve
+      debt, // debt + liquidation reserve
       collateralAmount, // collateral
       address(0), // upperHint,
       address(0), // lowerHint,

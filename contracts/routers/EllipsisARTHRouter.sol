@@ -161,4 +161,9 @@ contract EllipsisARTHRouter is IEllipsisRouter {
     if (usdt.balanceOf(me) > 0) usdt.transfer(to, usdt.balanceOf(me));
     if (busd.balanceOf(me) > 0) busd.transfer(to, busd.balanceOf(me));
   }
+
+  // 0.3% fee
+  function fee() public view returns (uint256) {
+    return 30000000;
+  }
 }
