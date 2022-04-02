@@ -245,7 +245,144 @@ contract CurveARTHRouter is ICurveSwapRouter {
     _flush(to);
   }
 
+  function _addLiquidityUsingARTHusd(
+    uint256 amountARTHusdIn,
+    uint256 amountBUSDIn,
+    uint256 amountUSDCIn,
+    uint256 amountUSDTIn,
+    uint256 minLpTokensOut,
+    address to,
+    uint256 deadline
+  ) internal {
+    busd.transferFrom(msg.sender, me, amountBUSDIn);
+    usdc.transferFrom(msg.sender, me, amountUSDCIn);
+    usdt.transferFrom(msg.sender, me, amountUSDTIn);
+
+    arthUsd.approve(address(zap), amountARTHusdIn);
+    busd.approve(address(zap), amountBUSDIn);
+    usdc.approve(address(zap), amountUSDCIn);
+    usdt.approve(address(zap), amountUSDTIn);
+
+    uint256[4] memory amounts = [amountARTHusdIn, amountBUSDIn, amountUSDCIn, amountUSDTIn];
+    
+    uint256 expectedLpTokensOut = zap.calc_token_amount(pool, amounts, true);
+    _requireExpectedOutGreaterThanMinOut(expectedLpTokensOut, minLpTokensOut);
+    
+    zap.add_liquidity(
+      pool, 
+      amounts,
+      expectedLpTokensOut
+    );
+
+    require(block.timestamp <= deadline, "Swap: tx expired");
+    _flush(to);
+  }
+
+  function addLiquidityUsingARTHusd(
+    uint256 amountARTHusdIn,
+    uint256 amountBUSDIn,
+    uint256 amountUSDCIn,
+    uint256 amountUSDTIn,
+    uint256 minLpTokensOut,
+    address to,
+    uint256 deadline
+  ) external override {
+    arthUsd.transferFrom(msg.sender, me, amountARTHusdIn);
+    _addLiquidityUsingARTHusd(
+      amountARTHusdIn, 
+      amountBUSDIn, 
+      amountUSDCIn, 
+      amountUSDTIn, 
+      minLpTokensOut, 
+      to, 
+      deadline
+    );
+  }
+
+  function addLiquidityUsingARTH(
+    uint256 amountARTHIn,
+    uint256 amountBUSDIn,
+    uint256 amountUSDCIn,
+    uint256 amountUSDTIn,
+    uint256 minLpTokensOut,
+    address to,
+    uint256 deadline
+  ) external override {
+    arth.transferFrom(msg.sender, me, amountARTHIn);
+    arthUsd.deposit(amountARTHIn);
+   _addLiquidityUsingARTHusd(
+      arthUsd.balanceOf(me), 
+      amountBUSDIn, 
+      amountUSDCIn, 
+      amountUSDTIn, 
+      minLpTokensOut, 
+      to, 
+      deadline
+    );
+  }
+
+  function _removeLiquidityUsingARTHusd(
+    uint256 amountLpIn,
+    uint256 minBUSDOut,
+    uint256 minUSDCOut,
+    uint256 minUSDTOut,
+    uint256 minARTHusdOut,
+    uint256 deadline
+  ) internal {
+    lp.transferFrom(msg.sender, me, amountLpIn);
+    lp.approve(address(zap), amountLpIn);
+
+    uint256[4] memory minAmountsOut = [minARTHusdOut, minBUSDOut, minUSDCOut, minUSDTOut];
+    zap.remove_liquidity(pool, amountLpIn, minAmountsOut);
+
+    require(block.timestamp <= deadline, "Swap: expirde");
+  }
+
+  function removeLiquidityUsingARTHusd(
+    uint256 amountLpIn,
+    uint256 minBUSDOut,
+    uint256 minUSDCOut,
+    uint256 minUSDTOut,
+    uint256 minARTHusdOut,
+    address to,
+    uint256 deadline
+  ) external override {
+    _removeLiquidityUsingARTHusd(
+      amountLpIn,
+      minBUSDOut,
+      minUSDCOut,
+      minUSDTOut,
+      minARTHusdOut,
+      deadline
+    );
+
+    _flush(to);
+  }
+
+  function removeLiquidityUsingARTH(
+    uint256 amountLpIn,
+    uint256 minBUSDOut,
+    uint256 minUSDCOut,
+    uint256 minUSDTOut,
+    uint256 minARTHusdOut,
+    address to,
+    uint256 deadline
+  ) external override {
+    _removeLiquidityUsingARTHusd(
+      amountLpIn,
+      minBUSDOut,
+      minUSDCOut,
+      minUSDTOut,
+      minARTHusdOut,
+      deadline
+    );
+
+    arthUsd.withdraw(arthUsd.balanceOf(me));
+    _flush(to);
+  }
+
   function _flush(address to) internal {
+    if (lp.balanceOf(me) > 0) lp.transfer(to, lp.balanceOf(me));
     if (arth.balanceOf(me) > 0) arth.transfer(to, arth.balanceOf(me));
     if (arthUsd.balanceOf(me) > 0) arthUsd.transfer(to, arthUsd.balanceOf(me));
     if (usdc.balanceOf(me) > 0) usdc.transfer(to, usdc.balanceOf(me));
