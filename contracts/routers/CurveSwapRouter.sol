@@ -9,7 +9,7 @@ import {ICurveSwapRouter} from "../interfaces/ICurveSwapRouter.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import { IARTHusdRebase } from "../interfaces/IARTHusdRebase.sol";
 
-contract CurveARTHRouter is ICurveSwapRouter {
+contract CurveSwapRouter is ICurveSwapRouter {
   using SafeMath for uint256;
 
   IERC20WithDecimals public lp;
