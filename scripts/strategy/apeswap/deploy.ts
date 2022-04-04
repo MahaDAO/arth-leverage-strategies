@@ -25,7 +25,6 @@ async function main() {
     "0x3f3cdCC49599600EeaF7c6e11Da2E377BDEE95cA", // address _borrowerOperations,
     "0x0F7e695770E1bC16a9A899580828e22B16d93314", // address _troveManager,
     "0x9c66D9475e8492963F98c8B2642C8e5F50EE695f", // address _priceFeed,
-    "0xc4bBeFDc3066b919cd1A6B5901241E11282e625D", // address _recorder,
     "0xBb9858603B1FB9375f6Df972650343e985186Ac5", // address _stakingWrapper,
     "0x3A076D0EBF9ff41473071864bf23Afdbd77A253E" // address _accountRegistry
   );

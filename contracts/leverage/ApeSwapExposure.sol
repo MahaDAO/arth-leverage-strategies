@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.0;
 
+import {IEllipsisRouter} from "../interfaces/IEllipsisRouter.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Wrapper} from "../interfaces/IERC20Wrapper.sol";
 import {IFlashBorrower} from "../interfaces/IFlashBorrower.sol";
@@ -14,10 +15,6 @@ import {IUniswapV2Router02} from "../interfaces/IUniswapV2Router02.sol";
 import {LeverageAccount, LeverageAccountRegistry} from "../account/LeverageAccountRegistry.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {TroveHelpers} from "../helpers/TroveHelpers.sol";
-import {IPrincipalCollateralRecorder} from "../interfaces/IPrincipalCollateralRecorder.sol";
-import {IUniswapV2Router02} from "../interfaces/IUniswapV2Router02.sol";
-import {IUniswapV2Factory} from "../interfaces/IUniswapV2Factory.sol";
-import {IEllipsisRouter} from "../interfaces/IEllipsisRouter.sol";
 
 contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
   using SafeMath for uint256;
@@ -34,7 +31,6 @@ contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
 
   IFlashLoan public flashLoan;
   LeverageAccountRegistry public accountRegistry;
-  address public recorder;
 
   IERC20 public lp;
 
@@ -46,9 +42,6 @@ contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
   IUniswapV2Factory public apeswapFactory;
 
   address private me;
-
-  bytes4 private constant RECORD_PRINCIPAL_SELECTOR =
-    bytes4(keccak256("recordPrincipalCollateral(string,uint256,uint256,uint256)"));
 
   constructor(
     address _flashloan,
@@ -80,7 +73,6 @@ contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
     address _borrowerOperations,
     address _troveManager,
     address _priceFeed,
-    address _recorder,
     address _stakingWrapper,
     address _accountRegistry
   ) public {
@@ -90,8 +82,6 @@ contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
     priceFeed = IPriceFeed(_priceFeed);
     stakingWrapper = IERC20Wrapper(_stakingWrapper);
     accountRegistry = LeverageAccountRegistry(_accountRegistry);
-
-    recorder = _recorder;
   }
 
   function getAccount(address who) public view returns (LeverageAccount) {
@@ -110,19 +100,7 @@ contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
     // todo swap excess
 
     // estimate how much we should flashloan based on how much we want to borrow
-    uint256 flashloanAmount = estimateAmountToFlashloanBuy(finalExposure, principalCollateral)
-      .mul(102)
-      .div(100);
-
-    // LeverageAccount acct = getAccount(msg.sender);
-    // bytes memory principalCollateralData = abi.encodeWithSelector(
-    //   RECORD_PRINCIPAL_SELECTOR,
-    //   "BUSD-USDC-ALP-S",
-    //   principalCollateral[0],
-    //   0,
-    //   0
-    // );
-    // acct.callFn(recorder, principalCollateralData);
+    uint256 flashloanAmount = estimateAmountToFlashloanBuy(finalExposure, principalCollateral);
 
     bytes memory flashloanData = abi.encode(
       msg.sender,
@@ -289,19 +267,19 @@ contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
 
     ellipsis.buyARTHForExact(
       busd.balanceOf(me).sub(minCollateral[0]),
-      usdc.balanceOf(me).sub(minCollateral[1]),
+      usdc.balanceOf(me),
       0,
       flashloanAmount,
       me,
       block.timestamp
     );
 
-    require(usdc.balanceOf(me) >= minCollateral[0], "not enough usdc");
-    require(busd.balanceOf(me) >= minCollateral[1], "not enough busd");
+    require(busd.balanceOf(me) >= minCollateral[0], "not enough busd");
+    // require(usdc.balanceOf(me) >= minCollateral[1], "not enough usdc");
 
     // 4. payback the loan..
     arth.approve(address(flashLoan), flashloanAmount);
-    require(arth.balanceOf(me) >= flashloanAmount, "not enough arth for flashload");
+    require(arth.balanceOf(me) >= flashloanAmount, "not enough for flashload");
   }
 
   function estimateARTHReturnedFromClose(address who) public view returns (uint256[3] memory) {
@@ -330,7 +308,26 @@ contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
         .div(100); // 1% slippage
   }
 
-  function _getTroveCR(address who) internal returns (uint256) {
+  // function estimateCollateralReturned(address who) public view returns (uint256[2] memory) {
+  //   uint256 troveCollateral = troveManager.getTroveColl(address(getAccount(who)));
+  //   uint256 collateralRatio = _getTroveCR(address(getAccount(who)));
+  //   // uint256 troveCollateralDecimals = 18;
+
+  //   // uint256 leverage = ; // say cr = 190%; leverage = 2.1x in 1e18
+  //   uint256 principalCollateral = troveCollateral.div(
+  //     collateralRatio.mul(1e18).div(collateralRatio.sub(100e18))
+  //   );
+
+  //   // estimate amount of usdc and busd in principalCollateral
+  //   uint256 percentage = lp.totalSupply().mul(1e18).div(principalCollateral);
+
+  //   return [
+  //     busd.balanceOf(address(lp)).mul(percentage).div(1e18),
+  //     usdc.balanceOf(address(lp)).mul(percentage).div(1e18)
+  //   ];
+  // }
+
+  function _getTroveCR(address who) internal view returns (uint256) {
     uint256 price = priceFeed.fetchPrice();
     uint256 debt = troveManager.getTroveDebt(who);
     uint256 coll = troveManager.getTroveColl(who);
@@ -338,32 +335,13 @@ contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
   }
 
   function _flush(address to) internal {
-    if (arth.balanceOf(me) > 0) arth.transfer(to, arth.balanceOf(me));
+    if (arth.balanceOf(me) > 0) {
+      arth.approve(address(arthUsd), arth.balanceOf(me));
+      arthUsd.deposit(arth.balanceOf(me));
+    }
     if (arthUsd.balanceOf(me) > 0) arthUsd.transfer(to, arthUsd.balanceOf(me));
     if (usdc.balanceOf(me) > 0) usdc.transfer(to, usdc.balanceOf(me));
     if (busd.balanceOf(me) > 0) busd.transfer(to, busd.balanceOf(me));
     if (rewardToken.balanceOf(me) > 0) rewardToken.transfer(to, rewardToken.balanceOf(me));
-  }
-
-  function uint2str(uint256 _i) internal pure returns (string memory _uintAsString) {
-    if (_i == 0) {
-      return "0";
-    }
-    uint256 j = _i;
-    uint256 len;
-    while (j != 0) {
-      len++;
-      j /= 10;
-    }
-    bytes memory bstr = new bytes(len);
-    uint256 k = len;
-    while (_i != 0) {
-      k = k - 1;
-      uint8 temp = (48 + uint8(_i - (_i / 10) * 10));
-      bytes1 b1 = bytes1(temp);
-      bstr[k] = b1;
-      _i /= 10;
-    }
-    return string(bstr);
   }
 }
