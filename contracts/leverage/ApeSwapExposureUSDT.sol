@@ -16,7 +16,7 @@ import {LeverageAccount, LeverageAccountRegistry} from "../account/LeverageAccou
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {TroveHelpers} from "../helpers/TroveHelpers.sol";
 
-contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
+contract ApeSwapExposureUSDT is TroveHelpers, IFlashBorrower, ILeverageStrategy {
   using SafeMath for uint256;
 
   address public borrowerOperations;
@@ -26,7 +26,7 @@ contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
 
   IERC20 public arth;
   IERC20 public busd;
-  IERC20 public usdc;
+  IERC20 public usdt;
   IERC20 public rewardToken;
 
   IFlashLoan public flashLoan;
@@ -46,7 +46,7 @@ contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
   constructor(
     address _flashloan,
     address _arth,
-    address _usdc,
+    address _usdt,
     address _busd,
     address _rewardToken,
     address _ellipsisRouter,
@@ -57,7 +57,7 @@ contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
 
     busd = IERC20(_busd);
     arth = IERC20(_arth);
-    usdc = IERC20(_usdc);
+    usdt = IERC20(_usdt);
     rewardToken = IERC20(_rewardToken);
     flashLoan = IFlashLoan(_flashloan);
     arthUsd = IERC20Wrapper(_arthUsd);
@@ -66,7 +66,7 @@ contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
 
     apeswapRouter = IUniswapV2Router02(_uniswapRouter);
     apeswapFactory = IUniswapV2Factory(apeswapRouter.factory());
-    lp = IERC20(apeswapFactory.getPair(_usdc, _busd));
+    lp = IERC20(apeswapFactory.getPair(_usdt, _busd));
   }
 
   function init(
@@ -180,20 +180,20 @@ contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
     ellipsis.sellARTHForExact(
       flashloanAmount,
       finalExposure[0].sub(principalCollateral[0]), // amountBUSDOut,
-      finalExposure[1], // amountUSDCOut,
-      0, // amountUSDTOut,
+      0, // amountusdCOut,
+      finalExposure[1], // amountUSDTOut,
       me,
       block.timestamp
     );
 
     // 2. LP all the collateral
-    usdc.approve(address(apeswapRouter), usdc.balanceOf(me));
+    usdt.approve(address(apeswapRouter), usdt.balanceOf(me));
     busd.approve(address(apeswapRouter), busd.balanceOf(me));
 
     apeswapRouter.addLiquidity(
-      address(usdc),
+      address(usdt),
       address(busd),
-      usdc.balanceOf(me),
+      usdt.balanceOf(me),
       busd.balanceOf(me),
       0,
       0,
@@ -253,7 +253,7 @@ contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
     // 5. remove from LP
     lp.approve(address(apeswapRouter), lp.balanceOf(me));
     apeswapRouter.removeLiquidity(
-      address(usdc),
+      address(usdt),
       address(busd),
       lp.balanceOf(me),
       0, // amountAMin
@@ -263,19 +263,19 @@ contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
     );
 
     busd.approve(address(ellipsis), busd.balanceOf(me));
-    usdc.approve(address(ellipsis), usdc.balanceOf(me));
+    usdt.approve(address(ellipsis), usdt.balanceOf(me));
 
     ellipsis.buyARTHForExact(
       busd.balanceOf(me).sub(minCollateral[0]),
-      usdc.balanceOf(me),
       0,
+      usdt.balanceOf(me),
       flashloanAmount,
       me,
       block.timestamp
     );
 
     require(busd.balanceOf(me) >= minCollateral[0], "not enough busd");
-    // require(usdc.balanceOf(me) >= minCollateral[1], "not enough usdc");
+    // require(usdt.balanceOf(me) >= minCollateral[1], "not enough usdt");
 
     // 4. payback the loan..
     arth.approve(address(flashLoan), flashloanAmount);
@@ -288,12 +288,12 @@ contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
 
     uint256 percInLP = collatAmount.mul(1e10).div(lp.totalSupply());
 
-    uint256 usdcInCollat = usdc.balanceOf(address(lp)).mul(percInLP).div(1e10);
+    uint256 usdtInCollat = usdt.balanceOf(address(lp)).mul(percInLP).div(1e10);
     uint256 busdInCollat = busd.balanceOf(address(lp)).mul(percInLP).div(1e10);
 
-    uint256 arthToBuy = ellipsis.estimateARTHtoBuy(busdInCollat, usdcInCollat, 0);
+    uint256 arthToBuy = ellipsis.estimateARTHtoBuy(busdInCollat, 0, usdtInCollat);
 
-    return [usdcInCollat, busdInCollat, arthToBuy.sub(flashloanAmount)];
+    return [usdtInCollat, busdInCollat, arthToBuy.sub(flashloanAmount)];
   }
 
   function estimateAmountToFlashloanBuy(
@@ -303,7 +303,7 @@ contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
     return
       ellipsis
       // we have some busd
-        .estimateARTHtoBuy(finalExposure[0].sub(principalCollateral[0]), finalExposure[1], 0)
+        .estimateARTHtoBuy(finalExposure[0].sub(principalCollateral[0]), 0, finalExposure[1])
         .mul(101)
         .div(100); // 1% slippage
   }
@@ -318,12 +318,12 @@ contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
   //     collateralRatio.mul(1e18).div(collateralRatio.sub(100e18))
   //   );
 
-  //   // estimate amount of usdc and busd in principalCollateral
+  //   // estimate amount of usdt and busd in principalCollateral
   //   uint256 percentage = lp.totalSupply().mul(1e18).div(principalCollateral);
 
   //   return [
   //     busd.balanceOf(address(lp)).mul(percentage).div(1e18),
-  //     usdc.balanceOf(address(lp)).mul(percentage).div(1e18)
+  //     usdt.balanceOf(address(lp)).mul(percentage).div(1e18)
   //   ];
   // }
 
@@ -340,7 +340,7 @@ contract ApeSwapExposure is TroveHelpers, IFlashBorrower, ILeverageStrategy {
       arthUsd.deposit(arth.balanceOf(me));
     }
     if (arthUsd.balanceOf(me) > 0) arthUsd.transfer(to, arthUsd.balanceOf(me));
-    if (usdc.balanceOf(me) > 0) usdc.transfer(to, usdc.balanceOf(me));
+    if (usdt.balanceOf(me) > 0) usdt.transfer(to, usdt.balanceOf(me));
     if (busd.balanceOf(me) > 0) busd.transfer(to, busd.balanceOf(me));
     if (rewardToken.balanceOf(me) > 0) rewardToken.transfer(to, rewardToken.balanceOf(me));
   }

@@ -3,7 +3,7 @@ import { wait } from "../utils";
 
 async function main() {
   const constructorArguments = [
-    "0x5035cc9988f88f99cdef210d833957a80236c0a4", // address _ellipsisSwap,
+    "0x5035cc9988f88f99cdef210d833957a80236c0a4", // address _zap,
     "0xb38b49bae104bbb6a82640094fd61b341a858f78", // address _lp,
     "0x98245Bfbef4e3059535232D68821a58abB265C45", // address _pool,
     "0xb69a424df8c737a122d0e60695382b3eec07ff4b", // address _arth,
@@ -13,26 +13,26 @@ async function main() {
     "0xe9e7cea3dedca5984780bafc599bd69add087d56" // address _busd
   ];
 
-  // // We get the contract to deploy
-  // const EllipsisARTHRouter = await ethers.getContractFactory("EllipsisARTHRouter");
-  // const instance = await EllipsisARTHRouter.deploy(
-  //   String(constructorArguments[0]),
-  //   String(constructorArguments[1]),
-  //   String(constructorArguments[2]),
-  //   String(constructorArguments[3]),
-  //   String(constructorArguments[4]),
-  //   String(constructorArguments[5]),
-  //   String(constructorArguments[6]),
-  //   String(constructorArguments[7])
-  // );
+  // We get the contract to deploy
+  const EllipsisARTHRouter = await ethers.getContractFactory("EllipsisARTHRouter");
+  const instance = await EllipsisARTHRouter.deploy(
+    String(constructorArguments[0]),
+    String(constructorArguments[1]),
+    String(constructorArguments[2]),
+    String(constructorArguments[3]),
+    String(constructorArguments[4]),
+    String(constructorArguments[5]),
+    String(constructorArguments[6]),
+    String(constructorArguments[7])
+  );
 
-  // await instance.deployed();
-  // console.log("EllipsisARTHRouter deployed to:", instance.address);
+  await instance.deployed();
+  console.log("EllipsisARTHRouter deployed to:", instance.address);
 
-  // await wait(30 * 1000);
+  await wait(30 * 1000);
 
   await hre.run("verify:verify", {
-    address: "0x241EbCBe76A04c41e3b15cc38F9A5CF59fEddDec",
+    address: instance.address,
     constructorArguments
   });
 }

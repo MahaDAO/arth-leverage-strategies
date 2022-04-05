@@ -56,32 +56,43 @@ contract EllipsisARTHRouter is IEllipsisRouter {
     address to,
     uint256 deadline
   ) external override {
-    IStableSwap swap = IStableSwap(pool);
+    // convert arth -> arth.usd
+    arth.transferFrom(msg.sender, me, amountArthInMax);
+    arth.approve(address(arthUsd), amountArthInMax);
+    arthUsd.deposit(amountArthInMax);
 
-    uint256 totalIn = amountBUSDOut + amountUSDCOut + amountUSDTOut;
-    uint256 totalArthIn = swap.get_dy_underlying(1, 0, totalIn).mul(1010).div(2000);
+    arthUsd.approve(address(zap), arthUsd.balanceOf(me));
+    uint256[4] memory amountsIn = [arthUsd.balanceOf(me), 0, 0, 0];
+    zap.add_liquidity(pool, amountsIn, 0);
 
-    require(totalArthIn <= amountArthInMax, "not enough expected arth in");
-
-    arth.transferFrom(msg.sender, me, totalArthIn);
-    arth.approve(address(arthUsd), totalArthIn);
-    arthUsd.deposit(totalArthIn);
-    arthUsd.approve(address(swap), arthUsd.balanceOf(me));
+    lp.approve(address(zap), lp.balanceOf(me));
 
     if (amountBUSDOut > 0) {
-      uint256 arthUsdAmount = swap.get_dy_underlying(1, 0, amountBUSDOut);
-      swap.exchange_underlying(0, 1, arthUsdAmount.mul(1010).div(1000), amountBUSDOut, me);
-    }
-    if (amountUSDCOut > 0) {
-      uint256 arthUsdAmount = swap.get_dy_underlying(2, 0, amountUSDCOut);
-      swap.exchange_underlying(0, 2, arthUsdAmount.mul(1010).div(1000), amountUSDCOut, me);
-    }
-    if (amountUSDTOut > 0) {
-      uint256 arthUsdAmount = swap.get_dy_underlying(3, 0, amountUSDTOut);
-      swap.exchange_underlying(0, 3, arthUsdAmount.mul(1010).div(1000), amountUSDTOut, me);
+      uint256[4] memory amountsOut = [0, amountBUSDOut, 0, 0];
+      uint256 burnAmount = zap.calc_token_amount(pool, amountsOut, false);
+      zap.remove_liquidity_one_coin(pool, burnAmount.mul(101).div(100), 1, amountBUSDOut);
     }
 
+    if (amountUSDCOut > 0) {
+      uint256[4] memory amountsOut = [0, 0, amountUSDCOut, 0];
+      uint256 burnAmount = zap.calc_token_amount(pool, amountsOut, false);
+      zap.remove_liquidity_one_coin(pool, burnAmount.mul(101).div(100), 2, amountUSDCOut);
+    }
+
+    if (amountUSDTOut > 0) {
+      uint256[4] memory amountsOut = [0, 0, 0, amountUSDTOut];
+      uint256 burnAmount = zap.calc_token_amount(pool, amountsOut, false);
+      zap.remove_liquidity_one_coin(pool, burnAmount.mul(101).div(100), 3, amountUSDTOut);
+    }
+
+    // if there are some leftover lp tokens we extract it out as arth and send it back
+    if (lp.balanceOf(me) > 1e12) zap.remove_liquidity_one_coin(pool, lp.balanceOf(me), 0, 0);
+
+    require(busd.balanceOf(me) <= amountBUSDOut, "not enough busd out");
+    require(usdc.balanceOf(me) <= amountUSDCOut, "not enough usdc out");
+    require(usdt.balanceOf(me) <= amountUSDTOut, "not enough usdt out");
     require(block.timestamp <= deadline, "swap deadline expired");
+
     _flush(to);
   }
 
@@ -93,31 +104,23 @@ contract EllipsisARTHRouter is IEllipsisRouter {
     address to,
     uint256 deadline
   ) external override {
-    IStableSwap swap = IStableSwap(pool);
-
     if (amountBUSDIn > 0) busd.transferFrom(msg.sender, me, amountBUSDIn);
     if (amountUSDCIn > 0) usdc.transferFrom(msg.sender, me, amountUSDCIn);
     if (amountUSDTIn > 0) usdt.transferFrom(msg.sender, me, amountUSDTIn);
 
-    busd.approve(pool, amountBUSDIn);
-    usdc.approve(pool, amountUSDCIn);
-    usdt.approve(pool, amountUSDTIn);
+    busd.approve(address(zap), amountBUSDIn);
+    usdc.approve(address(zap), amountUSDCIn);
+    usdt.approve(address(zap), amountUSDTIn);
 
-    if (amountBUSDIn > 0) {
-      uint256 arthUsdAmount = swap.get_dy_underlying(1, 0, amountBUSDIn);
-      swap.exchange_underlying(1, 0, amountBUSDIn, arthUsdAmount.mul(99).div(100), me);
-    }
-    if (amountUSDCIn > 0) {
-      uint256 arthUsdAmount = swap.get_dy_underlying(2, 0, amountUSDCIn);
-      swap.exchange_underlying(2, 0, amountUSDCIn, arthUsdAmount.mul(99).div(100), me);
-    }
-    if (amountUSDTIn > 0) {
-      uint256 arthUsdAmount = swap.get_dy_underlying(3, 0, amountUSDTIn);
-      swap.exchange_underlying(3, 0, amountUSDTIn, arthUsdAmount.mul(99).div(100), me);
-    }
+    uint256[4] memory amountsIn = [0, amountBUSDIn, amountUSDCIn, amountUSDTIn];
+    zap.add_liquidity(pool, amountsIn, 0);
+
+    lp.approve(address(zap), lp.balanceOf(me));
+    uint256[4] memory amountsOut = [amountARTHOutMin, 0, 0, 0];
+    uint256 burnAmount = zap.calc_token_amount(pool, amountsOut, false);
+    zap.remove_liquidity_one_coin(pool, burnAmount.mul(101).div(100), 0, amountARTHOutMin);
 
     arthUsd.withdraw(arthUsd.balanceOf(me).div(2));
-
     require(arth.balanceOf(me) >= amountARTHOutMin, "not enough arth out");
     require(block.timestamp <= deadline, "swap deadline expired");
 
@@ -125,45 +128,42 @@ contract EllipsisARTHRouter is IEllipsisRouter {
   }
 
   function estimateARTHtoSell(
+    uint256 busdNeeded,
     uint256 usdcNeeded,
-    uint256 usdtNeeded,
-    uint256 busdNeeded
+    uint256 usdtNeeded
   ) external view override returns (uint256) {
-    // todo this is a hack; need to do it properly
-    IStableSwap swap = IStableSwap(pool);
+    uint256[4] memory amountsIn = [0, busdNeeded, usdcNeeded, usdtNeeded];
 
-    uint256 totalIn = usdcNeeded + usdtNeeded + busdNeeded;
-    uint256 totalArthIn = swap.get_dy_underlying(1, 0, totalIn);
+    uint256 lpIn = zap.calc_token_amount(pool, amountsIn, true);
+    uint256 arthUsdOut = zap.calc_withdraw_one_coin(pool, lpIn, 0);
 
     // todo: need to divide by GMU
-    return totalArthIn.div(2);
+    return arthUsdOut.div(2);
   }
 
   function estimateARTHtoBuy(
+    uint256 busdToSell,
     uint256 usdcToSell,
-    uint256 usdtToSell,
-    uint256 busdToSell
+    uint256 usdtToSell
   ) external view override returns (uint256) {
-    IStableSwap swap = IStableSwap(pool);
+    uint256[4] memory amountsIn = [0, busdToSell, usdcToSell, usdtToSell];
 
-    // todo this is a hack; need to do it properly
-    uint256 totalIn = usdcToSell + usdtToSell + busdToSell;
-    uint256 totalArthOut = swap.get_dy_underlying(0, 1, totalIn);
+    uint256 lpIn = zap.calc_token_amount(pool, amountsIn, true);
+    uint256 arthUsdOut = zap.calc_withdraw_one_coin(pool, lpIn, 0);
 
     // todo: need to divide by GMU
-    return totalArthOut.div(2);
+    return arthUsdOut.div(2);
   }
 
   function _flush(address to) internal {
+    if (arthUsd.balanceOf(me) > 0) {
+      arthUsd.withdraw(arthUsd.balanceOf(me).div(2));
+    }
+
     if (arth.balanceOf(me) > 0) arth.transfer(to, arth.balanceOf(me));
-    if (arthUsd.balanceOf(me) > 0) arthUsd.transfer(to, arthUsd.balanceOf(me));
     if (usdc.balanceOf(me) > 0) usdc.transfer(to, usdc.balanceOf(me));
+    if (lp.balanceOf(me) > 0) lp.transfer(to, lp.balanceOf(me));
     if (usdt.balanceOf(me) > 0) usdt.transfer(to, usdt.balanceOf(me));
     if (busd.balanceOf(me) > 0) busd.transfer(to, busd.balanceOf(me));
-  }
-
-  // 0.3% fee
-  function fee() public view returns (uint256) {
-    return 30000000;
   }
 }

@@ -6,11 +6,11 @@ async function main() {
   // We get the contract to deploy
   const instance = await ethers.getContractAt(
     "EllipsisARTHRouter",
-    "0x16f3022DD080FeCDf0C02D4F793838f7a698599a"
+    "0x6e7a8592721aB3CB3703eFBa1CbF4496b0314F01"
   );
 
   await approve(
-    "0xb69a424df8c737a122d0e60695382b3eec07ff4b",
+    "0xb69a424df8c737a122d0e60695382b3eec07ff4b", // arth
     "3000000000000000000000000",
     instance.address
   );
@@ -31,7 +31,7 @@ async function main() {
   //   instance.address
   // );
 
-  // // await approve(
+  // await approve(
   //   "0xb38b49bae104bbb6a82640094fd61b341a858f78",
   //   "3000000000000000000000000",
   //   instance.address
@@ -41,25 +41,25 @@ async function main() {
   console.log("swapping 2 arth for 1 usdt and 3 busd");
 
   const tx = await instance.sellARTHForExact(
-    "210000000000000000", // uint256 amountArthInMax,
+    "200000000000000000", // uint256 amountArthInMax,
     "100000000000000000", // uint256 amountBUSDOut,
-    "0", // uint256 amountUSDCOut,
+    "100000000000000000", // uint256 amountUSDCOut,
     "100000000000000000", // uint256 amountUSDTOut,
     owner.address, // address to,
     Math.floor(Date.now() / 1000) + 3600 // uint256 deadline
   );
-  console.log("swap", tx.hash);
+  console.log("sell", tx.hash);
 
-  const tx2 = await instance.buyARTHForExact(
-    "10000000000000000", // uint256 amountBUSDIn,
-    "10000000000000000", // uint256 amountUSDCIn,
-    "10000000000000000", // uint256 amountUSDTIn,
-    10000000000000000 * 0.99, // uint256 amountARTHOutMin,
-    owner.address, // address to,
-    Math.floor(Date.now() / 1000) + 3600 // uint256 deadline
-  );
+  // const tx2 = await instance.buyARTHForExact(
+  //   "10000000000000000", // uint256 amountBUSDIn,
+  //   "10000000000000000", // uint256 amountUSDCIn,
+  //   "10000000000000000", // uint256 amountUSDTIn,
+  //   10000000000000000 * 0.99, // uint256 amountARTHOutMin,
+  //   owner.address, // address to,
+  //   Math.floor(Date.now() / 1000) + 3600 // uint256 deadline
+  // );
 
-  console.log("swap", tx2.hash);
+  // console.log("swap", tx2.hash);
 }
 
 // eslint-disable-next-line no-unused-vars
