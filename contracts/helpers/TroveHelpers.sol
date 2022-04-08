@@ -28,7 +28,7 @@ abstract contract TroveHelpers {
     address frontEndTag,
     IERC20 arth,
     IERC20 tokenB
-  ) internal {
+  ) public {
     bytes memory openLoanData = abi.encodeWithSelector(
       OPEN_LOAN_SELECTOR,
       maxFee,
@@ -57,7 +57,7 @@ abstract contract TroveHelpers {
     uint256 availableARTH,
     IERC20 arth,
     IERC20 tokenB
-  ) internal {
+  ) public {
     bytes memory closeLoanData = abi.encodeWithSignature("closeTrove()");
 
     // approve spending for controller (if polygon)

@@ -19,6 +19,7 @@ import {TroveLibrary} from "../helpers/TroveLibrary.sol";
 
 contract ApeSwapExposureUSDC is IFlashBorrower, ILeverageStrategy {
   using SafeMath for uint256;
+  using LeverageLibraryBSC for *;
 
   address public borrowerOperations;
 

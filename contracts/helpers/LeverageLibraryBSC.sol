@@ -25,7 +25,7 @@ library LeverageLibraryBSC {
     IPriceFeed priceFeed,
     ITroveManager troveManager,
     address who
-  ) internal view returns (uint256) {
+  ) public view returns (uint256) {
     uint256 price = priceFeed.fetchPrice();
     uint256 debt = troveManager.getTroveDebt(who);
     uint256 coll = troveManager.getTroveColl(who);
@@ -37,7 +37,7 @@ library LeverageLibraryBSC {
     ITroveManager troveManager,
     IERC20Wrapper stakingWrapper,
     address who
-  ) internal view returns (uint256) {
+  ) public view returns (uint256) {
     address acct = address(getAccount(accountRegistry, who));
     uint256 collat = troveManager.getTroveColl(acct);
 
@@ -52,7 +52,7 @@ library LeverageLibraryBSC {
     address to,
     IEllipsisRouter ellipsis,
     IERC20 arth
-  ) internal {
+  ) public {
     if (arth.balanceOf(me) > 0) {
       arth.approve(address(ellipsis), arth.balanceOf(me));
       ellipsis.sellARTHforToken(1, arth.balanceOf(me), to, block.timestamp);
