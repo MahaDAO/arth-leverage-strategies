@@ -19,7 +19,6 @@ import {TroveLibrary} from "../helpers/TroveLibrary.sol";
 
 contract ApeSwapExposureUSDC is IFlashBorrower, ILeverageStrategy {
   using SafeMath for uint256;
-  using LeverageLibraryBSC for *;
 
   address public borrowerOperations;
 
@@ -45,17 +44,27 @@ contract ApeSwapExposureUSDC is IFlashBorrower, ILeverageStrategy {
 
   address private me;
 
-  constructor(
-    address _flashloan,
-    address _arth,
-    address _usdc,
-    address _busd,
-    address _rewardToken,
-    address _ellipsisRouter,
-    address _arthUsd,
-    address _uniswapRouter
-  ) {
-    ellipsis = IEllipsisRouter(_ellipsisRouter);
+  constructor(bytes memory data1, bytes memory data2) {
+    (
+      address _flashloan,
+      address _arth,
+      address _usdc,
+      address _busd,
+      address _rewardToken,
+      address _ellipsis,
+      address _arthUsd,
+      address _uniswapRouter // address _borrowerOperations,
+    ) = abi.decode(data1, (address, address, address, address, address, address, address, address));
+
+    (
+      address _borrowerOperations,
+      address _troveManager,
+      address _priceFeed,
+      address _stakingWrapper,
+      address _accountRegistry
+    ) = abi.decode(data2, (address, address, address, address, address));
+
+    ellipsis = IEllipsisRouter(_ellipsis);
 
     busd = IERC20(_busd);
     arth = IERC20(_arth);
@@ -69,16 +78,7 @@ contract ApeSwapExposureUSDC is IFlashBorrower, ILeverageStrategy {
     apeswapRouter = IUniswapV2Router02(_uniswapRouter);
     apeswapFactory = IUniswapV2Factory(apeswapRouter.factory());
     lp = IERC20(apeswapFactory.getPair(_usdc, _busd));
-  }
 
-  function init(
-    address _borrowerOperations,
-    address _troveManager,
-    address _priceFeed,
-    address _stakingWrapper,
-    address _accountRegistry
-  ) public {
-    require(borrowerOperations == address(0), "already initialized");
     borrowerOperations = _borrowerOperations;
     troveManager = ITroveManager(_troveManager);
     priceFeed = IPriceFeed(_priceFeed);

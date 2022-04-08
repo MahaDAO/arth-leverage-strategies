@@ -37,7 +37,7 @@ async function main() {
   const args1 = [
     "0x91aBAa2ae79220f68C0C76Dd558248BA788A71cD", // address _flashloan,
     "0xb69a424df8c737a122d0e60695382b3eec07ff4b", // address _arth,
-    "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d", // address _usdc,
+    "0x55d398326f99059ff775485246999027b3197955", // address _usdt,
     "0xe9e7cea3dedca5984780bafc599bd69add087d56", // address _busd,
     "0x603c7f932ed1fc6575303d8fb018fdcbb0f39a95", // address _rewardToken,
     "0xf808ecc6d51FA40Af5b1C3Dadf6c366e5cD943ec", // address _ellipsis,
@@ -46,10 +46,10 @@ async function main() {
   ];
 
   const args2 = [
-    "0x3f3cdCC49599600EeaF7c6e11Da2E377BDEE95cA", // address _borrowerOperations,
-    "0x0F7e695770E1bC16a9A899580828e22B16d93314", // address _troveManager,
-    "0x9c66D9475e8492963F98c8B2642C8e5F50EE695f", // address _priceFeed,
-    "0xBb9858603B1FB9375f6Df972650343e985186Ac5", // address _stakingWrapper,
+    "0xE4E773433Be8cc3ABDa9Bb5393C97336F27AE76b", // address _borrowerOperations,
+    "0x7A535496c5a0eF6A9B014A01e1aB9d7493F503ea", // address _troveManager,
+    "0xD23d824A9938DC490075CeAc311820312267A517", // address _priceFeed,
+    "0xc5FB6476a6518dd35687e0Ad2670CB8Ab5a0D4C5", // address _stakingWrapper,
     "0x3A076D0EBF9ff41473071864bf23Afdbd77A253E" // address _accountRegistry
   ];
 
@@ -76,7 +76,7 @@ async function main() {
   });
 
   await hre.run("verify:verify", {
-    address: instance.address,
+    address: "0x71153960c588Bd1A5F9331fE4ED91067da79A543",
     constructorArguments: [data1, data2]
   });
 }
