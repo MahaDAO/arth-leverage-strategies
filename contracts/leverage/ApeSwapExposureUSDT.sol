@@ -13,10 +13,11 @@ import {ITroveManager} from "../interfaces/ITroveManager.sol";
 import {IUniswapV2Factory} from "../interfaces/IUniswapV2Factory.sol";
 import {IUniswapV2Router02} from "../interfaces/IUniswapV2Router02.sol";
 import {LeverageAccount, LeverageAccountRegistry} from "../account/LeverageAccountRegistry.sol";
+import {LeverageLibraryBSC} from "../helpers/LeverageLibraryBSC.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import {TroveHelpers} from "../helpers/TroveHelpers.sol";
+import {TroveLibrary} from "../helpers/TroveLibrary.sol";
 
-contract ApeSwapExposureUSDT is TroveHelpers, IFlashBorrower, ILeverageStrategy {
+contract ApeSwapExposureUSDT is IFlashBorrower, ILeverageStrategy {
   using SafeMath for uint256;
 
   address public borrowerOperations;
@@ -100,7 +101,12 @@ contract ApeSwapExposureUSDT is TroveHelpers, IFlashBorrower, ILeverageStrategy 
     // todo swap excess
 
     // estimate how much we should flashloan based on how much we want to borrow
-    uint256 flashloanAmount = estimateAmountToFlashloanBuy(finalExposure, principalCollateral)
+    uint256 flashloanAmount = ellipsis
+      .estimateARTHtoBuy(
+        finalExposure[0].sub(principalCollateral[0]),
+        0,
+        finalExposure[1].sub(principalCollateral[0])
+      )
       .mul(101)
       .div(100);
 
@@ -115,6 +121,8 @@ contract ApeSwapExposureUSDT is TroveHelpers, IFlashBorrower, ILeverageStrategy 
 
     flashLoan.flashLoan(address(this), flashloanAmount, flashloanData);
     _flush(msg.sender);
+
+    emit PositionOpened(msg.sender, address(stakingWrapper), finalExposure, principalCollateral);
   }
 
   function closePosition(uint256[] memory minExpectedCollateral) external override {
@@ -128,8 +136,19 @@ contract ApeSwapExposureUSDT is TroveHelpers, IFlashBorrower, ILeverageStrategy 
     );
 
     // todo need to make this MEV resistant
-    uint256 flashloanAmount = troveManager.getTroveDebt(address(getAccount(msg.sender)));
+    address who = address(getAccount(msg.sender));
+    uint256 flashloanAmount = troveManager.getTroveDebt(who);
+
+    emit PositionClosed(
+      msg.sender,
+      address(stakingWrapper),
+      troveManager.getTroveColl(who),
+      flashloanAmount
+    );
+
     flashLoan.flashLoan(address(this), flashloanAmount, flashloanData);
+
+    LeverageLibraryBSC.swapExcessARTH(me, msg.sender, ellipsis, arth);
     _flush(msg.sender);
   }
 
@@ -213,7 +232,7 @@ contract ApeSwapExposureUSDT is TroveHelpers, IFlashBorrower, ILeverageStrategy 
 
     // 5: open loan using the collateral
     uint256 debt = flashloanAmount.sub(arth.balanceOf(me));
-    openLoan(
+    TroveLibrary.openLoan(
       acct,
       borrowerOperations,
       maxBorrowingFee, // borrowing fee
@@ -227,7 +246,11 @@ contract ApeSwapExposureUSDT is TroveHelpers, IFlashBorrower, ILeverageStrategy 
     );
 
     // 6. check if we met the min leverage conditions
-    require(_getTroveCR(address(acct)) >= minExpectedCollateralRatio, "min cr not met");
+    require(
+      LeverageLibraryBSC.getTroveCR(priceFeed, troveManager, address(acct)) >=
+        minExpectedCollateralRatio,
+      "min cr not met"
+    );
 
     // 7. payback the loan..
     arth.approve(address(flashLoan), flashloanAmount);
@@ -245,7 +268,14 @@ contract ApeSwapExposureUSDT is TroveHelpers, IFlashBorrower, ILeverageStrategy 
     arth.transfer(address(acct), flashloanAmount);
 
     // 2. use the flashloan'd ARTH to payback the debt and close the loan
-    closeLoan(acct, address(0), borrowerOperations, flashloanAmount, arth, stakingWrapper);
+    TroveLibrary.closeLoan(
+      acct,
+      address(0),
+      borrowerOperations,
+      flashloanAmount,
+      arth,
+      stakingWrapper
+    );
 
     // 3. get the collateral and swap back to arth to back the loan
     // 4. unstake and un-tokenize
@@ -298,42 +328,8 @@ contract ApeSwapExposureUSDT is TroveHelpers, IFlashBorrower, ILeverageStrategy 
     return [usdtInCollat, busdInCollat, arthToBuy.sub(flashloanAmount)];
   }
 
-  function estimateAmountToFlashloanBuy(
-    uint256[] memory finalExposure,
-    uint256[] memory principalCollateral
-  ) public view returns (uint256) {
-    return
-      ellipsis
-      // we have some busd
-        .estimateARTHtoBuy(finalExposure[0].sub(principalCollateral[0]), 0, finalExposure[1])
-        .mul(101)
-        .div(100); // 1% slippage
-  }
-
-  // function estimateCollateralReturned(address who) public view returns (uint256[2] memory) {
-  //   uint256 troveCollateral = troveManager.getTroveColl(address(getAccount(who)));
-  //   uint256 collateralRatio = _getTroveCR(address(getAccount(who)));
-  //   // uint256 troveCollateralDecimals = 18;
-
-  //   // uint256 leverage = ; // say cr = 190%; leverage = 2.1x in 1e18
-  //   uint256 principalCollateral = troveCollateral.div(
-  //     collateralRatio.mul(1e18).div(collateralRatio.sub(100e18))
-  //   );
-
-  //   // estimate amount of usdt and busd in principalCollateral
-  //   uint256 percentage = lp.totalSupply().mul(1e18).div(principalCollateral);
-
-  //   return [
-  //     busd.balanceOf(address(lp)).mul(percentage).div(1e18),
-  //     usdt.balanceOf(address(lp)).mul(percentage).div(1e18)
-  //   ];
-  // }
-
-  function _getTroveCR(address who) internal view returns (uint256) {
-    uint256 price = priceFeed.fetchPrice();
-    uint256 debt = troveManager.getTroveDebt(who);
-    uint256 coll = troveManager.getTroveColl(who);
-    return coll.mul(price).div(debt);
+  function rewardsEarned(address who) external view override returns (uint256) {
+    return LeverageLibraryBSC.rewardsEarned(accountRegistry, troveManager, stakingWrapper, who);
   }
 
   function _flush(address to) internal {

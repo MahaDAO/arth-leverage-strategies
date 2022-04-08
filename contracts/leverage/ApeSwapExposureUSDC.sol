@@ -101,8 +101,12 @@ contract ApeSwapExposureUSDC is IFlashBorrower, ILeverageStrategy {
     // todo swap excess
 
     // estimate how much we should flashloan based on how much we want to borrow
-    uint256 flashloanAmount = LeverageLibraryBSC
-      .estimateAmountToFlashloanBuy(ellipsis, finalExposure, principalCollateral)
+    uint256 flashloanAmount = ellipsis
+      .estimateARTHtoBuy(
+        finalExposure[0].sub(principalCollateral[0]),
+        finalExposure[1].sub(principalCollateral[0]),
+        0
+      )
       .mul(101)
       .div(100);
 

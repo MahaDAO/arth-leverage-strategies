@@ -47,15 +47,6 @@ library LeverageLibraryBSC {
     return accRewards.mul(perc).div(1e18);
   }
 
-  function estimateAmountToFlashloanBuy(
-    IEllipsisRouter ellipsis,
-    uint256[] memory finalExposure,
-    uint256[] memory principalCollateral
-  ) public view returns (uint256) {
-    return
-      ellipsis.estimateARTHtoBuy(finalExposure[0].sub(principalCollateral[0]), finalExposure[1], 0);
-  }
-
   function swapExcessARTH(
     address me,
     address to,
