@@ -65,24 +65,4 @@ interface ICurveSwapRouter {
     address to,
     uint256 deadline
   ) external;
-
-  function removeLiquidityUsingARTHusd(
-    uint256 amountLpIn,
-    uint256 minBUSDOut,
-    uint256 minUSDCOut,
-    uint256 minUSDTOut,
-    uint256 minARTHusdOut,
-    address to,
-    uint256 deadline
-  ) external;
-
-  function removeLiquidityUsingARTH(
-    uint256 amountLpIn,
-    uint256 minBUSDOut,
-    uint256 minUSDCOut,
-    uint256 minUSDTOut,
-    uint256 minARTHusdOut,
-    address to,
-    uint256 deadline
-  ) external;
 }

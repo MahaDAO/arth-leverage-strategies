@@ -40,4 +40,13 @@ interface IZapDepositor {
     uint256[4] memory _deposit_amounts,
     uint256 min_mint_amount
   ) external;
+
+  function exchange_underlying(
+    address pool,
+    int128 i,
+    int128 j,
+    uint256 dx,
+    uint256 min_dy,
+    address _receiver
+  ) external returns (uint256);
 }

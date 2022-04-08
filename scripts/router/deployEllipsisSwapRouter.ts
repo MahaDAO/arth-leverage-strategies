@@ -3,14 +3,14 @@ import { wait } from "../utils";
 
 async function main() {
   const constructorArguments = [
-    "0x5035cc9988f88f99cdef210d833957a80236c0a4", // address _ellipsisSwap,
-    "0xb38b49bae104bbb6a82640094fd61b341a858f78", // address _lp,
-    "0x98245Bfbef4e3059535232D68821a58abB265C45", // address _pool,
-    "0xb69a424df8c737a122d0e60695382b3eec07ff4b", // address _arth,
-    "0x88fd584df3f97c64843cd474bdc6f78e398394f4", // address _arthUsd,
-    "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d", // address _usdc,
-    "0x55d398326f99059ff775485246999027b3197955", // address _usdt,
-    "0xe9e7cea3dedca5984780bafc599bd69add087d56" // address _busd
+    "0x5ab5c56b9db92ba45a0b46a207286cd83c15c939", // address _ellipsisSwap,
+    "0xdde5fdb48b2ec6bc26bb4487f8e3a4eb99b3d633", // address _lp,
+    "0xdde5fdb48b2ec6bc26bb4487f8e3a4eb99b3d633", // address _pool,
+    "0xe52509181feb30eb4979e29ec70d50fd5c44d590", // address _arth,
+    "0x84f168e646d31f6c33fdbf284d9037f59603aa28", // address _arthUsd,
+    "0x2791bca1f2de4661ed88a30c99a7a9449aa84174", // address _usdc,
+    "0xc2132d05d31c914a87c6611c10748aeb04b58e8f", // address _usdt,
+    "0x8f3cf7ad23cd3cadbd9735aff958023239c6a063" // address _busd
   ];
 
   // We get the contract to deploy

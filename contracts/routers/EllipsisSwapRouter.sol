@@ -9,7 +9,7 @@ import {ICurveSwapRouter} from "../interfaces/ICurveSwapRouter.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import { IARTHusdRebase } from "../interfaces/IARTHusdRebase.sol";
 
-contract CurveSwapRouter is ICurveSwapRouter {
+contract EllipsisSwapRouter is ICurveSwapRouter {
   using SafeMath for uint256;
 
   IERC20WithDecimals public lp;
@@ -58,16 +58,24 @@ contract CurveSwapRouter is ICurveSwapRouter {
     address to,
     uint256 deadline
   ) internal {
+    IStableSwap swap = IStableSwap(pool);
+
     if (amountBUSDOutMin > 0) {
-      zap.exchange_underlying(pool, 0, 1, amountARTHUSDInForBUSD, amountBUSDOutMin, me);
+      uint256 amountBUSDOutExpected = swap.get_dy_underlying(0, 1, amountARTHUSDInForBUSD);
+      _requireExpectedOutGreaterThanMinOut(amountBUSDOutExpected, amountBUSDOutMin);
+      swap.exchange_underlying(0, 1, amountARTHUSDInForBUSD, amountBUSDOutExpected, me);
     }
 
     if (amountUSDCOutMin > 0) {
-      zap.exchange_underlying(pool, 0, 2, amountARTHUSDInForUSDC, amountUSDCOutMin, me);
+      uint256 amountUSDCOutExpected = swap.get_dy_underlying(0, 2, amountARTHUSDInForUSDC);
+      _requireExpectedOutGreaterThanMinOut(amountUSDCOutExpected, amountUSDCOutMin);
+      swap.exchange_underlying(0, 2, amountARTHUSDInForUSDC, amountUSDCOutExpected, me);
     }
 
     if (amountUSDTOutMin > 0) {
-      zap.exchange_underlying(pool, 0, 3, amountARTHUSDInForUSDT, amountUSDTOutMin, me);
+      uint256 amountUSDTOutExpected = swap.get_dy_underlying(0, 3, amountARTHUSDInForUSDT);
+      _requireExpectedOutGreaterThanMinOut(amountUSDTOutExpected, amountUSDTOutMin);
+      swap.exchange_underlying(0, 3, amountARTHUSDInForUSDT, amountUSDTOutExpected, me);
     }
 
     require(block.timestamp <= deadline, "Swap: Deadline expired");
@@ -88,7 +96,7 @@ contract CurveSwapRouter is ICurveSwapRouter {
       .add(amountARTHUSDInForUSDC)
       .add(amountARTHUSDInForUSDT);
     arthUsd.transferFrom(msg.sender, me, amountARTHUSDIn);
-    arthUsd.approve(address(zap), amountARTHUSDIn);
+    arthUsd.approve(pool, amountARTHUSDIn);
 
     _sellARTHUSDForExact(
       amountARTHUSDInForBUSD, 
@@ -111,22 +119,30 @@ contract CurveSwapRouter is ICurveSwapRouter {
     uint256 amountARTHUSDOutMinForUSDT,
     uint256 deadline
   ) internal {
+    IStableSwap swap = IStableSwap(pool);
+
     if (amountBUSDIn > 0) {
       busd.transferFrom(msg.sender, me, amountBUSDIn);
-      busd.approve(address(zap), amountBUSDIn);
-      zap.exchange_underlying(pool, 1, 0, amountBUSDIn, amountARTHUSDOutMinForBUSD, me);
+      busd.approve(pool, amountBUSDIn);
+      uint256 arthUsdAmountExpected = swap.get_dy_underlying(1, 0, amountBUSDIn);
+      _requireExpectedOutGreaterThanMinOut(arthUsdAmountExpected, amountARTHUSDOutMinForBUSD);
+      swap.exchange_underlying(1, 0, amountBUSDIn, arthUsdAmountExpected, me);
     }
 
     if (amountUSDCIn > 0) {
       usdc.transferFrom(msg.sender, me, amountUSDCIn);
-      usdc.approve(address(zap), amountUSDCIn);
-      zap.exchange_underlying(pool, 2, 0, amountUSDCIn, amountARTHUSDOutMinForUSDC, me);
+      usdc.approve(pool, amountUSDCIn);
+      uint256 arthUsdAmountExpected = swap.get_dy_underlying(2, 0, amountUSDCIn);
+      _requireExpectedOutGreaterThanMinOut(arthUsdAmountExpected, amountARTHUSDOutMinForUSDC);
+      swap.exchange_underlying(2, 0, amountUSDCIn, arthUsdAmountExpected, me);
     }
 
     if (amountUSDTIn > 0) {
       usdt.transferFrom(msg.sender, me, amountUSDTIn);
-      usdt.approve(address(zap), amountUSDTIn);
-      zap.exchange_underlying(pool, 3, 0, amountUSDTIn, amountARTHUSDOutMinForUSDT, me);
+      usdt.approve(pool, amountUSDTIn);
+      uint256 arthUsdAmountExpected = swap.get_dy_underlying(3, 0, amountUSDTIn);
+      _requireExpectedOutGreaterThanMinOut(arthUsdAmountExpected, amountARTHUSDOutMinForUSDT);
+      swap.exchange_underlying(3, 0, amountUSDTIn, arthUsdAmountExpected, me);
     }
 
     require(block.timestamp <= deadline, "Swap: Deadline expired");
@@ -191,7 +207,7 @@ contract CurveSwapRouter is ICurveSwapRouter {
         .sub(arthUSDBalanceFromARTHForUSDC);
     }
 
-    arthUsd.approve(address(zap), arthUsd.balanceOf(me));
+    arthUsd.approve(pool, arthUsd.balanceOf(me));
     _sellARTHUSDForExact(
       arthUSDBalanceFromARTHForBUSD, 
       arthUSDBalanceFromARTHForUSDC, 
