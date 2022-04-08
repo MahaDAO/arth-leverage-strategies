@@ -13,7 +13,7 @@ async function main() {
     "0x55d398326f99059ff775485246999027b3197955", // address _usdt,
     "0xe9e7cea3dedca5984780bafc599bd69add087d56", // address _busd,
     "0x603c7f932ed1fc6575303d8fb018fdcbb0f39a95", // address _rewardToken,
-    "0x16f3022DD080FeCDf0C02D4F793838f7a698599a", // address _ellipsis,
+    "0xf808ecc6d51FA40Af5b1C3Dadf6c366e5cD943ec", // address _ellipsis,
     "0x88fd584df3f97c64843cd474bdc6f78e398394f4", // address _arthUsd,
     "0xcf0febd3f17cef5b47b0cd257acf6025c5bff3b7" // address _uniswapRouter
   );
@@ -41,7 +41,7 @@ async function main() {
       "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d", // address _usdc,
       "0xe9e7cea3dedca5984780bafc599bd69add087d56", // address _busd,
       "0x603c7f932ed1fc6575303d8fb018fdcbb0f39a95", // address _rewardToken,
-      "0x16f3022DD080FeCDf0C02D4F793838f7a698599a", // address _ellipsis,
+      "0xf808ecc6d51FA40Af5b1C3Dadf6c366e5cD943ec", // address _ellipsis,
       "0x88fd584df3f97c64843cd474bdc6f78e398394f4", // address _arthUsd,
       "0xcf0febd3f17cef5b47b0cd257acf6025c5bff3b7" // address _uniswapRouter
     ]

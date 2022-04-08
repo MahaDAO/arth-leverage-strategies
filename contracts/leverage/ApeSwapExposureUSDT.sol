@@ -100,7 +100,9 @@ contract ApeSwapExposureUSDT is TroveHelpers, IFlashBorrower, ILeverageStrategy 
     // todo swap excess
 
     // estimate how much we should flashloan based on how much we want to borrow
-    uint256 flashloanAmount = estimateAmountToFlashloanBuy(finalExposure, principalCollateral);
+    uint256 flashloanAmount = estimateAmountToFlashloanBuy(finalExposure, principalCollateral)
+      .mul(101)
+      .div(100);
 
     bytes memory flashloanData = abi.encode(
       msg.sender,

@@ -8,7 +8,7 @@ import {IERC20Wrapper} from "../interfaces/IERC20Wrapper.sol";
 import {IEllipsisRouter} from "../interfaces/IEllipsisRouter.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
-contract CurveARTHRouter is IEllipsisRouter {
+abstract contract CurveARTHRouter is IEllipsisRouter {
   using SafeMath for uint256;
 
   address public pool;

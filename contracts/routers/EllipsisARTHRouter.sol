@@ -88,9 +88,9 @@ contract EllipsisARTHRouter is IEllipsisRouter {
     // if there are some leftover lp tokens we extract it out as arth and send it back
     if (lp.balanceOf(me) > 1e12) zap.remove_liquidity_one_coin(pool, lp.balanceOf(me), 0, 0);
 
-    require(busd.balanceOf(me) <= amountBUSDOut, "not enough busd out");
-    require(usdc.balanceOf(me) <= amountUSDCOut, "not enough usdc out");
-    require(usdt.balanceOf(me) <= amountUSDTOut, "not enough usdt out");
+    require(busd.balanceOf(me) >= amountBUSDOut, "not enough busd out");
+    require(usdc.balanceOf(me) >= amountUSDCOut, "not enough usdc out");
+    require(usdt.balanceOf(me) >= amountUSDTOut, "not enough usdt out");
     require(block.timestamp <= deadline, "swap deadline expired");
 
     _flush(to);
@@ -116,15 +116,39 @@ contract EllipsisARTHRouter is IEllipsisRouter {
     zap.add_liquidity(pool, amountsIn, 0);
 
     lp.approve(address(zap), lp.balanceOf(me));
-    uint256[4] memory amountsOut = [amountARTHOutMin, 0, 0, 0];
+    uint256[4] memory amountsOut = [amountARTHOutMin.mul(2), 0, 0, 0];
     uint256 burnAmount = zap.calc_token_amount(pool, amountsOut, false);
-    zap.remove_liquidity_one_coin(pool, burnAmount.mul(101).div(100), 0, amountARTHOutMin);
+
+    // todo make this revert properly
+    zap.remove_liquidity_one_coin(pool, burnAmount.mul(101).div(100), 0, amountARTHOutMin.mul(2));
+
+    // if there are some leftover lp tokens we extract it out as arth and send it back
+    if (lp.balanceOf(me) > 1e12) zap.remove_liquidity_one_coin(pool, lp.balanceOf(me), 0, 0);
 
     arthUsd.withdraw(arthUsd.balanceOf(me).div(2));
     require(arth.balanceOf(me) >= amountARTHOutMin, "not enough arth out");
     require(block.timestamp <= deadline, "swap deadline expired");
 
     _flush(to);
+  }
+
+  function sellARTHforToken(
+    int128 tokenId, // 1 -> busd, 2 -> usdc, 3 -> usdt
+    uint256 amountARTHin,
+    address to,
+    uint256 deadline
+  ) external override {
+    if (amountARTHin > 0) arth.transferFrom(msg.sender, me, amountARTHin);
+    arth.approve(address(arthUsd), amountARTHin);
+    arthUsd.deposit(amountARTHin);
+
+    arthUsd.approve(pool, arthUsd.balanceOf(me));
+    IStableSwap swap = IStableSwap(pool);
+
+    uint256 amountTokenOut = swap.get_dy_underlying(0, tokenId, amountARTHin);
+    swap.exchange_underlying(0, tokenId, amountARTHin, amountTokenOut, to);
+
+    require(block.timestamp <= deadline, "swap deadline expired");
   }
 
   function estimateARTHtoSell(
@@ -134,7 +158,7 @@ contract EllipsisARTHRouter is IEllipsisRouter {
   ) external view override returns (uint256) {
     uint256[4] memory amountsIn = [0, busdNeeded, usdcNeeded, usdtNeeded];
 
-    uint256 lpIn = zap.calc_token_amount(pool, amountsIn, true);
+    uint256 lpIn = zap.calc_token_amount(pool, amountsIn, false);
     uint256 arthUsdOut = zap.calc_withdraw_one_coin(pool, lpIn, 0);
 
     // todo: need to divide by GMU

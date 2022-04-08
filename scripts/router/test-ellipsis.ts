@@ -6,20 +6,20 @@ async function main() {
   // We get the contract to deploy
   const instance = await ethers.getContractAt(
     "EllipsisARTHRouter",
-    "0x6e7a8592721aB3CB3703eFBa1CbF4496b0314F01"
-  );
-
-  await approve(
-    "0xb69a424df8c737a122d0e60695382b3eec07ff4b", // arth
-    "3000000000000000000000000",
-    instance.address
+    "0xf808ecc6d51FA40Af5b1C3Dadf6c366e5cD943ec"
   );
 
   // await approve(
-  //   "0xe9e7cea3dedca5984780bafc599bd69add087d56", // busd
+  //   "0xb69a424df8c737a122d0e60695382b3eec07ff4b", // arth
   //   "3000000000000000000000000",
   //   instance.address
   // );
+
+  await approve(
+    "0xe9e7cea3dedca5984780bafc599bd69add087d56", // busd
+    "3000000000000000000000000",
+    instance.address
+  );
   // await approve(
   //   "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d", // usdc
   //   "3000000000000000000000000",
@@ -38,28 +38,29 @@ async function main() {
   // );
 
   console.log("i am", owner.address);
-  console.log("swapping 2 arth for 1 usdt and 3 busd");
 
-  const tx = await instance.sellARTHForExact(
-    "200000000000000000", // uint256 amountArthInMax,
-    "100000000000000000", // uint256 amountBUSDOut,
-    "100000000000000000", // uint256 amountUSDCOut,
-    "100000000000000000", // uint256 amountUSDTOut,
-    owner.address, // address to,
-    Math.floor(Date.now() / 1000) + 3600 // uint256 deadline
-  );
-  console.log("sell", tx.hash);
-
-  // const tx2 = await instance.buyARTHForExact(
-  //   "10000000000000000", // uint256 amountBUSDIn,
-  //   "10000000000000000", // uint256 amountUSDCIn,
-  //   "10000000000000000", // uint256 amountUSDTIn,
-  //   10000000000000000 * 0.99, // uint256 amountARTHOutMin,
+  // console.log("swapping 2 arth for 1 usdt and 3 busd");
+  // const tx = await instance.sellARTHForExact(
+  //   "200000000000000000", // uint256 amountArthInMax,
+  //   "100000000000000000", // uint256 amountBUSDOut,
+  //   "100000000000000000", // uint256 amountUSDCOut,
+  //   "100000000000000000", // uint256 amountUSDTOut,
   //   owner.address, // address to,
   //   Math.floor(Date.now() / 1000) + 3600 // uint256 deadline
   // );
+  // console.log("sell", tx.hash);
 
-  // console.log("swap", tx2.hash);
+  console.log("swapping 1 busd for 1 arth.usd");
+  const tx2 = await instance.buyARTHForExact(
+    "10000000000000000", // uint256 amountBUSDIn,
+    "0", // uint256 amountUSDCIn,
+    "0", // uint256 amountUSDTIn,
+    "4900000000000000", // uint256 amountARTHOutMin,
+    owner.address, // address to,
+    Math.floor(Date.now() / 1000) + 3600 // uint256 deadline
+  );
+
+  console.log("buy", tx2.hash);
 }
 
 // eslint-disable-next-line no-unused-vars

@@ -11,4 +11,20 @@ interface ILeverageStrategy {
   ) external;
 
   function closePosition(uint256[] memory minExpectedCollateral) external;
+
+  function rewardsEarned(address who) external view returns (uint256);
+
+  event PositionOpened(
+    address indexed who,
+    address collateral,
+    uint256[] finalExposure,
+    uint256[] principalCollateral
+  );
+
+  event PositionClosed(
+    address indexed who,
+    address collateral,
+    uint256 collateralRedeemed,
+    uint256 debt
+  );
 }

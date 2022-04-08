@@ -20,6 +20,13 @@ interface IEllipsisRouter {
     uint256 deadline
   ) external;
 
+  function sellARTHforToken(
+    int128 tokenId, // 1 -> busd, 2 -> usdc, 3 -> usdt
+    uint256 amountARTHin,
+    address to,
+    uint256 deadline
+  ) external;
+
   function estimateARTHtoSell(
     uint256 busdNeeded,
     uint256 usdcNeeded,
