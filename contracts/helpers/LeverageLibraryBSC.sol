@@ -50,12 +50,13 @@ library LeverageLibraryBSC {
   function swapExcessARTH(
     address me,
     address to,
+    int128 tokenId, // 1 -> busd, 2 -> usdc, 3 -> usdt
     IEllipsisRouter ellipsis,
     IERC20 arth
   ) public {
     if (arth.balanceOf(me) > 0) {
       arth.approve(address(ellipsis), arth.balanceOf(me));
-      ellipsis.sellARTHforToken(1, arth.balanceOf(me), to, block.timestamp);
+      ellipsis.sellARTHforToken(tokenId, arth.balanceOf(me), to, block.timestamp);
     }
   }
 }

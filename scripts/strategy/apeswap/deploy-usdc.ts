@@ -6,7 +6,7 @@ import { wait } from "../../utils";
 async function main() {
   // deploy libraries
   console.log("deploying LeverageLibraryBSC");
-  const leverageLibraryAddress = "0x36F3ab22614927605b52d3abaea8Fa9f852Cc1fF";
+  const leverageLibraryAddress = null;
   const LeverageLibraryBSC = await ethers.getContractFactory("LeverageLibraryBSC");
   const leverageLibrary = leverageLibraryAddress
     ? await ethers.getContractAt("LeverageLibraryBSC", leverageLibraryAddress)
@@ -16,7 +16,7 @@ async function main() {
 
   // deploy libraries
   console.log("deploying TroveLibrary");
-  const troveLibaryAddress = "0x016084191E5FD9F8250EA43261ec7B44DD10beb2";
+  const troveLibaryAddress = null;
   const TroveLibrary = await ethers.getContractFactory("TroveLibrary");
   const troveLibrary = troveLibaryAddress
     ? await ethers.getContractAt("TroveLibrary", troveLibaryAddress)
@@ -60,19 +60,10 @@ async function main() {
   );
   const data2 = encoder.encode(["address", "address", "address", "address", "address"], args2);
 
-  const instance = await ApeSwapExposureUSDC.deploy(data1, data2);
-
-  await instance.deployed();
-  console.log("ApeSwapExposureUSDC deployed to:", instance.address);
-
-  console.log("done init");
-
-  await wait(20 * 1000); // wait for a minute
-
-  await hre.run("verify:verify", {
-    address: instance.address,
-    constructorArguments: [data1, data2]
-  });
+  // const instance = await ApeSwapExposureUSDC.deploy(data1, data2);
+  // await instance.deployed();
+  // console.log("ApeSwapExposureUSDC deployed to:", instance.address);
+  // await wait(20 * 1000); // wait for a minute
 
   await hre.run("verify:verify", {
     address: leverageLibrary.address
@@ -81,6 +72,11 @@ async function main() {
   await hre.run("verify:verify", {
     address: troveLibrary.address
   });
+
+  // await hre.run("verify:verify", {
+  //   address: instance.address,
+  //   constructorArguments: [data1, data2]
+  // });
 }
 
 // We recommend this pattern to be able to use async/await everywhere

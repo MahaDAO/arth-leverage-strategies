@@ -149,7 +149,7 @@ contract ApeSwapExposureUSDC is IFlashBorrower, ILeverageStrategy {
     );
 
     // any pending ARTH; swap for BUSD and send it back to the user
-    LeverageLibraryBSC.swapExcessARTH(me, msg.sender, ellipsis, arth);
+    LeverageLibraryBSC.swapExcessARTH(me, msg.sender, 1, ellipsis, arth);
 
     _flush(msg.sender);
   }
