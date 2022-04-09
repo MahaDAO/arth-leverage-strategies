@@ -13,9 +13,9 @@ import {IUniswapV2Router02} from "../../../interfaces/IUniswapV2Router02.sol";
 import {LeverageAccount, LeverageAccountRegistry} from "../../../account/LeverageAccountRegistry.sol";
 import {LeverageLibraryBSC} from "../../../helpers/LeverageLibraryBSC.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import {TroveLibrary} from "../../../helpers/TroveLibrary.sol";
+import {TroveHelpers} from "../../../helpers/TroveHelpers.sol";
 
-contract ApeSwapSingleBUSDUSDT is ILeverageStrategy {
+contract ApeSwapSingleBUSDUSDT is TroveHelpers, ILeverageStrategy {
   using SafeMath for uint256;
 
   address public borrowerOperations;
@@ -95,91 +95,48 @@ contract ApeSwapSingleBUSDUSDT is ILeverageStrategy {
     busd.transferFrom(msg.sender, address(this), principalCollateral[0]);
 
     // todo swap excess
-
-    address who = address(getAccount(msg.sender));
-    _onOpenPosition(
-      who,
-      0,
-      finalExposure,
-      principalCollateral,
-      minExpectedCollateralRatio,
-      maxBorrowingFee
-    );
-
-    _flush(msg.sender);
-
-    emit PositionOpened(msg.sender, address(stakingWrapper), finalExposure, principalCollateral);
-  }
-
-  function closePosition(uint256[] memory minExpectedCollateral) external override {
-    // todo need to make this MEV resistant
-    address who = address(getAccount(msg.sender));
-    uint256 flashloanAmount = troveManager.getTroveDebt(who);
-
-    emit PositionClosed(
-      msg.sender,
-      address(stakingWrapper),
-      troveManager.getTroveColl(who),
-      flashloanAmount
-    );
-
-    _onFlashloanClosePosition(who, flashloanAmount, minExpectedCollateral);
-
-    LeverageLibraryBSC.swapExcessARTH(me, msg.sender, 1, ellipsis, arth);
-    _flush(msg.sender);
-  }
-
-  function _onOpenPosition(
-    address who,
-    uint256 flashloanAmount,
-    uint256[] memory finalExposure,
-    uint256[] memory principalCollateral,
-    uint256 minExpectedCollateralRatio,
-    uint256 maxBorrowingFee
-  ) internal {
-    LeverageAccount acct = getAccount(who);
+    LeverageAccount acct = getAccount(msg.sender);
 
     // 1: sell arth for collateral
-    arth.approve(address(ellipsis), flashloanAmount);
-    ellipsis.sellARTHForExact(
-      flashloanAmount,
-      finalExposure[0].sub(principalCollateral[0]), // amountBUSDOut,
-      0, // amountusdCOut,
-      finalExposure[1], // amountUSDTOut,
+    ellipsis.sellTokenForToken(
+      busd,
+      1, // busd
+      3, // usdt
+      principalCollateral[0].sub(finalExposure[0]),
+      finalExposure[1],
       me,
       block.timestamp
     );
 
-    // 2. LP all the collateral
-    usdt.approve(address(apeswapRouter), usdt.balanceOf(me));
-    busd.approve(address(apeswapRouter), busd.balanceOf(me));
+    // // 2. LP all the collateral
+    // usdt.approve(address(apeswapRouter), usdt.balanceOf(me));
+    // busd.approve(address(apeswapRouter), busd.balanceOf(me));
 
-    apeswapRouter.addLiquidity(
-      address(usdt),
-      address(busd),
-      usdt.balanceOf(me),
-      busd.balanceOf(me),
-      0,
-      0,
-      me,
-      block.timestamp
-    );
+    // apeswapRouter.addLiquidity(
+    //   address(usdt),
+    //   address(busd),
+    //   usdt.balanceOf(me),
+    //   busd.balanceOf(me),
+    //   0,
+    //   0,
+    //   me,
+    //   block.timestamp
+    // );
 
-    // 3. Stake and tokenize
-    uint256 collateralAmount = lp.balanceOf(me);
-    lp.approve(address(stakingWrapper), collateralAmount);
-    stakingWrapper.deposit(collateralAmount);
+    // // 3. Stake and tokenize
+    // uint256 collateralAmount = lp.balanceOf(me);
+    // lp.approve(address(stakingWrapper), collateralAmount);
+    // stakingWrapper.deposit(collateralAmount);
 
     // // 4: send the collateral to the leverage account
     // stakingWrapper.transfer(address(acct), collateralAmount);
 
     // // 5: open loan using the collateral
-    // uint256 debt = flashloanAmount.sub(arth.balanceOf(me));
-    // TroveLibrary.openLoan(
+    // openLoan(
     //   acct,
     //   borrowerOperations,
     //   maxBorrowingFee, // borrowing fee
-    //   debt, // debt
+    //   0, // debt
     //   collateralAmount, // collateral
     //   address(0), // upperHint,
     //   address(0), // lowerHint,
@@ -194,27 +151,30 @@ contract ApeSwapSingleBUSDUSDT is ILeverageStrategy {
     //     minExpectedCollateralRatio,
     //   "min cr not met"
     // );
+
+    _flush(msg.sender);
+    emit PositionOpened(msg.sender, address(stakingWrapper), finalExposure, principalCollateral);
   }
 
-  function _onFlashloanClosePosition(
-    address who,
-    uint256 flashloanAmount,
-    uint256[] memory minCollateral
-  ) internal {
-    LeverageAccount acct = getAccount(who);
+  function closePosition(uint256[] memory minExpectedCollateral) external override {
+    // todo need to make this MEV resistant
+    LeverageAccount acct = getAccount(msg.sender);
+
+    address who = address(acct);
+    uint256 flashloanAmount = troveManager.getTroveDebt(who);
+
+    emit PositionClosed(
+      msg.sender,
+      address(stakingWrapper),
+      troveManager.getTroveColl(who),
+      flashloanAmount
+    );
 
     // 1. send the flashloaned arth to the account
-    arth.transfer(address(acct), flashloanAmount);
+    arth.transfer(who, flashloanAmount);
 
     // 2. use the flashloan'd ARTH to payback the debt and close the loan
-    TroveLibrary.closeLoan(
-      acct,
-      address(0),
-      borrowerOperations,
-      flashloanAmount,
-      arth,
-      stakingWrapper
-    );
+    closeLoan(acct, address(0), borrowerOperations, flashloanAmount, arth, stakingWrapper);
 
     // 3. get the collateral and swap back to arth to back the loan
     // 4. unstake and un-tokenize
@@ -237,7 +197,7 @@ contract ApeSwapSingleBUSDUSDT is ILeverageStrategy {
     usdt.approve(address(ellipsis), usdt.balanceOf(me));
 
     ellipsis.buyARTHForExact(
-      busd.balanceOf(me).sub(minCollateral[0]),
+      busd.balanceOf(me).sub(minExpectedCollateral[0]),
       0,
       usdt.balanceOf(me),
       flashloanAmount,
@@ -245,8 +205,11 @@ contract ApeSwapSingleBUSDUSDT is ILeverageStrategy {
       block.timestamp
     );
 
-    require(busd.balanceOf(me) >= minCollateral[0], "not enough busd");
+    require(busd.balanceOf(me) >= minExpectedCollateral[0], "not enough busd");
     // require(usdt.balanceOf(me) >= minCollateral[1], "not enough usdt");
+
+    LeverageLibraryBSC.swapExcessARTH(me, msg.sender, 1, ellipsis, arth);
+    _flush(msg.sender);
   }
 
   function rewardsEarned(address who) external view override returns (uint256) {

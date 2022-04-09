@@ -1,7 +1,7 @@
 import { AbiCoder } from "ethers/lib/utils";
 import hre, { ethers } from "hardhat";
 // eslint-disable-next-line node/no-missing-import
-import { wait } from "../../utils";
+import { wait } from "../../../utils";
 
 async function main() {
   // deploy libraries

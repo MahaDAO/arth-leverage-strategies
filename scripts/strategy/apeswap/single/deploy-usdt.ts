@@ -1,41 +1,23 @@
 import { AbiCoder } from "ethers/lib/utils";
 import hre, { ethers } from "hardhat";
 // eslint-disable-next-line node/no-missing-import
-import { wait } from "../../utils";
+import { wait } from "../../../utils";
+import { initLibrary } from "../library";
 
 async function main() {
   // deploy libraries
-  console.log("deploying LeverageLibraryBSC");
-  const leverageLibraryAddress = "0xb2514553b994BE2E9F0D3fF8E43DF9113E145616";
-  const LeverageLibraryBSC = await ethers.getContractFactory("LeverageLibraryBSC");
-  const leverageLibrary = leverageLibraryAddress
-    ? await ethers.getContractAt("LeverageLibraryBSC", leverageLibraryAddress)
-    : await LeverageLibraryBSC.deploy();
-  console.log("LeverageLibraryBSC at", leverageLibrary.address);
-  leverageLibraryAddress == null && (await wait(15 * 1000)); // wait 15 sec
-
-  // deploy libraries
-  console.log("deploying TroveLibrary");
-  const troveLibaryAddress = "0x49A7Cc69A95F4beF8979657C86b05C0A5d2f32cE";
-  const TroveLibrary = await ethers.getContractFactory("TroveLibrary");
-  const troveLibrary = troveLibaryAddress
-    ? await ethers.getContractAt("TroveLibrary", troveLibaryAddress)
-    : await TroveLibrary.deploy();
-  console.log("TroveLibrary at", troveLibrary.address);
-  troveLibaryAddress == null && (await wait(15 * 1000)); // wait 15 sec
-
-  console.log("deploying ApeSwapLeverageBUSDUSDT");
+  const { leverageLibrary, troveLibrary } = await initLibrary();
+  console.log("deploying ApeSwapSingleBUSDUSDT");
 
   // We get the contract to deploy
-  const ApeSwapLeverageBUSDUSDT = await ethers.getContractFactory("ApeSwapLeverageBUSDUSDT", {
+  const ApeSwapSingleBUSDUSDT = await ethers.getContractFactory("ApeSwapSingleBUSDUSDT", {
     libraries: {
-      LeverageLibraryBSC: leverageLibrary.address,
-      TroveLibrary: troveLibrary.address
+      LeverageLibraryBSC: leverageLibrary.address
+      // TroveLibrary: troveLibrary.address
     }
   });
 
   const args1 = [
-    "0x91aBAa2ae79220f68C0C76Dd558248BA788A71cD", // address _flashloan,
     "0xb69a424df8c737a122d0e60695382b3eec07ff4b", // address _arth,
     "0x55d398326f99059ff775485246999027b3197955", // address _usdt,
     "0xe9e7cea3dedca5984780bafc599bd69add087d56", // address _busd,
@@ -55,26 +37,16 @@ async function main() {
 
   const encoder = new AbiCoder();
   const data1 = encoder.encode(
-    ["address", "address", "address", "address", "address", "address", "address", "address"],
+    ["address", "address", "address", "address", "address", "address", "address"],
     args1
   );
   const data2 = encoder.encode(["address", "address", "address", "address", "address"], args2);
 
-  const instance = await ApeSwapLeverageBUSDUSDT.deploy(data1, data2);
-
+  const instance = await ApeSwapSingleBUSDUSDT.deploy(data1, data2);
   await instance.deployed();
-  console.log("ApeSwapLeverageBUSDUSDT deployed to:", instance.address);
+  console.log("ApeSwapSingleBUSDUSDT deployed to:", instance.address);
 
   await wait(20 * 1000); // wait for 20s
-
-  // await hre.run("verify:verify", {
-  //   address: leverageLibrary.address
-  // });
-
-  // await hre.run("verify:verify", {
-  //   address: troveLibrary.address
-  // });
-
   await hre.run("verify:verify", {
     address: instance.address,
     constructorArguments: [data1, data2]

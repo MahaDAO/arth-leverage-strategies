@@ -63,30 +63,30 @@ contract EllipsisARTHRouter is IEllipsisRouter {
 
     arthUsd.approve(address(zap), arthUsd.balanceOf(me));
     uint256[4] memory amountsIn = [arthUsd.balanceOf(me), 0, 0, 0];
-    zap.add_liquidity(pool, amountsIn, 0);
+    _addLiquidity(amountsIn, 0);
 
     lp.approve(address(zap), lp.balanceOf(me));
 
     if (amountBUSDOut > 0) {
       uint256[4] memory amountsOut = [0, amountBUSDOut, 0, 0];
       uint256 burnAmount = zap.calc_token_amount(pool, amountsOut, false);
-      zap.remove_liquidity_one_coin(pool, burnAmount.mul(101).div(100), 1, amountBUSDOut);
+      _removeLiquidityOneCoin(burnAmount.mul(101).div(100), 1, amountBUSDOut);
     }
 
     if (amountUSDCOut > 0) {
       uint256[4] memory amountsOut = [0, 0, amountUSDCOut, 0];
       uint256 burnAmount = zap.calc_token_amount(pool, amountsOut, false);
-      zap.remove_liquidity_one_coin(pool, burnAmount.mul(101).div(100), 2, amountUSDCOut);
+      _removeLiquidityOneCoin(burnAmount.mul(101).div(100), 2, amountUSDCOut);
     }
 
     if (amountUSDTOut > 0) {
       uint256[4] memory amountsOut = [0, 0, 0, amountUSDTOut];
       uint256 burnAmount = zap.calc_token_amount(pool, amountsOut, false);
-      zap.remove_liquidity_one_coin(pool, burnAmount.mul(101).div(100), 3, amountUSDTOut);
+      _removeLiquidityOneCoin(burnAmount.mul(101).div(100), 3, amountUSDTOut);
     }
 
     // if there are some leftover lp tokens we extract it out as arth and send it back
-    if (lp.balanceOf(me) > 1e12) zap.remove_liquidity_one_coin(pool, lp.balanceOf(me), 0, 0);
+    if (lp.balanceOf(me) > 1e12) _removeLiquidityOneCoin(lp.balanceOf(me), 0, 0);
 
     require(busd.balanceOf(me) >= amountBUSDOut, "not enough busd out");
     require(usdc.balanceOf(me) >= amountUSDCOut, "not enough usdc out");
@@ -113,17 +113,17 @@ contract EllipsisARTHRouter is IEllipsisRouter {
     usdt.approve(address(zap), amountUSDTIn);
 
     uint256[4] memory amountsIn = [0, amountBUSDIn, amountUSDCIn, amountUSDTIn];
-    zap.add_liquidity(pool, amountsIn, 0);
+    _addLiquidity(amountsIn, 0);
 
     lp.approve(address(zap), lp.balanceOf(me));
     uint256[4] memory amountsOut = [amountARTHOutMin.mul(2), 0, 0, 0];
     uint256 burnAmount = zap.calc_token_amount(pool, amountsOut, false);
 
     // todo make this revert properly
-    zap.remove_liquidity_one_coin(pool, burnAmount.mul(101).div(100), 0, amountARTHOutMin.mul(2));
+    _removeLiquidityOneCoin(burnAmount.mul(101).div(100), 0, amountARTHOutMin.mul(2));
 
     // if there are some leftover lp tokens we extract it out as arth and send it back
-    if (lp.balanceOf(me) > 1e12) zap.remove_liquidity_one_coin(pool, lp.balanceOf(me), 0, 0);
+    if (lp.balanceOf(me) > 1e12) _removeLiquidityOneCoin(lp.balanceOf(me), 0, 0);
 
     arthUsd.withdraw(arthUsd.balanceOf(me).div(2));
     require(arth.balanceOf(me) >= amountARTHOutMin, "not enough arth out");
@@ -148,6 +148,27 @@ contract EllipsisARTHRouter is IEllipsisRouter {
     uint256 amountTokenOut = swap.get_dy_underlying(0, tokenId, amountARTHin);
     swap.exchange_underlying(0, tokenId, amountARTHin, amountTokenOut, to);
 
+    require(block.timestamp <= deadline, "swap deadline expired");
+  }
+
+  function sellTokenForToken(
+    IERC20 fromToken,
+    int128 fromTokenId, // 1 -> busd, 2 -> usdc, 3 -> usdt
+    int128 toTokenId, // 1 -> busd, 2 -> usdc, 3 -> usdt
+    uint256 amountInMax,
+    uint256 amountOutMin,
+    address to,
+    uint256 deadline
+  ) external override {
+    if (amountInMax > 0) fromToken.transferFrom(msg.sender, me, amountInMax);
+
+    fromToken.approve(pool, fromToken.balanceOf(me));
+    IStableSwap swap = IStableSwap(pool);
+
+    uint256 amountTokenOut = swap.get_dy_underlying(fromTokenId, toTokenId, amountInMax);
+    require(amountTokenOut >= amountOutMin, "amountOutMin not met");
+
+    swap.exchange_underlying(fromTokenId, toTokenId, amountInMax, amountTokenOut, to);
     require(block.timestamp <= deadline, "swap deadline expired");
   }
 
@@ -189,5 +210,36 @@ contract EllipsisARTHRouter is IEllipsisRouter {
     if (lp.balanceOf(me) > 0) lp.transfer(to, lp.balanceOf(me));
     if (usdt.balanceOf(me) > 0) usdt.transfer(to, usdt.balanceOf(me));
     if (busd.balanceOf(me) > 0) busd.transfer(to, busd.balanceOf(me));
+  }
+
+  function _removeLiquidityOneCoin(
+    uint256 burnAmount,
+    int128 i,
+    uint256 minReceived
+  ) internal {
+    (bool success, ) = address(zap).call{value: msg.value, gas: 5000}(
+      abi.encodeWithSignature(
+        "remove_liquidity_one_coin(address,uint256,int128,uint256)",
+        pool,
+        burnAmount,
+        i,
+        minReceived
+      )
+    );
+
+    require(success, "EllipsisARTHRouter: remove_liquidity_one_coin failed");
+  }
+
+  function _addLiquidity(uint256[4] memory depositAmounts, uint256 minMintAmount) internal {
+    (bool success, ) = address(zap).call{value: msg.value, gas: 5000}(
+      abi.encodeWithSignature(
+        "add_liquidity(uint256[4],uint256)",
+        pool,
+        depositAmounts,
+        minMintAmount
+      )
+    );
+
+    require(success, "EllipsisARTHRouter: add_liquidity failed");
   }
 }

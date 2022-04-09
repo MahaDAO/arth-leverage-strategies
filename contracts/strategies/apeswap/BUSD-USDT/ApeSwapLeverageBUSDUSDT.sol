@@ -15,9 +15,9 @@ import {IUniswapV2Router02} from "../../../interfaces/IUniswapV2Router02.sol";
 import {LeverageAccount, LeverageAccountRegistry} from "../../../account/LeverageAccountRegistry.sol";
 import {LeverageLibraryBSC} from "../../../helpers/LeverageLibraryBSC.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import {TroveLibrary} from "../../../helpers/TroveLibrary.sol";
+import {TroveHelpers} from "../../../helpers/TroveHelpers.sol";
 
-contract ApeSwapLeverageBUSDUSDT is IFlashBorrower, ILeverageStrategy {
+contract ApeSwapLeverageBUSDUSDT is TroveHelpers, IFlashBorrower, ILeverageStrategy {
   using SafeMath for uint256;
 
   address public borrowerOperations;
@@ -119,13 +119,13 @@ contract ApeSwapLeverageBUSDUSDT is IFlashBorrower, ILeverageStrategy {
     flashLoan.flashLoan(address(this), flashloanAmount, flashloanData);
     _flush(msg.sender);
 
-    emit PositionOpened(msg.sender, address(stakingWrapper), finalExposure, principalCollateral);
+    // emit PositionOpened(msg.sender, address(stakingWrapper), finalExposure, principalCollateral);
   }
 
   function closePosition(uint256[] memory minExpectedCollateral) external override {
     bytes memory flashloanData = abi.encode(
       msg.sender,
-      uint256(1), // action = 0 -> close loan
+      uint256(1), // action = 1 -> close loan
       uint256(0),
       uint256(0),
       minExpectedCollateral,
@@ -207,7 +207,6 @@ contract ApeSwapLeverageBUSDUSDT is IFlashBorrower, ILeverageStrategy {
     // 2. LP all the collateral
     usdt.approve(address(apeswapRouter), usdt.balanceOf(me));
     busd.approve(address(apeswapRouter), busd.balanceOf(me));
-
     apeswapRouter.addLiquidity(
       address(usdt),
       address(busd),
@@ -224,25 +223,25 @@ contract ApeSwapLeverageBUSDUSDT is IFlashBorrower, ILeverageStrategy {
     lp.approve(address(stakingWrapper), collateralAmount);
     stakingWrapper.deposit(collateralAmount);
 
-    // // 4: send the collateral to the leverage account
-    // stakingWrapper.transfer(address(acct), collateralAmount);
+    // 4: send the collateral to the leverage account
+    stakingWrapper.transfer(address(acct), collateralAmount);
 
-    // // 5: open loan using the collateral
-    // uint256 debt = flashloanAmount.sub(arth.balanceOf(me));
-    // TroveLibrary.openLoan(
-    //   acct,
-    //   borrowerOperations,
-    //   maxBorrowingFee, // borrowing fee
-    //   debt, // debt
-    //   collateralAmount, // collateral
-    //   address(0), // upperHint,
-    //   address(0), // lowerHint,
-    //   address(0), // frontEndTag,
-    //   arth,
-    //   stakingWrapper
-    // );
+    // 5: open loan using the collateral
+    uint256 debt = flashloanAmount.sub(arth.balanceOf(me));
+    openLoan(
+      acct,
+      borrowerOperations,
+      maxBorrowingFee, // borrowing fee
+      debt, // debt
+      collateralAmount, // collateral
+      address(0), // upperHint,
+      address(0), // lowerHint,
+      address(0), // frontEndTag,
+      arth,
+      stakingWrapper
+    );
 
-    // // 6. check if we met the min leverage conditions
+    // 6. check if we met the min leverage conditions
     // require(
     //   LeverageLibraryBSC.getTroveCR(priceFeed, troveManager, address(acct)) >=
     //     minExpectedCollateralRatio,
@@ -265,14 +264,7 @@ contract ApeSwapLeverageBUSDUSDT is IFlashBorrower, ILeverageStrategy {
     arth.transfer(address(acct), flashloanAmount);
 
     // 2. use the flashloan'd ARTH to payback the debt and close the loan
-    TroveLibrary.closeLoan(
-      acct,
-      address(0),
-      borrowerOperations,
-      flashloanAmount,
-      arth,
-      stakingWrapper
-    );
+    closeLoan(acct, address(0), borrowerOperations, flashloanAmount, arth, stakingWrapper);
 
     // 3. get the collateral and swap back to arth to back the loan
     // 4. unstake and un-tokenize
