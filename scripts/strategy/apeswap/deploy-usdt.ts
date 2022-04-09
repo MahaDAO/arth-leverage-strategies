@@ -6,7 +6,7 @@ import { wait } from "../../utils";
 async function main() {
   // deploy libraries
   console.log("deploying LeverageLibraryBSC");
-  const leverageLibraryAddress = "0x36F3ab22614927605b52d3abaea8Fa9f852Cc1fF";
+  const leverageLibraryAddress = "0xb2514553b994BE2E9F0D3fF8E43DF9113E145616";
   const LeverageLibraryBSC = await ethers.getContractFactory("LeverageLibraryBSC");
   const leverageLibrary = leverageLibraryAddress
     ? await ethers.getContractAt("LeverageLibraryBSC", leverageLibraryAddress)
@@ -16,7 +16,7 @@ async function main() {
 
   // deploy libraries
   console.log("deploying TroveLibrary");
-  const troveLibaryAddress = "0x016084191E5FD9F8250EA43261ec7B44DD10beb2";
+  const troveLibaryAddress = "0x49A7Cc69A95F4beF8979657C86b05C0A5d2f32cE";
   const TroveLibrary = await ethers.getContractFactory("TroveLibrary");
   const troveLibrary = troveLibaryAddress
     ? await ethers.getContractAt("TroveLibrary", troveLibaryAddress)
@@ -24,10 +24,10 @@ async function main() {
   console.log("TroveLibrary at", troveLibrary.address);
   troveLibaryAddress == null && (await wait(15 * 1000)); // wait 15 sec
 
-  console.log("deploying ApeSwapExposureUSDT");
+  console.log("deploying ApeSwapLeverageBUSDUSDT");
 
   // We get the contract to deploy
-  const ApeSwapExposureUSDT = await ethers.getContractFactory("ApeSwapExposureUSDT", {
+  const ApeSwapLeverageBUSDUSDT = await ethers.getContractFactory("ApeSwapLeverageBUSDUSDT", {
     libraries: {
       LeverageLibraryBSC: leverageLibrary.address,
       TroveLibrary: troveLibrary.address
@@ -60,23 +60,23 @@ async function main() {
   );
   const data2 = encoder.encode(["address", "address", "address", "address", "address"], args2);
 
-  const instance = await ApeSwapExposureUSDT.deploy(data1, data2);
+  const instance = await ApeSwapLeverageBUSDUSDT.deploy(data1, data2);
 
   await instance.deployed();
-  console.log("ApeSwapExposureUSDT deployed to:", instance.address);
+  console.log("ApeSwapLeverageBUSDUSDT deployed to:", instance.address);
 
   await wait(20 * 1000); // wait for 20s
 
-  await hre.run("verify:verify", {
-    address: leverageLibrary.address
-  });
+  // await hre.run("verify:verify", {
+  //   address: leverageLibrary.address
+  // });
+
+  // await hre.run("verify:verify", {
+  //   address: troveLibrary.address
+  // });
 
   await hre.run("verify:verify", {
-    address: troveLibrary.address
-  });
-
-  await hre.run("verify:verify", {
-    address: "0x71153960c588Bd1A5F9331fE4ED91067da79A543",
+    address: instance.address,
     constructorArguments: [data1, data2]
   });
 }

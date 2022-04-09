@@ -14,6 +14,8 @@ interface ILeverageStrategy {
 
   function rewardsEarned(address who) external view returns (uint256);
 
+  function underlyingCollateralFromBalance(uint256 bal) external view returns (uint256[2] memory);
+
   event PositionOpened(
     address indexed who,
     address collateral,

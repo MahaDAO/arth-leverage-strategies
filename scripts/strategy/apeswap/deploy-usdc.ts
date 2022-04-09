@@ -60,10 +60,10 @@ async function main() {
   );
   const data2 = encoder.encode(["address", "address", "address", "address", "address"], args2);
 
-  // const instance = await ApeSwapExposureUSDC.deploy(data1, data2);
-  // await instance.deployed();
-  // console.log("ApeSwapExposureUSDC deployed to:", instance.address);
-  // await wait(20 * 1000); // wait for a minute
+  const instance = await ApeSwapExposureUSDC.deploy(data1, data2);
+  await instance.deployed();
+  console.log("ApeSwapExposureUSDC deployed to:", instance.address);
+  await wait(20 * 1000); // wait for a minute
 
   await hre.run("verify:verify", {
     address: leverageLibrary.address
@@ -73,10 +73,10 @@ async function main() {
     address: troveLibrary.address
   });
 
-  // await hre.run("verify:verify", {
-  //   address: instance.address,
-  //   constructorArguments: [data1, data2]
-  // });
+  await hre.run("verify:verify", {
+    address: instance.address,
+    constructorArguments: [data1, data2]
+  });
 }
 
 // We recommend this pattern to be able to use async/await everywhere

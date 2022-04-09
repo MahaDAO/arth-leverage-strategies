@@ -2,20 +2,20 @@
 
 pragma solidity ^0.8.0;
 
-import {IEllipsisRouter} from "../interfaces/IEllipsisRouter.sol";
+import {IEllipsisRouter} from "../../../interfaces/IEllipsisRouter.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC20Wrapper} from "../interfaces/IERC20Wrapper.sol";
-import {IFlashBorrower} from "../interfaces/IFlashBorrower.sol";
-import {IFlashLoan} from "../interfaces/IFlashLoan.sol";
-import {ILeverageStrategy} from "../interfaces/ILeverageStrategy.sol";
-import {IPriceFeed} from "../interfaces/IPriceFeed.sol";
-import {ITroveManager} from "../interfaces/ITroveManager.sol";
-import {IUniswapV2Factory} from "../interfaces/IUniswapV2Factory.sol";
-import {IUniswapV2Router02} from "../interfaces/IUniswapV2Router02.sol";
-import {LeverageAccount, LeverageAccountRegistry} from "../account/LeverageAccountRegistry.sol";
-import {LeverageLibraryBSC} from "../helpers/LeverageLibraryBSC.sol";
+import {IERC20Wrapper} from "../../../interfaces/IERC20Wrapper.sol";
+import {IFlashBorrower} from "../../../interfaces/IFlashBorrower.sol";
+import {IFlashLoan} from "../../../interfaces/IFlashLoan.sol";
+import {ILeverageStrategy} from "../../../interfaces/ILeverageStrategy.sol";
+import {IPriceFeed} from "../../../interfaces/IPriceFeed.sol";
+import {ITroveManager} from "../../../interfaces/ITroveManager.sol";
+import {IUniswapV2Factory} from "../../../interfaces/IUniswapV2Factory.sol";
+import {IUniswapV2Router02} from "../../../interfaces/IUniswapV2Router02.sol";
+import {LeverageAccount, LeverageAccountRegistry} from "../../../account/LeverageAccountRegistry.sol";
+import {LeverageLibraryBSC} from "../../../helpers/LeverageLibraryBSC.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import {TroveLibrary} from "../helpers/TroveLibrary.sol";
+import {TroveLibrary} from "../../../helpers/TroveLibrary.sol";
 
 contract ApeSwapExposureUSDC is IFlashBorrower, ILeverageStrategy {
   using SafeMath for uint256;
@@ -103,11 +103,7 @@ contract ApeSwapExposureUSDC is IFlashBorrower, ILeverageStrategy {
 
     // estimate how much we should flashloan based on how much we want to borrow
     uint256 flashloanAmount = ellipsis
-      .estimateARTHtoBuy(
-        finalExposure[0].sub(principalCollateral[0]),
-        finalExposure[1].sub(principalCollateral[0]),
-        0
-      )
+      .estimateARTHtoBuy(finalExposure[0].sub(principalCollateral[0]), finalExposure[1], 0)
       .mul(101)
       .div(100);
 
@@ -317,6 +313,15 @@ contract ApeSwapExposureUSDC is IFlashBorrower, ILeverageStrategy {
 
   function rewardsEarned(address who) external view override returns (uint256) {
     return LeverageLibraryBSC.rewardsEarned(accountRegistry, troveManager, stakingWrapper, who);
+  }
+
+  function underlyingCollateralFromBalance(uint256 bal)
+    external
+    view
+    override
+    returns (uint256[2] memory)
+  {
+    return LeverageLibraryBSC.underlyingCollateralFromBalance(bal, address(lp));
   }
 
   function _flush(address to) internal {
