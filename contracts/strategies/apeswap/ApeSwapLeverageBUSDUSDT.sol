@@ -2,22 +2,22 @@
 
 pragma solidity ^0.8.0;
 
-import {IEllipsisRouter} from "../../../interfaces/IEllipsisRouter.sol";
+import {IEllipsisRouter} from "../../interfaces/IEllipsisRouter.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC20Wrapper} from "../../../interfaces/IERC20Wrapper.sol";
-import {IFlashBorrower} from "../../../interfaces/IFlashBorrower.sol";
-import {IFlashLoan} from "../../../interfaces/IFlashLoan.sol";
-import {ILeverageStrategy} from "../../../interfaces/ILeverageStrategy.sol";
-import {IPriceFeed} from "../../../interfaces/IPriceFeed.sol";
-import {ITroveManager} from "../../../interfaces/ITroveManager.sol";
-import {IUniswapV2Factory} from "../../../interfaces/IUniswapV2Factory.sol";
-import {IUniswapV2Router02} from "../../../interfaces/IUniswapV2Router02.sol";
-import {LeverageAccount, LeverageAccountRegistry} from "../../../account/LeverageAccountRegistry.sol";
-import {LeverageLibraryBSC} from "../../../helpers/LeverageLibraryBSC.sol";
+import {IERC20Wrapper} from "../../interfaces/IERC20Wrapper.sol";
+import {IFlashBorrower} from "../../interfaces/IFlashBorrower.sol";
+import {IFlashLoan} from "../../interfaces/IFlashLoan.sol";
+import {ILeverageStrategy} from "../../interfaces/ILeverageStrategy.sol";
+import {IPriceFeed} from "../../interfaces/IPriceFeed.sol";
+import {ITroveManager} from "../../interfaces/ITroveManager.sol";
+import {IUniswapV2Factory} from "../../interfaces/IUniswapV2Factory.sol";
+import {IUniswapV2Router02} from "../../interfaces/IUniswapV2Router02.sol";
+import {LeverageAccount, LeverageAccountRegistry} from "../../account/LeverageAccountRegistry.sol";
+import {LeverageLibraryBSC} from "../../helpers/LeverageLibraryBSC.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import {TroveHelpers} from "../../../helpers/TroveHelpers.sol";
+import {TroveLibrary} from "../../helpers/TroveLibrary.sol";
 
-contract ApeSwapLeverageBUSDUSDT is TroveHelpers, IFlashBorrower, ILeverageStrategy {
+contract ApeSwapLeverageBUSDUSDT is IFlashBorrower, ILeverageStrategy {
   using SafeMath for uint256;
 
   address public borrowerOperations;
@@ -104,7 +104,7 @@ contract ApeSwapLeverageBUSDUSDT is TroveHelpers, IFlashBorrower, ILeverageStrat
     // estimate how much we should flashloan based on how much we want to borrow
     uint256 flashloanAmount = ellipsis
       .estimateARTHtoBuy(finalExposure[0].sub(principalCollateral[0]), 0, finalExposure[1])
-      .mul(101)
+      .mul(102)
       .div(100);
 
     bytes memory flashloanData = abi.encode(
@@ -228,7 +228,7 @@ contract ApeSwapLeverageBUSDUSDT is TroveHelpers, IFlashBorrower, ILeverageStrat
 
     // 5: open loan using the collateral
     uint256 debt = flashloanAmount.sub(arth.balanceOf(me));
-    openLoan(
+    TroveLibrary.openLoan(
       acct,
       borrowerOperations,
       maxBorrowingFee, // borrowing fee
@@ -242,11 +242,11 @@ contract ApeSwapLeverageBUSDUSDT is TroveHelpers, IFlashBorrower, ILeverageStrat
     );
 
     // 6. check if we met the min leverage conditions
-    // require(
-    //   LeverageLibraryBSC.getTroveCR(priceFeed, troveManager, address(acct)) >=
-    //     minExpectedCollateralRatio,
-    //   "min cr not met"
-    // );
+    require(
+      LeverageLibraryBSC.getTroveCR(priceFeed, troveManager, address(acct)) >=
+        minExpectedCollateralRatio,
+      "min cr not met"
+    );
 
     // 7. payback the loan..
     arth.approve(address(flashLoan), flashloanAmount);
@@ -264,7 +264,14 @@ contract ApeSwapLeverageBUSDUSDT is TroveHelpers, IFlashBorrower, ILeverageStrat
     arth.transfer(address(acct), flashloanAmount);
 
     // 2. use the flashloan'd ARTH to payback the debt and close the loan
-    closeLoan(acct, address(0), borrowerOperations, flashloanAmount, arth, stakingWrapper);
+    TroveLibrary.closeLoan(
+      acct,
+      address(0),
+      borrowerOperations,
+      flashloanAmount,
+      arth,
+      stakingWrapper
+    );
 
     // 3. get the collateral and swap back to arth to back the loan
     // 4. unstake and un-tokenize

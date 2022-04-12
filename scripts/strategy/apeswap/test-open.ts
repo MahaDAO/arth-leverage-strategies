@@ -5,11 +5,11 @@ async function main() {
   // We get the contract to deploy
   const instance = await ethers.getContractAt(
     "ApeSwapLeverageBUSDUSDT",
-    "0x390898Df755CB3d79feE52ef5Ac4aCdc58862b65"
+    "0x0569fBF08C0E3286d167FF9b9fE52eA8710955B2"
   );
 
-  // // console.log(await instance.rewardsEarned("0xed77fd3f36535f26a072866ffead3db19bde9378"));
-  // await registerStrategy(instance.address, "0xC442C29B7Cf9C6C09Fc821B8a4ebB85b6d40fAA0");
+  // // // console.log(await instance.rewardsEarned("0xed77fd3f36535f26a072866ffead3db19bde9378"));
+  // await registerStrategy(instance.address, "0xBbA13eb45ed9aA4C1648BCfB23FC883088A35CEc");
   // await approve(
   //   "0xe9e7cea3dedca5984780bafc599bd69add087d56", // busd
   //   "3000000000000000000000000",

@@ -13,8 +13,8 @@ async function main() {
   // We get the contract to deploy
   const ApeSwapLeverageBUSDUSDT = await ethers.getContractFactory("ApeSwapLeverageBUSDUSDT", {
     libraries: {
-      LeverageLibraryBSC: leverageLibrary.address
-      // TroveLibrary: troveLibrary.address
+      LeverageLibraryBSC: leverageLibrary.address,
+      TroveLibrary: troveLibrary.address
     }
   });
 
@@ -24,7 +24,7 @@ async function main() {
     "0x55d398326f99059ff775485246999027b3197955", // address _usdt,
     "0xe9e7cea3dedca5984780bafc599bd69add087d56", // address _busd,
     "0x603c7f932ed1fc6575303d8fb018fdcbb0f39a95", // address _rewardToken,
-    "0xF83a30aCf56f4BBA4A3e5cfebF4D6eb5223bDA49", // address _ellipsis,
+    "0x1aA6C2Be4Ef370933970AD242E4646973D01ED06", // address _ellipsis,
     "0x88fd584df3f97c64843cd474bdc6f78e398394f4", // address _arthUsd,
     "0xcf0febd3f17cef5b47b0cd257acf6025c5bff3b7" // address _uniswapRouter
   ];
@@ -50,14 +50,6 @@ async function main() {
   console.log("ApeSwapLeverageBUSDUSDT deployed to:", instance.address);
 
   await wait(20 * 1000); // wait for 20s
-
-  // await hre.run("verify:verify", {
-  //   address: leverageLibrary.address
-  // });
-
-  // await hre.run("verify:verify", {
-  //   address: troveLibrary.address
-  // });
 
   await hre.run("verify:verify", {
     address: instance.address,

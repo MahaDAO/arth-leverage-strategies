@@ -146,9 +146,11 @@ contract EllipsisARTHRouter is IEllipsisRouter {
     IStableSwap swap = IStableSwap(pool);
 
     uint256 amountTokenOut = swap.get_dy_underlying(0, tokenId, amountARTHin);
-    swap.exchange_underlying(0, tokenId, amountARTHin, amountTokenOut, to);
+    swap.exchange_underlying(0, tokenId, arthUsd.balanceOf(me), amountTokenOut, to);
 
     require(block.timestamp <= deadline, "swap deadline expired");
+
+    _flush(to);
   }
 
   function sellTokenForToken(
@@ -170,6 +172,8 @@ contract EllipsisARTHRouter is IEllipsisRouter {
 
     swap.exchange_underlying(fromTokenId, toTokenId, amountInMax, amountTokenOut, to);
     require(block.timestamp <= deadline, "swap deadline expired");
+
+    _flush(to);
   }
 
   function estimateARTHtoSell(
@@ -217,7 +221,7 @@ contract EllipsisARTHRouter is IEllipsisRouter {
     int128 i,
     uint256 minReceived
   ) internal {
-    (bool success, ) = address(zap).call{value: msg.value, gas: 5000}(
+    (bool success, ) = address(zap).call(
       abi.encodeWithSignature(
         "remove_liquidity_one_coin(address,uint256,int128,uint256)",
         pool,
@@ -231,9 +235,9 @@ contract EllipsisARTHRouter is IEllipsisRouter {
   }
 
   function _addLiquidity(uint256[4] memory depositAmounts, uint256 minMintAmount) internal {
-    (bool success, ) = address(zap).call{value: msg.value, gas: 5000}(
+    (bool success, ) = address(zap).call(
       abi.encodeWithSignature(
-        "add_liquidity(uint256[4],uint256)",
+        "add_liquidity(address,uint256[4],uint256)",
         pool,
         depositAmounts,
         minMintAmount

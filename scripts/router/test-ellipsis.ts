@@ -6,7 +6,7 @@ async function main() {
   // We get the contract to deploy
   const instance = await ethers.getContractAt(
     "EllipsisARTHRouter",
-    "0xf808ecc6d51FA40Af5b1C3Dadf6c366e5cD943ec"
+    "0xbAC8eA9822C85234f34E826A4A5d1B01244E5102"
   );
 
   // await approve(
@@ -59,7 +59,6 @@ async function main() {
     owner.address, // address to,
     Math.floor(Date.now() / 1000) + 3600 // uint256 deadline
   );
-
   console.log("buy", tx2.hash);
 }
 

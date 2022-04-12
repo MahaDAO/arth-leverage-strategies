@@ -2,22 +2,22 @@
 
 pragma solidity ^0.8.0;
 
-import {IEllipsisRouter} from "../../../interfaces/IEllipsisRouter.sol";
+import {IEllipsisRouter} from "../../interfaces/IEllipsisRouter.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC20Wrapper} from "../../../interfaces/IERC20Wrapper.sol";
-import {IFlashBorrower} from "../../../interfaces/IFlashBorrower.sol";
-import {IFlashLoan} from "../../../interfaces/IFlashLoan.sol";
-import {ILeverageStrategy} from "../../../interfaces/ILeverageStrategy.sol";
-import {IPriceFeed} from "../../../interfaces/IPriceFeed.sol";
-import {ITroveManager} from "../../../interfaces/ITroveManager.sol";
-import {IUniswapV2Factory} from "../../../interfaces/IUniswapV2Factory.sol";
-import {IUniswapV2Router02} from "../../../interfaces/IUniswapV2Router02.sol";
-import {LeverageAccount, LeverageAccountRegistry} from "../../../account/LeverageAccountRegistry.sol";
-import {LeverageLibraryBSC} from "../../../helpers/LeverageLibraryBSC.sol";
+import {IERC20Wrapper} from "../../interfaces/IERC20Wrapper.sol";
+import {IFlashBorrower} from "../../interfaces/IFlashBorrower.sol";
+import {IFlashLoan} from "../../interfaces/IFlashLoan.sol";
+import {ILeverageStrategy} from "../../interfaces/ILeverageStrategy.sol";
+import {IPriceFeed} from "../../interfaces/IPriceFeed.sol";
+import {ITroveManager} from "../../interfaces/ITroveManager.sol";
+import {IUniswapV2Factory} from "../../interfaces/IUniswapV2Factory.sol";
+import {IUniswapV2Router02} from "../../interfaces/IUniswapV2Router02.sol";
+import {LeverageAccount, LeverageAccountRegistry} from "../../account/LeverageAccountRegistry.sol";
+import {LeverageLibraryBSC} from "../../helpers/LeverageLibraryBSC.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import {TroveLibrary} from "../../../helpers/TroveLibrary.sol";
+import {TroveLibrary} from "../../helpers/TroveLibrary.sol";
 
-contract ApeSwapExposureUSDC is IFlashBorrower, ILeverageStrategy {
+contract ApeSwapLeverageBUSDUSDC is IFlashBorrower, ILeverageStrategy {
   using SafeMath for uint256;
 
   address public borrowerOperations;
@@ -104,7 +104,7 @@ contract ApeSwapExposureUSDC is IFlashBorrower, ILeverageStrategy {
     // estimate how much we should flashloan based on how much we want to borrow
     uint256 flashloanAmount = ellipsis
       .estimateARTHtoBuy(finalExposure[0].sub(principalCollateral[0]), finalExposure[1], 0)
-      .mul(101)
+      .mul(102)
       .div(100);
 
     bytes memory flashloanData = abi.encode(
@@ -125,7 +125,7 @@ contract ApeSwapExposureUSDC is IFlashBorrower, ILeverageStrategy {
   function closePosition(uint256[] memory minExpectedCollateral) external override {
     bytes memory flashloanData = abi.encode(
       msg.sender,
-      uint256(1), // action = 0 -> close loan
+      uint256(1), // action = 1 -> close loan
       uint256(0),
       uint256(0),
       minExpectedCollateral,
@@ -135,7 +135,6 @@ contract ApeSwapExposureUSDC is IFlashBorrower, ILeverageStrategy {
     // todo need to make this MEV resistant
     address who = address(getAccount(msg.sender));
     uint256 flashloanAmount = troveManager.getTroveDebt(who);
-    flashLoan.flashLoan(address(this), flashloanAmount, flashloanData);
 
     emit PositionClosed(
       msg.sender,
@@ -144,9 +143,9 @@ contract ApeSwapExposureUSDC is IFlashBorrower, ILeverageStrategy {
       flashloanAmount
     );
 
-    // any pending ARTH; swap for BUSD and send it back to the user
-    LeverageLibraryBSC.swapExcessARTH(me, msg.sender, 1, ellipsis, arth);
+    flashLoan.flashLoan(address(this), flashloanAmount, flashloanData);
 
+    LeverageLibraryBSC.swapExcessARTH(me, msg.sender, 1, ellipsis, arth);
     _flush(msg.sender);
   }
 
@@ -199,7 +198,7 @@ contract ApeSwapExposureUSDC is IFlashBorrower, ILeverageStrategy {
     ellipsis.sellARTHForExact(
       flashloanAmount,
       finalExposure[0].sub(principalCollateral[0]), // amountBUSDOut,
-      finalExposure[1], // amountUSDCOut,
+      finalExposure[1], // amountusdCOut,
       0, // amountUSDTOut,
       me,
       block.timestamp
@@ -208,7 +207,6 @@ contract ApeSwapExposureUSDC is IFlashBorrower, ILeverageStrategy {
     // 2. LP all the collateral
     usdc.approve(address(apeswapRouter), usdc.balanceOf(me));
     busd.approve(address(apeswapRouter), busd.balanceOf(me));
-
     apeswapRouter.addLiquidity(
       address(usdc),
       address(busd),
@@ -245,7 +243,8 @@ contract ApeSwapExposureUSDC is IFlashBorrower, ILeverageStrategy {
 
     // 6. check if we met the min leverage conditions
     require(
-      LeverageLibraryBSC.getTroveCR(priceFeed, troveManager, who) >= minExpectedCollateralRatio,
+      LeverageLibraryBSC.getTroveCR(priceFeed, troveManager, address(acct)) >=
+        minExpectedCollateralRatio,
       "min cr not met"
     );
 

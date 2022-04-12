@@ -2,32 +2,15 @@ import { AbiCoder } from "ethers/lib/utils";
 import hre, { ethers } from "hardhat";
 // eslint-disable-next-line node/no-missing-import
 import { wait } from "../../../utils";
+import { initLibrary } from "../library";
 
 async function main() {
-  // deploy libraries
-  console.log("deploying LeverageLibraryBSC");
-  const leverageLibraryAddress = null;
-  const LeverageLibraryBSC = await ethers.getContractFactory("LeverageLibraryBSC");
-  const leverageLibrary = leverageLibraryAddress
-    ? await ethers.getContractAt("LeverageLibraryBSC", leverageLibraryAddress)
-    : await LeverageLibraryBSC.deploy();
-  console.log("LeverageLibraryBSC at", leverageLibrary.address);
-  leverageLibraryAddress == null && (await wait(15 * 1000)); // wait 15 sec
+  const { leverageLibrary, troveLibrary } = await initLibrary();
 
-  // deploy libraries
-  console.log("deploying TroveLibrary");
-  const troveLibaryAddress = null;
-  const TroveLibrary = await ethers.getContractFactory("TroveLibrary");
-  const troveLibrary = troveLibaryAddress
-    ? await ethers.getContractAt("TroveLibrary", troveLibaryAddress)
-    : await TroveLibrary.deploy();
-  console.log("TroveLibrary at", troveLibrary.address);
-  troveLibaryAddress == null && (await wait(15 * 1000)); // wait 15 sec
-
-  console.log("deploying ApeSwapExposureUSDC");
+  console.log("deploying ApeSwapLeverageBUSDUSDC");
 
   // We get the contract to deploy
-  const ApeSwapExposureUSDC = await ethers.getContractFactory("ApeSwapExposureUSDC", {
+  const ApeSwapLeverageBUSDUSDC = await ethers.getContractFactory("ApeSwapLeverageBUSDUSDC", {
     libraries: {
       LeverageLibraryBSC: leverageLibrary.address,
       TroveLibrary: troveLibrary.address
@@ -40,7 +23,7 @@ async function main() {
     "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d", // address _usdc,
     "0xe9e7cea3dedca5984780bafc599bd69add087d56", // address _busd,
     "0x603c7f932ed1fc6575303d8fb018fdcbb0f39a95", // address _rewardToken,
-    "0xf808ecc6d51FA40Af5b1C3Dadf6c366e5cD943ec", // address _ellipsis,
+    "0x1aA6C2Be4Ef370933970AD242E4646973D01ED06", // address _ellipsis,
     "0x88fd584df3f97c64843cd474bdc6f78e398394f4", // address _arthUsd,
     "0xcf0febd3f17cef5b47b0cd257acf6025c5bff3b7" // address _uniswapRouter
   ];
@@ -60,18 +43,10 @@ async function main() {
   );
   const data2 = encoder.encode(["address", "address", "address", "address", "address"], args2);
 
-  const instance = await ApeSwapExposureUSDC.deploy(data1, data2);
+  const instance = await ApeSwapLeverageBUSDUSDC.deploy(data1, data2);
   await instance.deployed();
-  console.log("ApeSwapExposureUSDC deployed to:", instance.address);
+  console.log("ApeSwapLeverageBUSDUSDC deployed to:", instance.address);
   await wait(20 * 1000); // wait for a minute
-
-  await hre.run("verify:verify", {
-    address: leverageLibrary.address
-  });
-
-  await hre.run("verify:verify", {
-    address: troveLibrary.address
-  });
 
   await hre.run("verify:verify", {
     address: instance.address,
