@@ -13,7 +13,7 @@ import {ITroveManager} from "../../interfaces/ITroveManager.sol";
 import {IUniswapV2Factory} from "../../interfaces/IUniswapV2Factory.sol";
 import {IUniswapV2Router02} from "../../interfaces/IUniswapV2Router02.sol";
 import {LeverageAccount, LeverageAccountRegistry} from "../../account/LeverageAccountRegistry.sol";
-import {LeverageLibraryBSC} from "../../helpers/LeverageLibraryBSC.sol";
+import {LeverageLibrary} from "../../helpers/LeverageLibrary.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {TroveLibrary} from "../../helpers/TroveLibrary.sol";
 
@@ -145,7 +145,7 @@ contract ApeSwapLeverageBUSDUSDT is IFlashBorrower, ILeverageStrategy {
 
     flashLoan.flashLoan(address(this), flashloanAmount, flashloanData);
 
-    LeverageLibraryBSC.swapExcessARTH(me, msg.sender, 1, ellipsis, arth);
+    LeverageLibrary.swapExcessARTH(me, msg.sender, 1, ellipsis, arth);
     _flush(msg.sender);
   }
 
@@ -244,7 +244,7 @@ contract ApeSwapLeverageBUSDUSDT is IFlashBorrower, ILeverageStrategy {
 
     // 6. check if we met the min leverage conditions
     require(
-      LeverageLibraryBSC.getTroveCR(priceFeed, troveManager, address(acct)) >=
+      LeverageLibrary.getTroveCR(priceFeed, troveManager, address(acct)) >=
         minExpectedCollateralRatio,
       "min cr not met"
     );
@@ -312,7 +312,7 @@ contract ApeSwapLeverageBUSDUSDT is IFlashBorrower, ILeverageStrategy {
   }
 
   function rewardsEarned(address who) external view override returns (uint256) {
-    return LeverageLibraryBSC.rewardsEarned(accountRegistry, troveManager, stakingWrapper, who);
+    return LeverageLibrary.rewardsEarned(accountRegistry, troveManager, stakingWrapper, who);
   }
 
   function underlyingCollateralFromBalance(uint256 bal)
@@ -321,7 +321,7 @@ contract ApeSwapLeverageBUSDUSDT is IFlashBorrower, ILeverageStrategy {
     override
     returns (uint256[2] memory)
   {
-    return LeverageLibraryBSC.underlyingCollateralFromBalance(bal, address(lp));
+    return LeverageLibrary.underlyingCollateralFromBalance(bal, address(lp));
   }
 
   function _flush(address to) internal {

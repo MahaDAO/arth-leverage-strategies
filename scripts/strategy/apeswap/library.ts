@@ -3,14 +3,14 @@ import hre, { ethers } from "hardhat";
 import { wait } from "../../utils";
 
 export async function initLibrary() {
-  // deploy LeverageLibraryBSC
-  console.log("deploying LeverageLibraryBSC");
+  // deploy LeverageLibrary
+  console.log("deploying LeverageLibrary");
   const leverageLibraryAddress = "0xb2514553b994BE2E9F0D3fF8E43DF9113E145616";
-  const LeverageLibraryBSC = await ethers.getContractFactory("LeverageLibraryBSC");
+  const LeverageLibrary = await ethers.getContractFactory("LeverageLibrary");
   const leverageLibrary = leverageLibraryAddress
-    ? await ethers.getContractAt("LeverageLibraryBSC", leverageLibraryAddress)
-    : await LeverageLibraryBSC.deploy();
-  console.log("LeverageLibraryBSC at", leverageLibrary.address);
+    ? await ethers.getContractAt("LeverageLibrary", leverageLibraryAddress)
+    : await LeverageLibrary.deploy();
+  console.log("LeverageLibrary at", leverageLibrary.address);
   leverageLibraryAddress == null && (await wait(15 * 1000)); // wait 15 sec
 
   // deploy TroveLibrary

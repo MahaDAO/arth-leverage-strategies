@@ -12,7 +12,7 @@ async function main() {
   // We get the contract to deploy
   const ApeSwapLeverageBUSDUSDC = await ethers.getContractFactory("ApeSwapLeverageBUSDUSDC", {
     libraries: {
-      LeverageLibraryBSC: leverageLibrary.address,
+      LeverageLibrary: leverageLibrary.address,
       TroveLibrary: troveLibrary.address
     }
   });

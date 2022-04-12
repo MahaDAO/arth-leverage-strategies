@@ -12,7 +12,7 @@ import {IERC20Wrapper} from "../interfaces/IERC20Wrapper.sol";
 import {LeverageAccount, LeverageAccountRegistry} from "../account/LeverageAccountRegistry.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
-library LeverageLibraryBSC {
+library LeverageLibrary {
   using SafeMath for uint256;
 
   function getAccount(LeverageAccountRegistry accountRegistry, address who)

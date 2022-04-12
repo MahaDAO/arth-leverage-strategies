@@ -13,7 +13,7 @@ import {ITroveManager} from "../../interfaces/ITroveManager.sol";
 import {IUniswapV2Factory} from "../../interfaces/IUniswapV2Factory.sol";
 import {IUniswapV2Router02} from "../../interfaces/IUniswapV2Router02.sol";
 import {LeverageAccount, LeverageAccountRegistry} from "../../account/LeverageAccountRegistry.sol";
-import {LeverageLibraryBSC} from "../../helpers/LeverageLibraryBSC.sol";
+import {LeverageLibrary} from "../../helpers/LeverageLibrary.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {TroveLibrary} from "../../helpers/TroveLibrary.sol";
 
@@ -26,7 +26,7 @@ contract QuickswapUSDCUSDT is IFlashBorrower, ILeverageStrategy {
   IPriceFeed public priceFeed;
 
   IERC20 public arth;
-  IERC20 public busd;
+  IERC20 public usdt;
   IERC20 public usdc;
   IERC20 public rewardToken;
 
@@ -39,7 +39,7 @@ contract QuickswapUSDCUSDT is IFlashBorrower, ILeverageStrategy {
   IERC20Wrapper public stakingWrapper;
 
   IStableSwapRouter public curve;
-  IUniswapV2Router02 public apeswapRouter;
+  IUniswapV2Router02 public quickswapRouter;
   IUniswapV2Factory public apeswapFactory;
 
   address private me;
@@ -49,7 +49,7 @@ contract QuickswapUSDCUSDT is IFlashBorrower, ILeverageStrategy {
       address _flashloan,
       address _arth,
       address _usdc,
-      address _busd,
+      address _usdt,
       address _rewardToken,
       address _curve,
       address _arthUsd,
@@ -66,7 +66,7 @@ contract QuickswapUSDCUSDT is IFlashBorrower, ILeverageStrategy {
 
     curve = IStableSwapRouter(_curve);
 
-    busd = IERC20(_busd);
+    usdt = IERC20(_usdt);
     arth = IERC20(_arth);
     usdc = IERC20(_usdc);
     rewardToken = IERC20(_rewardToken);
@@ -75,9 +75,9 @@ contract QuickswapUSDCUSDT is IFlashBorrower, ILeverageStrategy {
 
     me = address(this);
 
-    apeswapRouter = IUniswapV2Router02(_uniswapRouter);
-    apeswapFactory = IUniswapV2Factory(apeswapRouter.factory());
-    lp = IERC20(apeswapFactory.getPair(_usdc, _busd));
+    quickswapRouter = IUniswapV2Router02(_uniswapRouter);
+    apeswapFactory = IUniswapV2Factory(quickswapRouter.factory());
+    lp = IERC20(apeswapFactory.getPair(_usdc, _usdt));
 
     borrowerOperations = _borrowerOperations;
     troveManager = ITroveManager(_troveManager);
@@ -97,7 +97,7 @@ contract QuickswapUSDCUSDT is IFlashBorrower, ILeverageStrategy {
     uint256 maxBorrowingFee
   ) external override {
     // take the principal
-    busd.transferFrom(msg.sender, address(this), principalCollateral[0]);
+    usdt.transferFrom(msg.sender, address(this), principalCollateral[0]);
 
     // todo swap excess
 
@@ -145,7 +145,7 @@ contract QuickswapUSDCUSDT is IFlashBorrower, ILeverageStrategy {
 
     flashLoan.flashLoan(address(this), flashloanAmount, flashloanData);
 
-    LeverageLibraryBSC.swapExcessARTH(me, msg.sender, 1, curve, arth);
+    LeverageLibrary.swapExcessARTH(me, msg.sender, 1, curve, arth);
     _flush(msg.sender);
   }
 
@@ -198,21 +198,21 @@ contract QuickswapUSDCUSDT is IFlashBorrower, ILeverageStrategy {
     arth.approve(address(curve), flashloanAmount);
     curve.sellARTHForExact(
       flashloanAmount,
-      finalExposure[0].sub(principalCollateral[0]), // amountBUSDOut,
-      finalExposure[1], // amountusdCOut,
-      0, // amountUSDTOut,
+      0, // amountDAIOut,
+      finalExposure[0].sub(principalCollateral[0]), // amountusdCOut,
+      finalExposure[1], // amountUSDTOut,
       me,
       block.timestamp
     );
 
     // 2. LP all the collateral
-    usdc.approve(address(apeswapRouter), usdc.balanceOf(me));
-    busd.approve(address(apeswapRouter), busd.balanceOf(me));
-    apeswapRouter.addLiquidity(
+    usdc.approve(address(quickswapRouter), usdc.balanceOf(me));
+    usdt.approve(address(quickswapRouter), usdt.balanceOf(me));
+    quickswapRouter.addLiquidity(
       address(usdc),
-      address(busd),
+      address(usdt),
       usdc.balanceOf(me),
-      busd.balanceOf(me),
+      usdt.balanceOf(me),
       0,
       0,
       me,
@@ -244,7 +244,7 @@ contract QuickswapUSDCUSDT is IFlashBorrower, ILeverageStrategy {
 
     // 6. check if we met the min leverage conditions
     require(
-      LeverageLibraryBSC.getTroveCR(priceFeed, troveManager, address(acct)) >=
+      LeverageLibrary.getTroveCR(priceFeed, troveManager, address(acct)) >=
         minExpectedCollateralRatio,
       "min cr not met"
     );
@@ -280,10 +280,10 @@ contract QuickswapUSDCUSDT is IFlashBorrower, ILeverageStrategy {
     stakingWrapper.withdraw(collateralAmount);
 
     // 5. remove from LP
-    lp.approve(address(apeswapRouter), lp.balanceOf(me));
-    apeswapRouter.removeLiquidity(
+    lp.approve(address(quickswapRouter), lp.balanceOf(me));
+    quickswapRouter.removeLiquidity(
       address(usdc),
-      address(busd),
+      address(usdt),
       lp.balanceOf(me),
       0, // amountAMin
       0, // amountBMin
@@ -291,11 +291,11 @@ contract QuickswapUSDCUSDT is IFlashBorrower, ILeverageStrategy {
       block.timestamp
     );
 
-    busd.approve(address(curve), busd.balanceOf(me));
+    usdt.approve(address(curve), usdt.balanceOf(me));
     usdc.approve(address(curve), usdc.balanceOf(me));
 
     curve.buyARTHForExact(
-      busd.balanceOf(me).sub(minCollateral[0]),
+      usdt.balanceOf(me).sub(minCollateral[0]),
       usdc.balanceOf(me),
       0,
       flashloanAmount,
@@ -303,7 +303,7 @@ contract QuickswapUSDCUSDT is IFlashBorrower, ILeverageStrategy {
       block.timestamp
     );
 
-    require(busd.balanceOf(me) >= minCollateral[0], "not enough busd");
+    require(usdt.balanceOf(me) >= minCollateral[0], "not enough usdt");
     // require(usdc.balanceOf(me) >= minCollateral[1], "not enough usdc");
 
     // 4. payback the loan..
@@ -312,7 +312,7 @@ contract QuickswapUSDCUSDT is IFlashBorrower, ILeverageStrategy {
   }
 
   function rewardsEarned(address who) external view override returns (uint256) {
-    return LeverageLibraryBSC.rewardsEarned(accountRegistry, troveManager, stakingWrapper, who);
+    return LeverageLibrary.rewardsEarned(accountRegistry, troveManager, stakingWrapper, who);
   }
 
   function underlyingCollateralFromBalance(uint256 bal)
@@ -321,7 +321,7 @@ contract QuickswapUSDCUSDT is IFlashBorrower, ILeverageStrategy {
     override
     returns (uint256[2] memory)
   {
-    return LeverageLibraryBSC.underlyingCollateralFromBalance(bal, address(lp));
+    return LeverageLibrary.underlyingCollateralFromBalance(bal, address(lp));
   }
 
   function _flush(address to) internal {
@@ -331,7 +331,7 @@ contract QuickswapUSDCUSDT is IFlashBorrower, ILeverageStrategy {
     }
     if (arthUsd.balanceOf(me) > 0) arthUsd.transfer(to, arthUsd.balanceOf(me));
     if (usdc.balanceOf(me) > 0) usdc.transfer(to, usdc.balanceOf(me));
-    if (busd.balanceOf(me) > 0) busd.transfer(to, busd.balanceOf(me));
+    if (usdt.balanceOf(me) > 0) usdt.transfer(to, usdt.balanceOf(me));
     if (rewardToken.balanceOf(me) > 0) rewardToken.transfer(to, rewardToken.balanceOf(me));
   }
 }
