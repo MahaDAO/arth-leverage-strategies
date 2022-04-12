@@ -17,7 +17,7 @@ import {LeverageLibraryBSC} from "../../helpers/LeverageLibraryBSC.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {TroveLibrary} from "../../helpers/TroveLibrary.sol";
 
-contract ApeSwapLeverageBUSDUSDC is IFlashBorrower, ILeverageStrategy {
+contract QuickswapUSDCUSDT is IFlashBorrower, ILeverageStrategy {
   using SafeMath for uint256;
 
   address public borrowerOperations;
@@ -38,7 +38,7 @@ contract ApeSwapLeverageBUSDUSDC is IFlashBorrower, ILeverageStrategy {
   IERC20Wrapper public arthUsd;
   IERC20Wrapper public stakingWrapper;
 
-  IStableSwapRouter public ellipsis;
+  IStableSwapRouter public curve;
   IUniswapV2Router02 public apeswapRouter;
   IUniswapV2Factory public apeswapFactory;
 
@@ -51,7 +51,7 @@ contract ApeSwapLeverageBUSDUSDC is IFlashBorrower, ILeverageStrategy {
       address _usdc,
       address _busd,
       address _rewardToken,
-      address _ellipsis,
+      address _curve,
       address _arthUsd,
       address _uniswapRouter // address _borrowerOperations,
     ) = abi.decode(data1, (address, address, address, address, address, address, address, address));
@@ -64,7 +64,7 @@ contract ApeSwapLeverageBUSDUSDC is IFlashBorrower, ILeverageStrategy {
       address _accountRegistry
     ) = abi.decode(data2, (address, address, address, address, address));
 
-    ellipsis = IStableSwapRouter(_ellipsis);
+    curve = IStableSwapRouter(_curve);
 
     busd = IERC20(_busd);
     arth = IERC20(_arth);
@@ -102,7 +102,7 @@ contract ApeSwapLeverageBUSDUSDC is IFlashBorrower, ILeverageStrategy {
     // todo swap excess
 
     // estimate how much we should flashloan based on how much we want to borrow
-    uint256 flashloanAmount = ellipsis
+    uint256 flashloanAmount = curve
       .estimateARTHtoBuy(finalExposure[0].sub(principalCollateral[0]), finalExposure[1], 0)
       .mul(102)
       .div(100);
@@ -145,7 +145,7 @@ contract ApeSwapLeverageBUSDUSDC is IFlashBorrower, ILeverageStrategy {
 
     flashLoan.flashLoan(address(this), flashloanAmount, flashloanData);
 
-    LeverageLibraryBSC.swapExcessARTH(me, msg.sender, 1, ellipsis, arth);
+    LeverageLibraryBSC.swapExcessARTH(me, msg.sender, 1, curve, arth);
     _flush(msg.sender);
   }
 
@@ -194,8 +194,8 @@ contract ApeSwapLeverageBUSDUSDC is IFlashBorrower, ILeverageStrategy {
     LeverageAccount acct = getAccount(who);
 
     // 1: sell arth for collateral
-    arth.approve(address(ellipsis), flashloanAmount);
-    ellipsis.sellARTHForExact(
+    arth.approve(address(curve), flashloanAmount);
+    curve.sellARTHForExact(
       flashloanAmount,
       finalExposure[0].sub(principalCollateral[0]), // amountBUSDOut,
       finalExposure[1], // amountusdCOut,
@@ -290,10 +290,10 @@ contract ApeSwapLeverageBUSDUSDC is IFlashBorrower, ILeverageStrategy {
       block.timestamp
     );
 
-    busd.approve(address(ellipsis), busd.balanceOf(me));
-    usdc.approve(address(ellipsis), usdc.balanceOf(me));
+    busd.approve(address(curve), busd.balanceOf(me));
+    usdc.approve(address(curve), usdc.balanceOf(me));
 
-    ellipsis.buyARTHForExact(
+    curve.buyARTHForExact(
       busd.balanceOf(me).sub(minCollateral[0]),
       usdc.balanceOf(me),
       0,

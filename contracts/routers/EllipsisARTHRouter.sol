@@ -6,10 +6,10 @@ import {IERC20, IERC20WithDecimals} from "../interfaces/IERC20WithDecimals.sol";
 import {IZapDepositor} from "../interfaces/IZapDepositor.sol";
 import {IStableSwap} from "../interfaces/IStableSwap.sol";
 import {IERC20Wrapper} from "../interfaces/IERC20Wrapper.sol";
-import {IEllipsisRouter} from "../interfaces/IEllipsisRouter.sol";
+import {IStableSwapRouter} from "../interfaces/IStableSwapRouter.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
-contract EllipsisARTHRouter is IEllipsisRouter {
+contract EllipsisARTHRouter is IStableSwapRouter {
   using SafeMath for uint256;
 
   IERC20WithDecimals public lp;

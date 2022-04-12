@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.0;
 
-import {IEllipsisRouter} from "../../interfaces/IEllipsisRouter.sol";
+import {IStableSwapRouter} from "../../interfaces/IStableSwapRouter.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Wrapper} from "../../interfaces/IERC20Wrapper.sol";
 import {IFlashBorrower} from "../../interfaces/IFlashBorrower.sol";
@@ -38,7 +38,7 @@ contract ApeSwapLeverageBUSDUSDT is IFlashBorrower, ILeverageStrategy {
   IERC20Wrapper public arthUsd;
   IERC20Wrapper public stakingWrapper;
 
-  IEllipsisRouter public ellipsis;
+  IStableSwapRouter public ellipsis;
   IUniswapV2Router02 public apeswapRouter;
   IUniswapV2Factory public apeswapFactory;
 
@@ -64,7 +64,7 @@ contract ApeSwapLeverageBUSDUSDT is IFlashBorrower, ILeverageStrategy {
       address _accountRegistry
     ) = abi.decode(data2, (address, address, address, address, address));
 
-    ellipsis = IEllipsisRouter(_ellipsis);
+    ellipsis = IStableSwapRouter(_ellipsis);
 
     busd = IERC20(_busd);
     arth = IERC20(_arth);

@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.0;
 
-import {IEllipsisRouter} from "../interfaces/IEllipsisRouter.sol";
+import {IStableSwapRouter} from "../interfaces/IStableSwapRouter.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IPriceFeed} from "../interfaces/IPriceFeed.sol";
 import {ITroveManager} from "../interfaces/ITroveManager.sol";
@@ -69,7 +69,7 @@ library LeverageLibraryBSC {
     address me,
     address to,
     int128 tokenId, // 1 -> busd, 2 -> usdc, 3 -> usdt
-    IEllipsisRouter ellipsis,
+    IStableSwapRouter ellipsis,
     IERC20 arth
   ) public {
     if (arth.balanceOf(me) > 0) {
