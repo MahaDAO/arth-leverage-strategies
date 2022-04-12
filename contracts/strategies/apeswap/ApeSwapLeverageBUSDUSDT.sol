@@ -172,13 +172,14 @@ contract ApeSwapLeverageBUSDUSDT is IFlashBorrower, ILeverageStrategy {
     if (action == 0) {
       _onFlashloanOpenPosition(
         who,
-        flashloanAmount,
+        flashloanAmount.add(fee),
         finalExposure,
         minCollateralOrPrincipalCollateral,
         minExpectedCollateralRatio,
         maxBorrowingFee
       );
-    } else _onFlashloanClosePosition(who, flashloanAmount, minCollateralOrPrincipalCollateral);
+    } else
+      _onFlashloanClosePosition(who, flashloanAmount.add(fee), minCollateralOrPrincipalCollateral);
 
     return keccak256("FlashMinter.onFlashLoan");
   }
