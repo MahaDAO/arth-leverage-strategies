@@ -17,7 +17,7 @@ import {LeverageLibrary} from "../../helpers/LeverageLibrary.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {TroveLibrary} from "../../helpers/TroveLibrary.sol";
 
-contract ApeSwapLeverageBUSDUSDT is IFlashBorrower, ILeverageStrategy {
+contract ApeSwapBUSDUSDT is IFlashBorrower, ILeverageStrategy {
   using SafeMath for uint256;
 
   address public borrowerOperations;

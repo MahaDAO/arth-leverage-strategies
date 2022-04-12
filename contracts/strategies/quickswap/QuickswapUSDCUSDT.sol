@@ -295,9 +295,9 @@ contract QuickswapUSDCUSDT is IFlashBorrower, ILeverageStrategy {
     usdc.approve(address(curve), usdc.balanceOf(me));
 
     curve.buyARTHForExact(
-      usdt.balanceOf(me).sub(minCollateral[0]),
-      usdc.balanceOf(me),
       0,
+      usdc.balanceOf(me),
+      usdt.balanceOf(me).sub(minCollateral[0]),
       flashloanAmount,
       me,
       block.timestamp
