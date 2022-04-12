@@ -21,6 +21,7 @@ contract QuickswapUSDCUSDT is IFlashBorrower, ILeverageStrategy {
   using SafeMath for uint256;
 
   address public borrowerOperations;
+  address public controller;
 
   ITroveManager public troveManager;
   IPriceFeed public priceFeed;
@@ -47,6 +48,7 @@ contract QuickswapUSDCUSDT is IFlashBorrower, ILeverageStrategy {
   constructor(bytes memory data1, bytes memory data2) {
     (
       address _flashloan,
+      address _controller,
       address _arth,
       address _usdc,
       address _usdt,
@@ -54,7 +56,10 @@ contract QuickswapUSDCUSDT is IFlashBorrower, ILeverageStrategy {
       address _curve,
       address _arthUsd,
       address _uniswapRouter // address _borrowerOperations,
-    ) = abi.decode(data1, (address, address, address, address, address, address, address, address));
+    ) = abi.decode(
+        data1,
+        (address, address, address, address, address, address, address, address, address)
+      );
 
     (
       address _borrowerOperations,
@@ -64,6 +69,7 @@ contract QuickswapUSDCUSDT is IFlashBorrower, ILeverageStrategy {
       address _accountRegistry
     ) = abi.decode(data2, (address, address, address, address, address));
 
+    controller = _controller;
     curve = IStableSwapRouter(_curve);
 
     usdt = IERC20(_usdt);
@@ -267,7 +273,7 @@ contract QuickswapUSDCUSDT is IFlashBorrower, ILeverageStrategy {
     // 2. use the flashloan'd ARTH to payback the debt and close the loan
     TroveLibrary.closeLoan(
       acct,
-      address(0),
+      controller,
       borrowerOperations,
       flashloanAmount,
       arth,

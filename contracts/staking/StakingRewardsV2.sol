@@ -46,7 +46,7 @@ contract StakingRewardsV2 is RewardsDistributionRecipient, ReentrancyGuard {
     address _rewardsToken,
     address _stakingToken,
     uint256 _rewardsDuration
-  ) public {
+  ) {
     rewardsToken = IERC20(_rewardsToken);
     stakingToken = IERC20(_stakingToken);
     rewardsDistribution = _rewardsDistribution;
