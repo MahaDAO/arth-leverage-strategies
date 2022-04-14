@@ -67,13 +67,15 @@ contract ChainlinkLPOracle is IPriceFeed {
 
   function tokenAInLP() public view returns (uint256) {
     uint256 price = tokenAPrice();
-    uint256 bal = _scalePriceByDigits(tokenA.balanceOf(address(lp)), tokenA.decimals());
+    (uint256 reserve0, /* uint256 reserve1 */, /* uint256 timestamp */) = lp.getReserves();
+    uint256 bal = _scalePriceByDigits(reserve0, tokenA.decimals());
     return price.mul(bal).div(1e18);
   }
 
   function tokenBInLP() public view returns (uint256) {
     uint256 price = tokenBPrice();
-    uint256 bal = _scalePriceByDigits(tokenB.balanceOf(address(lp)), tokenB.decimals());
+    (/* uint256 reserve0 */, uint256 reserve1, /* uint256 timestamp */) = lp.getReserves();
+    uint256 bal = _scalePriceByDigits(reserve1, tokenB.decimals());
     return price.mul(bal).div(1e18);
   }
 
