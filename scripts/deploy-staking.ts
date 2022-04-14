@@ -3,9 +3,9 @@ import hre, { ethers } from "hardhat";
 
 async function main() {
   const constructorArguments = [
-    "0xe595b22beb0deee5a41d2b29a86e4edec8b7d180", // address _rewardsDistribution,
-    "0x82b9b6ddd709f48119d979795e9f4379870db437", // address _rewardsToken,
-    "0x3c9ce572eED9e205A1cdc5E2ead3DbCeD381030E", // address _stakingToken,
+    "0xecce08c2636820a81fc0c805dbdc7d846636bbc4", // address _rewardsDistribution,
+    "0xce86f7fcd3b40791f63b86c3ea3b8b355ce2685b", // address _rewardsToken,
+    "0x84020eefe28647056eac16cb16095da2ccf25665", // address _stakingToken,
     "2592000" // uint256 _rewardsDuration
   ];
 

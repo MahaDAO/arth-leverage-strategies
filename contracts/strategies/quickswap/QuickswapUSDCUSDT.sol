@@ -103,7 +103,7 @@ contract QuickswapUSDCUSDT is IFlashBorrower, ILeverageStrategy {
     uint256 maxBorrowingFee
   ) external override {
     // take the principal
-    usdt.transferFrom(msg.sender, address(this), principalCollateral[0]);
+    usdc.transferFrom(msg.sender, address(this), principalCollateral[0]);
 
     // todo swap excess
 

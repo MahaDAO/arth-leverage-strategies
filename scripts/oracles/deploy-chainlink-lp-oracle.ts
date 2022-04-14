@@ -1,5 +1,5 @@
 import hre, { ethers } from "hardhat";
-import { wait } from "../../utils";
+import { wait } from "../utils";
 
 async function main() {
   const constructorArguments = [
@@ -10,7 +10,7 @@ async function main() {
   ];
 
   // We get the contract to deploy
-  const ChainlinkLPOracle = await ethers.getContractFactory("ChainlinkLPOracle");
+  const ChainlinkLPOracle = await ethers.getContractFactory("ChainlinkLPOracleGMU");
   const instance = await ChainlinkLPOracle.deploy(
     String(constructorArguments[0]),
     String(constructorArguments[1]),

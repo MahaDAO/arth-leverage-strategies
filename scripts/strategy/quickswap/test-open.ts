@@ -1,29 +1,28 @@
 import { ethers } from "hardhat";
-import { wait } from "../../utils";
 
 async function main() {
   // We get the contract to deploy
   const instance = await ethers.getContractAt(
-    "QuickSwapExposure",
-    "0xfF2b1B8826A6E4EbA73d48844FBCc735a6160C96"
+    "QuickswapUSDCUSDT",
+    "0x51210D88d1Af5f7579b1b73f8758eD6c55461A6C"
   );
 
-  // await registerStrategy(instance.address, "0xFc74c53c1d31d30ca685DE93feDD2FB1BB3DA440");
-  // await approve(
-  //   "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
-  //   "3000000000000000000000000",
-  //   instance.address
-  // );
+  await registerStrategy(instance.address, "0xf68491167500Bac6e513D03fF137F34Df4720bd6");
+  await approve(
+    "0x2791bca1f2de4661ed88a30c99a7a9449aa84174", // usdc
+    "3000000000000000000000000",
+    instance.address
+  );
 
-  const tx = await instance.openPosition(
-    ["75000000", "75000000"], // uint256 finalExposure,
-    ["75000000", "0"], // uint256 principalCollateral,
+  const tx = await instance.estimateGas.openPosition(
+    ["391770720", "391770720"], // uint256 finalExposure,
+    ["261180480", "0"], // uint256 principalCollateral,
     0,
-    10
+    0
   );
 
-  // console.log(tx);
-  console.log("open", tx.hash);
+  console.log(tx);
+  // console.log("open", tx.hash);
 }
 
 const registerStrategy = async (strategy: string, acct: string) => {
