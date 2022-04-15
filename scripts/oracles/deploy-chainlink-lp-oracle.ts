@@ -3,10 +3,10 @@ import { wait } from "../utils";
 
 async function main() {
   const constructorArguments = [
-    "0xb97ad0e74fa7d920791e90258a6e2085088b4320", // address _tokenAoracle,
-    "0xcBb98864Ef56E9042e7d2efef76141f15731B82f", // address _tokenBoracle,
-    "0xdD465B9c68750a02c307744a749954B1F9787efb", // address _gmuOracle,
-    "0x2e707261d086687470b515b320478eb1c88d49bb" // address _lp
+    "0xfe4a8cc5b5b2366c1b58bea3858e81843581b2f7", // address _tokenAoracle,
+    "0x0a6513e40db6eb1b165753ad52e80663aea50545", // address _tokenBoracle,
+    "0xbe5514e856a4eb971653bcc74475b26b56763fd0", // address _gmuOracle,
+    "0x2cf7252e74036d1da831d11089d326296e64a728" // address _lp
   ];
 
   // We get the contract to deploy

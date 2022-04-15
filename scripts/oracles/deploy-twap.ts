@@ -6,7 +6,7 @@ async function main() {
   const precision = BigNumber.from(10).pow(9);
 
   const constructorArguments = [
-    "0xFB82E32BcD4D72f0688f16109193053d52A23E47", // address _oracle,
+    "0x85200C132876dF6537AD54258f224fD8b863BbbC", // address _oracle,
     86400, // uint256 _epoch,
     precision.mul(5).toString() // uint256 _maxPriceChange
   ];
