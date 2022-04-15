@@ -1,25 +1,26 @@
+import { BigNumber } from "ethers";
 import hre, { ethers } from "hardhat";
 import { wait } from "../utils";
 
 async function main() {
+  const precision = BigNumber.from(10).pow(9);
+
   const constructorArguments = [
-    "0xb97ad0e74fa7d920791e90258a6e2085088b4320", // address _tokenAoracle,
-    "0xcBb98864Ef56E9042e7d2efef76141f15731B82f", // address _tokenBoracle,
-    "0xdD465B9c68750a02c307744a749954B1F9787efb", // address _gmuOracle,
-    "0x2e707261d086687470b515b320478eb1c88d49bb" // address _lp
+    "0xFB82E32BcD4D72f0688f16109193053d52A23E47", // address _oracle,
+    86400, // uint256 _epoch,
+    precision.mul(5).toString() // uint256 _maxPriceChange
   ];
 
   // We get the contract to deploy
-  const ChainlinkLPOracle = await ethers.getContractFactory("ChainlinkLPOracleGMU");
+  const ChainlinkLPOracle = await ethers.getContractFactory("TWAPOracle");
   const instance = await ChainlinkLPOracle.deploy(
     String(constructorArguments[0]),
     String(constructorArguments[1]),
-    String(constructorArguments[2]),
-    String(constructorArguments[3])
+    String(constructorArguments[2])
   );
 
   await instance.deployed();
-  console.log("ChainlinkLPOracle deployed to:", instance.address);
+  console.log("TWAPOracle deployed to:", instance.address);
   await wait(15 * 1000);
 
   await hre.run("verify:verify", {
