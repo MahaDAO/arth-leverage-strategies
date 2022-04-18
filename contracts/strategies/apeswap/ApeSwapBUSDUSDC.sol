@@ -351,25 +351,29 @@ contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
   {
     require(busdIn > usdcIn, "should always have more busd");
 
-    // first we even out the balances. if we have more of busd, then we sell the excess for token B
+    // first we even out the balances. if we have more of busd, then we sell the excess for usdc
     if (busdIn > busdOut) {
       // find the excess
       busdToSellForUsdc = busdIn.sub(busdOut);
 
-      // estimate how much it'd be if we sold the excess for usdc
+      // estimate how much usdc we'd get if we sold the excess busd; and update the balances
       usdcIn = usdcIn.add(ellipsis.estimateTokenForToken(busd, 1, 2, busdToSellForUsdc));
       busdIn = busdIn.sub(busdToSellForUsdc);
 
       // at this stage, we should have fair balances of busd & usdc
+      // our usdcOut > usdcIn and busdOut > busdIn
     }
 
-    // now estimate how much arth is needed if we had to sell any
+    require(busdOut >= busdIn, "have more busd than needed");
+    require(usdcOut >= usdcIn, "have more usdc than needed");
+
+    // now estimate how much arth is needed if we have to borrow any
     if (busdIn <= busdOut && usdcIn <= usdcOut) {
-      // if we have enough reserves then we don't need any arth to sell. we bail
+      // if we have enough reserves then we don't need any arth to sell. so return 0
       arthToSell = 0;
     } else {
       // if we don't have enough reserves then we estimate how much arth is needed
-      arthToSell = ellipsis.estimateARTHtoBuy(busdOut.sub(busdIn), usdcOut.sub(usdcOut), 0);
+      arthToSell = ellipsis.estimateARTHtoBuy(busdOut.sub(busdIn), usdcOut.sub(usdcIn), 0);
     }
 
     newPrincipalCollateral = [busdIn, usdcIn];
