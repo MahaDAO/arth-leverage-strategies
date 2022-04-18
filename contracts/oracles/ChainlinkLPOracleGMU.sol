@@ -9,7 +9,7 @@ import {IUniswapV2Pair} from "../interfaces/IUniswapV2Pair.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
-interface IERC20WithDeciamls is IERC20 {
+interface IERC20WithDecimals is IERC20 {
   function decimals() external view returns (uint256);
 }
 
@@ -17,8 +17,8 @@ contract ChainlinkLPOracleGMU is IPriceFeed {
   using SafeMath for uint256;
 
   IUniswapV2Pair public lp;
-  IERC20WithDeciamls public tokenA;
-  IERC20WithDeciamls public tokenB;
+  IERC20WithDecimals public tokenA;
+  IERC20WithDecimals public tokenB;
 
   AggregatorV3Interface public tokenAoracle;
   AggregatorV3Interface public tokenBoracle;
@@ -45,8 +45,8 @@ contract ChainlinkLPOracleGMU is IPriceFeed {
     tokenBoracle = AggregatorV3Interface(_tokenBoracle);
     gmuOracle = IOracle(_gmuOracle);
 
-    tokenA = IERC20WithDeciamls(lp.token0());
-    tokenB = IERC20WithDeciamls(lp.token1());
+    tokenA = IERC20WithDecimals(lp.token0());
+    tokenB = IERC20WithDecimals(lp.token1());
   }
 
   function priceFor(uint256 amount) external view returns (uint256) {
