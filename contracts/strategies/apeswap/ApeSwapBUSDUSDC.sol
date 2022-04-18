@@ -350,7 +350,6 @@ contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
     )
   {
     require(busdIn > usdcIn, "should always have more busd");
-    require(busdOut == usdcOut, "should output same amounts");
 
     // first we even out the balances. if we have more of busd, then we sell the excess for token B
     if (busdIn > busdOut) {
