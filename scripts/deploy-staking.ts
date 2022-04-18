@@ -4,14 +4,14 @@ import hre, { ethers } from "hardhat";
 async function main() {
   const constructorArguments = [
     "0xecce08c2636820a81fc0c805dbdc7d846636bbc4", // address _rewardsDistribution,
-    "0xce86f7fcd3b40791f63b86c3ea3b8b355ce2685b", // address _rewardsToken,
-    "0x84020eefe28647056eac16cb16095da2ccf25665", // address _stakingToken,
+    "0xCE86F7fcD3B40791F63B86C3ea3B8B355Ce2685b", // address _rewardsToken,
+    "0x4cfaabd5920021359bb22bb6924cce708773b6ac", // address _stakingToken,
     "2592000" // uint256 _rewardsDuration
   ];
 
   // We get the contract to deploy
-  const ArthUSDWrapper = await ethers.getContractFactory("StakingRewardsV2");
-  const instance = await ArthUSDWrapper.deploy(
+  const StakingRewardsV2 = await ethers.getContractFactory("StakingRewardsV2");
+  const instance = await StakingRewardsV2.deploy(
     String(constructorArguments[0]),
     String(constructorArguments[1]),
     String(constructorArguments[2]),
