@@ -9,7 +9,7 @@ import {IERC20Wrapper} from "../interfaces/IERC20Wrapper.sol";
 import {IStableSwapRouter} from "../interfaces/IStableSwapRouter.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
-contract EllipsisARTHRouter is IStableSwapRouter {
+abstract contract EllipsisARTHRouter is IStableSwapRouter {
   using SafeMath for uint256;
 
   IERC20WithDecimals public lp;

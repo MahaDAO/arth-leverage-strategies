@@ -34,6 +34,43 @@ library LeverageLibrary {
     return coll.mul(price).div(debt);
   }
 
+  function estimateSwapWithTokenAPrincipal(
+    IERC20 tokenA,
+    int128 tokenAid,
+    int128 tokenBid,
+    uint256 tokenAin,
+    uint256 tokenAout,
+    uint256 tokenBin,
+    uint256 tokenBout,
+    IStableSwapRouter router
+  ) public view returns (uint256 tokenAtoSellForTokenB, uint256 arthToSell) {
+    require(tokenAin > tokenBin, "should always have more token A");
+    require(tokenAout == tokenBout, "should output same amounts");
+
+    // first we even out the balances. if we have more of token A, then we sell the excess for token B
+    if (tokenAin > tokenAout) {
+      // find the excess
+      tokenAtoSellForTokenB = tokenAin.sub(tokenAout);
+
+      // estimate how much it'd be if we sold the excess for token B
+      tokenBin = tokenBin.add(
+        router.estimateTokenForToken(tokenA, tokenAid, tokenBid, tokenAtoSellForTokenB)
+      );
+      tokenAin = tokenAin.sub(tokenAtoSellForTokenB);
+
+      // at this stage, we should have fair balances of tokenA & tokenB
+    }
+
+    // now estimate how much arth is needed if we had to sell any
+    if (tokenAin <= tokenAout && tokenBin <= tokenBout) {
+      // if we have enough reserves then we don't need any arth to sell. we bail
+      arthToSell = 0;
+    } else {
+      // if we don't have enough reserves then we estimate how much arth is needed
+      arthToSell = router.estimateARTHtoBuy(tokenAout.sub(tokenAin), tokenBout.sub(tokenBout), 0);
+    }
+  }
+
   function rewardsEarned(
     LeverageAccountRegistry accountRegistry,
     ITroveManager troveManager,
@@ -69,12 +106,12 @@ library LeverageLibrary {
     address me,
     address to,
     int128 tokenId, // 1 -> busd, 2 -> usdc, 3 -> usdt
-    IStableSwapRouter ellipsis,
+    IStableSwapRouter router,
     IERC20 arth
   ) public {
     if (arth.balanceOf(me) > 0) {
-      arth.approve(address(ellipsis), arth.balanceOf(me));
-      ellipsis.sellARTHforToken(tokenId, arth.balanceOf(me), to, block.timestamp);
+      arth.approve(address(router), arth.balanceOf(me));
+      router.sellARTHforToken(tokenId, arth.balanceOf(me), to, block.timestamp);
     }
   }
 }

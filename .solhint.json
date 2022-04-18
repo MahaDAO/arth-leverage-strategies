@@ -2,7 +2,7 @@
   "extends": "solhint:recommended",
   "rules": {
     "not-rely-on-time": "off",
-
+    "reason-string": "off",
     "avoid-low-level-calls": "off",
     "no-inline-assembly": "off",
     "compiler-version": ["error", "^0.8.0"],

@@ -39,6 +39,13 @@ interface IStableSwapRouter {
     uint256 deadline
   ) external;
 
+  function estimateTokenForToken(
+    IERC20 fromToken,
+    int128 fromTokenId, // 1 -> busd, 2 -> usdc, 3 -> usdt
+    int128 toTokenId, // 1 -> busd, 2 -> usdc, 3 -> usdt
+    uint256 amountInMax
+  ) external view returns (uint256 amountOutMin);
+
   function estimateARTHtoSell(
     uint256 busdNeeded,
     uint256 usdcNeeded,

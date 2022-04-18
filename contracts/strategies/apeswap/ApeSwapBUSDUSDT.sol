@@ -91,8 +91,8 @@ contract ApeSwapBUSDUSDT is IFlashBorrower, ILeverageStrategy {
   }
 
   function openPosition(
-    uint256[] memory finalExposure,
-    uint256[] memory principalCollateral,
+    uint256[2] memory finalExposure,
+    uint256[2] memory principalCollateral,
     uint256 minExpectedCollateralRatio,
     uint256 maxBorrowingFee
   ) external override {
@@ -122,7 +122,7 @@ contract ApeSwapBUSDUSDT is IFlashBorrower, ILeverageStrategy {
     // emit PositionOpened(msg.sender, address(stakingWrapper), finalExposure, principalCollateral);
   }
 
-  function closePosition(uint256[] memory minExpectedCollateral) external override {
+  function closePosition(uint256[2] memory minExpectedCollateral) external override {
     bytes memory flashloanData = abi.encode(
       msg.sender,
       uint256(1), // action = 1 -> close loan
@@ -164,9 +164,9 @@ contract ApeSwapBUSDUSDT is IFlashBorrower, ILeverageStrategy {
       uint256 action,
       uint256 minExpectedCollateralRatio,
       uint256 maxBorrowingFee,
-      uint256[] memory finalExposure,
-      uint256[] memory minCollateralOrPrincipalCollateral
-    ) = abi.decode(data, (address, uint256, uint256, uint256, uint256[], uint256[]));
+      uint256[2] memory finalExposure,
+      uint256[2] memory minCollateralOrPrincipalCollateral
+    ) = abi.decode(data, (address, uint256, uint256, uint256, uint256[2], uint256[2]));
 
     // open or close the loan position
     if (action == 0) {
@@ -187,8 +187,8 @@ contract ApeSwapBUSDUSDT is IFlashBorrower, ILeverageStrategy {
   function _onFlashloanOpenPosition(
     address who,
     uint256 flashloanAmount,
-    uint256[] memory finalExposure,
-    uint256[] memory principalCollateral,
+    uint256[2] memory finalExposure,
+    uint256[2] memory principalCollateral,
     uint256 minExpectedCollateralRatio,
     uint256 maxBorrowingFee
   ) internal {
@@ -257,7 +257,7 @@ contract ApeSwapBUSDUSDT is IFlashBorrower, ILeverageStrategy {
   function _onFlashloanClosePosition(
     address who,
     uint256 flashloanAmount,
-    uint256[] memory minCollateral
+    uint256[2] memory minCollateral
   ) internal {
     LeverageAccount acct = getAccount(who);
 

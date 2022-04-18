@@ -91,8 +91,8 @@ contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
   }
 
   function openPosition(
-    uint256[] memory finalExposure,
-    uint256[] memory principalCollateral,
+    uint256[2] memory finalExposure,
+    uint256[2] memory principalCollateral,
     uint256 minExpectedCollateralRatio,
     uint256 maxBorrowingFee
   ) external override {
@@ -102,10 +102,21 @@ contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
     // todo swap excess
 
     // estimate how much we should flashloan based on how much we want to borrow
-    uint256 flashloanAmount = ellipsis
-      .estimateARTHtoBuy(finalExposure[0].sub(principalCollateral[0]), finalExposure[1], 0)
-      .mul(102)
-      .div(100);
+    (
+      uint256 busdToSellforUSDC,
+      uint256 flashloanAmount,
+      uint256[2] memory newPrinicpalCollateral
+    ) = estimateSwap(
+        principalCollateral[0],
+        finalExposure[0],
+        principalCollateral[1],
+        finalExposure[1]
+      );
+
+    if (busdToSellforUSDC > 0) {
+      busd.approve(address(ellipsis), busdToSellforUSDC);
+      ellipsis.sellTokenForToken(busd, 1, 2, busdToSellforUSDC, 0, me, block.timestamp);
+    }
 
     bytes memory flashloanData = abi.encode(
       msg.sender,
@@ -113,7 +124,7 @@ contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
       minExpectedCollateralRatio,
       maxBorrowingFee,
       finalExposure,
-      principalCollateral
+      newPrinicpalCollateral
     );
 
     flashLoan.flashLoan(address(this), flashloanAmount, flashloanData);
@@ -122,7 +133,7 @@ contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
     emit PositionOpened(msg.sender, address(stakingWrapper), finalExposure, principalCollateral);
   }
 
-  function closePosition(uint256[] memory minExpectedCollateral) external override {
+  function closePosition(uint256[2] memory minExpectedCollateral) external override {
     bytes memory flashloanData = abi.encode(
       msg.sender,
       uint256(1), // action = 1 -> close loan
@@ -164,9 +175,9 @@ contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
       uint256 action,
       uint256 minExpectedCollateralRatio,
       uint256 maxBorrowingFee,
-      uint256[] memory finalExposure,
-      uint256[] memory minCollateralOrPrincipalCollateral
-    ) = abi.decode(data, (address, uint256, uint256, uint256, uint256[], uint256[]));
+      uint256[2] memory finalExposure,
+      uint256[2] memory minCollateralOrPrincipalCollateral
+    ) = abi.decode(data, (address, uint256, uint256, uint256, uint256[2], uint256[2]));
 
     // open or close the loan position
     if (action == 0) {
@@ -187,8 +198,8 @@ contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
   function _onFlashloanOpenPosition(
     address who,
     uint256 flashloanAmount,
-    uint256[] memory finalExposure,
-    uint256[] memory principalCollateral,
+    uint256[2] memory finalExposure,
+    uint256[2] memory principalCollateral,
     uint256 minExpectedCollateralRatio,
     uint256 maxBorrowingFee
   ) internal {
@@ -257,7 +268,7 @@ contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
   function _onFlashloanClosePosition(
     address who,
     uint256 flashloanAmount,
-    uint256[] memory minCollateral
+    uint256[2] memory minCollateral
   ) internal {
     LeverageAccount acct = getAccount(who);
 
@@ -322,6 +333,47 @@ contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
     returns (uint256[2] memory)
   {
     return LeverageLibrary.underlyingCollateralFromBalance(bal, address(lp));
+  }
+
+  function estimateSwap(
+    uint256 busdIn,
+    uint256 busdOut,
+    uint256 usdcIn,
+    uint256 usdcOut
+  )
+    public
+    view
+    returns (
+      uint256 busdToSellForUsdc,
+      uint256 arthToSell,
+      uint256[2] memory newPrincipalCollateral
+    )
+  {
+    require(busdIn > usdcIn, "should always have more busd");
+    require(busdOut == usdcOut, "should output same amounts");
+
+    // first we even out the balances. if we have more of busd, then we sell the excess for token B
+    if (busdIn > busdOut) {
+      // find the excess
+      busdToSellForUsdc = busdIn.sub(busdOut);
+
+      // estimate how much it'd be if we sold the excess for usdc
+      usdcIn = usdcIn.add(ellipsis.estimateTokenForToken(busd, 1, 2, busdToSellForUsdc));
+      busdIn = busdIn.sub(busdToSellForUsdc);
+
+      // at this stage, we should have fair balances of busd & usdc
+    }
+
+    // now estimate how much arth is needed if we had to sell any
+    if (busdIn <= busdOut && usdcIn <= usdcOut) {
+      // if we have enough reserves then we don't need any arth to sell. we bail
+      arthToSell = 0;
+    } else {
+      // if we don't have enough reserves then we estimate how much arth is needed
+      arthToSell = ellipsis.estimateARTHtoBuy(busdOut.sub(busdIn), usdcOut.sub(usdcOut), 0);
+    }
+
+    newPrincipalCollateral = [busdIn, usdcIn];
   }
 
   function _flush(address to) internal {
