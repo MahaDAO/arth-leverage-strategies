@@ -6,16 +6,16 @@ async function main() {
   // We get the contract to deploy
   const instance = await ethers.getContractAt(
     "ApeSwapBUSDUSDC",
-    "0xDA84BA3c6a0dE224BA52620455b04A7E66Fea0f3"
+    "0x5cb08E8F108200c87C7bE8a123A2ee3C2825684b"
   );
 
   // console.log(await instance.rewardsEarned("0xed77fd3f36535f26a072866ffead3db19bde9378"));
-  // await registerStrategy(instance.address, "0xBbA13eb45ed9aA4C1648BCfB23FC883088A35CEc");
-  // await approve(
-  //   "0xe9e7cea3dedca5984780bafc599bd69add087d56", // busd
-  //   "3000000000000000000000000",
-  //   instance.address
-  // );
+  await registerStrategy(instance.address, "0xBbA13eb45ed9aA4C1648BCfB23FC883088A35CEc");
+  await approve(
+    "0xe9e7cea3dedca5984780bafc599bd69add087d56", // busd
+    "3000000000000000000000000",
+    instance.address
+  );
 
   const tx = await instance.openPosition(
     ["1000000000000000000", "0"], // uint256 finalExposure,

@@ -24,7 +24,7 @@ async function main() {
     "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d", // address _usdc,
     "0xe9e7cea3dedca5984780bafc599bd69add087d56", // address _busd,
     "0x603c7f932ed1fc6575303d8fb018fdcbb0f39a95", // address _rewardToken,
-    "0xC58f5F79Fdd17C2EEf6fe4F4849F58D234DBfA67", // address _ellipsis,
+    "0xD419461fec33fb758E3f518D12412d9ade0AB2c0", // address _ellipsis,
     "0x88fd584df3f97c64843cd474bdc6f78e398394f4", // address _arthUsd,
     "0xcf0febd3f17cef5b47b0cd257acf6025c5bff3b7" // address _uniswapRouter
   ];

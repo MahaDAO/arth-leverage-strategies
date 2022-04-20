@@ -9,12 +9,13 @@ import {IERC20Wrapper} from "../interfaces/IERC20Wrapper.sol";
 import {IStableSwapRouter} from "../interfaces/IStableSwapRouter.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
-abstract contract EllipsisARTHRouter is IStableSwapRouter {
+contract EllipsisARTHRouter is IStableSwapRouter {
   using SafeMath for uint256;
 
   IERC20WithDecimals public lp;
   IZapDepositor public zap;
   address public pool;
+  address public pool3eps;
 
   IERC20Wrapper public arthUsd;
   IERC20WithDecimals public arth;
@@ -32,10 +33,12 @@ abstract contract EllipsisARTHRouter is IStableSwapRouter {
     address _arthUsd,
     address _usdc,
     address _usdt,
-    address _busd
+    address _busd,
+    address _pool3eps
   ) {
     pool = _pool;
-
+    pool3eps = _pool3eps;
+    
     arthUsd = IERC20Wrapper(_arthUsd);
     zap = IZapDepositor(_zap);
 
@@ -164,15 +167,25 @@ abstract contract EllipsisARTHRouter is IStableSwapRouter {
   ) external override {
     if (amountInMax > 0) fromToken.transferFrom(msg.sender, me, amountInMax);
 
-    fromToken.approve(pool, fromToken.balanceOf(me));
-    IStableSwap swap = IStableSwap(pool);
+    // Check if any token involved is arth.usd or not.
+    if (fromTokenId == 0 || toTokenId == 0) {
+      fromToken.approve(pool, fromToken.balanceOf(me));
+      IStableSwap poolSwap = IStableSwap(pool);
+      uint256 amountTokenOut = poolSwap.get_dy_underlying(fromTokenId, toTokenId, amountInMax);
+      require(amountTokenOut >= amountOutMin, "amountOutMin not met");
+      poolSwap.exchange_underlying(fromTokenId, toTokenId, amountInMax, amountTokenOut, to);
+    } else { // If arth.usd is not involved then we use 3eps pool for swapping.
+      fromToken.approve(pool3eps, fromToken.balanceOf(me));
+      fromTokenId = fromTokenId - 1;
+      toTokenId = toTokenId - 1;
+      IStableSwap pool3epsSwap = IStableSwap(pool3eps);
+      uint256 amountTokenOut = pool3epsSwap.get_dy(fromTokenId, toTokenId, amountInMax);
+      require(amountTokenOut >= amountOutMin, "amountOutMin not met");
+      pool3epsSwap.exchange(fromTokenId, toTokenId, amountInMax, amountTokenOut, to);
+    }
 
-    uint256 amountTokenOut = swap.get_dy_underlying(fromTokenId, toTokenId, amountInMax);
-    require(amountTokenOut >= amountOutMin, "amountOutMin not met");
-
-    swap.exchange_underlying(fromTokenId, toTokenId, amountInMax, amountTokenOut, to);
     require(block.timestamp <= deadline, "swap deadline expired");
-
+    
     _flush(to);
   }
 
@@ -204,6 +217,23 @@ abstract contract EllipsisARTHRouter is IStableSwapRouter {
     return arthUsdOut.div(2);
   }
 
+  function estimateTokenForToken(
+    IERC20 fromToken,
+    int128 fromTokenId, // 1 -> busd, 2 -> usdc, 3 -> usdt
+    int128 toTokenId, // 1 -> busd, 2 -> usdc, 3 -> usdt
+    uint256 amountInMax
+  ) external view override returns (uint256) {
+    if (fromTokenId == 0 || toTokenId == 0) { // Check if any token involved is arth.usd
+      IStableSwap poolSwap = IStableSwap(pool);
+      return poolSwap.get_dy_underlying(fromTokenId, toTokenId, amountInMax);
+    }
+
+    fromTokenId = fromTokenId - 1;
+    toTokenId = toTokenId - 1;
+    IStableSwap pool3epsSwap = IStableSwap(pool3eps);
+    return pool3epsSwap.get_dy(fromTokenId, toTokenId, amountInMax);
+  }
+  
   function _flush(address to) internal {
     if (arthUsd.balanceOf(me) > 0) {
       arthUsd.withdraw(arthUsd.balanceOf(me).div(2));
