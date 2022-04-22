@@ -6,7 +6,7 @@ async function main() {
   // We get the contract to deploy
   const instance = await ethers.getContractAt(
     "ApeSwapBUSDUSDC",
-    "0xec433eD4d0A9F42dF60dDC47EeA47E5FEC92D7ab"
+    "0x5C985f16657458d0F20B56af68F27eE149C9630B"
   );
 
   // console.log(await instance.rewardsEarned("0xed77fd3f36535f26a072866ffead3db19bde9378"));
@@ -17,9 +17,9 @@ async function main() {
     instance.address
   );
 
-  const tx = await instance.openPosition(
-    ["500000000000000000", "0"], // uint256 finalExposure,
-    ["1000000000000000000", "0"], // uint256 principalCollateral,
+  const tx = await instance.estimateGas.openPosition(
+    ["40000000000000000000", "40000000000000000000"], // uint256 finalExposure,
+    ["102000000000000000000", "0"], // uint256 principalCollateral,
     0,
     0
   );

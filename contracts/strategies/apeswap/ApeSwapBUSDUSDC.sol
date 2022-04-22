@@ -101,42 +101,34 @@ contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
     // Take the principal.
     busd.transferFrom(msg.sender, address(this), principalCollateral[0]);
 
-    uint256 flashloanAmount;
-    uint256[2] memory newPrinicpalCollateral;
-    if (finalExposure[0] <= principalCollateral[0]) {  // We are taking `1 < leverage <= 1.9.
+    uint256[2] memory newExposure = finalExposure;
+    uint256[2] memory newPrinicpalCollateral = principalCollateral;
+    
+    if (finalExposure[0] <= principalCollateral[0]) {  // We are taking leverage such that: `1 < leverage <= 1.9`.
       (
-        uint256 busdToSellforUSDC,
-        uint256 flashloanAmountSuggested,
-        uint256[2] memory newPrinicpalCollateralSuggested
+        uint256[2] memory newPrinicpalSuggested,
+        uint256[2] memory newExposureSuggested
       ) = estimateSwap(  // Estimate how much we should flashloan based on how much we want to borrow.
           principalCollateral[0],
           finalExposure[0],
-          principalCollateral[1],
           finalExposure[1]
         );
 
-      if (busdToSellforUSDC > 0) {
-        busd.approve(address(ellipsis), busdToSellforUSDC);
-        ellipsis.sellTokenForToken(busd, 1, 2, busdToSellforUSDC, 0, me, block.timestamp);
-      }
+      newExposure = newExposureSuggested;
+      newPrinicpalCollateral = newPrinicpalSuggested;
+    }
 
-      flashloanAmount = flashloanAmountSuggested;
-      newPrinicpalCollateral = newPrinicpalCollateralSuggested;
-    } else {  // We are taking leverage >= 2x.
-      flashloanAmount = ellipsis  // Estimate how much we should flashloan based on how much we want to borrow.
-        .estimateARTHtoBuy(finalExposure[0].sub(principalCollateral[0]), finalExposure[1], 0)
+    uint256 flashloanAmount = ellipsis  // Estimate how much we should flashloan based on how much we want to borrow.
+        .estimateARTHtoBuy(newExposure[0].sub(newPrinicpalCollateral[0]), newExposure[1], 0)
         .mul(102)
         .div(100);
-
-      newPrinicpalCollateral = principalCollateral;
-    }
 
     bytes memory flashloanData = abi.encode(
       msg.sender,
       uint256(0), // action = 0 -> open loan
       minExpectedCollateralRatio,
       maxBorrowingFee,
-      finalExposure,
+      newExposure,
       newPrinicpalCollateral
     );
 
@@ -351,45 +343,26 @@ contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
   function estimateSwap(
     uint256 busdIn,
     uint256 busdOut,
-    uint256 usdcIn,
     uint256 usdcOut
   )
     public
-    view
+    pure
     returns (
-      uint256 busdToSellForUsdc,
-      uint256 arthToSell,
-      uint256[2] memory newPrincipalCollateral
+      uint256[2] memory newPrincipalCollateral,
+      uint256[2] memory newExposure
     )
   {
-    require(busdIn > usdcIn, "should always have more busd");
+    uint256 dollarIn = busdIn;
+    uint256 dollarOut = busdOut.add(usdcOut);  // Price of. busd ~ Price of usdc via stable coin price stability.
+    
+    require(dollarIn > dollarOut, "Leverage >= 2x but using <2x.");
 
-    // first we even out the balances. if we have more of busd, then we sell the excess for usdc
-    if (busdIn > busdOut) {
-      // find the excess
-      busdToSellForUsdc = busdIn.sub(busdOut);
+    uint256 dollarDiff = dollarIn.sub(dollarOut);
+    busdOut = dollarDiff.div(2);
+    usdcOut = dollarDiff.sub(busdOut);
 
-      // estimate how much usdc we'd get if we sold the excess busd; and update the balances
-      usdcIn = usdcIn.add(ellipsis.estimateTokenForToken(busd, 1, 2, busdToSellForUsdc));
-      busdIn = busdIn.sub(busdToSellForUsdc);
-
-      // at this stage, we should have fair balances of busd & usdc
-      // our usdcOut > usdcIn and busdOut > busdIn
-    }
-
-    require(busdOut >= busdIn, "have more busd than needed");
-    require(usdcOut >= usdcIn, "have more usdc than needed");
-
-    // now estimate how much arth is needed if we have to borrow any
-    if (busdIn <= busdOut && usdcIn <= usdcOut) {
-      // if we have enough reserves then we don't need any arth to sell. so return 0
-      arthToSell = 0;
-    } else {
-      // if we don't have enough reserves then we estimate how much arth is needed
-      arthToSell = ellipsis.estimateARTHtoBuy(busdOut.sub(busdIn), usdcOut.sub(usdcIn), 0);
-    }
-
-    newPrincipalCollateral = [busdIn, usdcIn];
+    newPrincipalCollateral = [busdIn, 0];
+    newExposure = [busdOut, usdcOut];
   }
 
   function _flush(address to) internal {
