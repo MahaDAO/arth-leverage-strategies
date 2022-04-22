@@ -101,21 +101,38 @@ contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
 
     // todo swap excess
 
-    // estimate how much we should flashloan based on how much we want to borrow
-    (
-      uint256 busdToSellforUSDC,
-      uint256 flashloanAmount,
-      uint256[2] memory newPrinicpalCollateral
-    ) = estimateSwap(
-        principalCollateral[0],
-        finalExposure[0],
-        principalCollateral[1],
-        finalExposure[1]
-      );
+    uint256 flashloanAmount;
+    uint256[2] memory newPrinicpalCollateral;
 
-    if (busdToSellforUSDC > 0) {
-      busd.approve(address(ellipsis), busdToSellforUSDC);
-      ellipsis.sellTokenForToken(busd, 1, 2, busdToSellforUSDC, 0, me, block.timestamp);
+    if (principalCollateral[1] == 0 && finalExposure[0] <= principalCollateral[0]) {  // We are taking `1 < leverage <= 1.9.
+      // Estimate how much we should flashloan based on how much we want to borrow.
+      (
+        uint256 busdToSellforUSDC,
+        uint256 flashloanAmountSuggested,
+        uint256[2] memory newPrinicpalCollateralSuggested
+      ) = estimateSwap(
+          principalCollateral[0],
+          finalExposure[0],
+          principalCollateral[1],
+          finalExposure[1]
+        );
+
+      if (busdToSellforUSDC > 0) {
+        busd.approve(address(ellipsis), busdToSellforUSDC);
+        ellipsis.sellTokenForToken(busd, 1, 2, busdToSellforUSDC, 0, me, block.timestamp);
+      }
+
+      flashloanAmount = flashloanAmountSuggested;
+      newPrinicpalCollateral = newPrinicpalCollateralSuggested;
+    } else {
+      // We are taking leverage >= 2x.
+      // Estimate how much we should flashloan based on how much we want to borrow.
+      flashloanAmount = ellipsis
+        .estimateARTHtoBuy(finalExposure[0].sub(principalCollateral[0]), finalExposure[1], 0)
+        .mul(102)
+        .div(100);
+
+      newPrinicpalCollateral = principalCollateral;
     }
 
     bytes memory flashloanData = abi.encode(
