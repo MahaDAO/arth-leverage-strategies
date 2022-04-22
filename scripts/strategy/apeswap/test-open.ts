@@ -19,7 +19,7 @@ async function main() {
 
   const tx = await instance.estimateGas.openPosition(
     ["40000000000000000000", "40000000000000000000"], // uint256 finalExposure,
-    ["102000000000000000000", "0"], // uint256 principalCollateral,
+    ["170000000000000000000", "0"], // uint256 principalCollateral,
     0,
     0
   );
