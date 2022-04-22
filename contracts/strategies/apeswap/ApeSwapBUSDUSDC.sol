@@ -99,12 +99,14 @@ contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
     // take the principal
     busd.transferFrom(msg.sender, address(this), principalCollateral[0]);
 
-    // todo swap excess
+    // TODO: swap excess
 
     uint256 flashloanAmount;
     uint256[2] memory newPrinicpalCollateral;
-
-    if (principalCollateral[1] == 0 && finalExposure[0] <= principalCollateral[0]) {  // We are taking `1 < leverage <= 1.9.
+    if (
+      finalExposure[1] <= principalCollateral[1] && 
+      finalExposure[0] <= principalCollateral[0]
+    ) {  // We are taking `1 < leverage <= 1.9.
       // Estimate how much we should flashloan based on how much we want to borrow.
       (
         uint256 busdToSellforUSDC,
