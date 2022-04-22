@@ -96,23 +96,19 @@ contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
     uint256 minExpectedCollateralRatio,
     uint256 maxBorrowingFee
   ) external override {
-    // take the principal
-    busd.transferFrom(msg.sender, address(this), principalCollateral[0]);
+    require(principalCollateral[1] == 0, "USDC principal is not used");
 
-    // TODO: swap excess
+    // Take the principal.
+    busd.transferFrom(msg.sender, address(this), principalCollateral[0]);
 
     uint256 flashloanAmount;
     uint256[2] memory newPrinicpalCollateral;
-    if (
-      finalExposure[1] <= principalCollateral[1] && 
-      finalExposure[0] <= principalCollateral[0]
-    ) {  // We are taking `1 < leverage <= 1.9.
-      // Estimate how much we should flashloan based on how much we want to borrow.
+    if (finalExposure[0] <= principalCollateral[0]) {  // We are taking `1 < leverage <= 1.9.
       (
         uint256 busdToSellforUSDC,
         uint256 flashloanAmountSuggested,
         uint256[2] memory newPrinicpalCollateralSuggested
-      ) = estimateSwap(
+      ) = estimateSwap(  // Estimate how much we should flashloan based on how much we want to borrow.
           principalCollateral[0],
           finalExposure[0],
           principalCollateral[1],
@@ -126,10 +122,8 @@ contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
 
       flashloanAmount = flashloanAmountSuggested;
       newPrinicpalCollateral = newPrinicpalCollateralSuggested;
-    } else {
-      // We are taking leverage >= 2x.
-      // Estimate how much we should flashloan based on how much we want to borrow.
-      flashloanAmount = ellipsis
+    } else {  // We are taking leverage >= 2x.
+      flashloanAmount = ellipsis  // Estimate how much we should flashloan based on how much we want to borrow.
         .estimateARTHtoBuy(finalExposure[0].sub(principalCollateral[0]), finalExposure[1], 0)
         .mul(102)
         .div(100);
