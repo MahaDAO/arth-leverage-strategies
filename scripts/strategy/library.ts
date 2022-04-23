@@ -5,7 +5,7 @@ import { wait } from "../utils";
 export async function initLibrary() {
   // deploy LeverageLibrary
   console.log("deploying LeverageLibrary");
-  const leverageLibraryAddress = "0x2ADd8472cC41dbee6c8E9af2C4a08a7256c5A088";
+  const leverageLibraryAddress = "0x8F2C23413A996b9f11cBB52BC8a4c69b3b14985f";
   const LeverageLibrary = await ethers.getContractFactory("LeverageLibrary");
   const leverageLibrary = leverageLibraryAddress
     ? await ethers.getContractAt("LeverageLibrary", leverageLibraryAddress)
@@ -15,7 +15,7 @@ export async function initLibrary() {
 
   // deploy TroveLibrary
   console.log("deploying TroveLibrary");
-  const troveLibaryAddress = "0x00328839B044A8D60d2C07DFe2538E7dD12BB49C";
+  const troveLibaryAddress = "0x621C066aB7da3a97453824854Fbd6682c79f0b7f";
   const TroveLibrary = await ethers.getContractFactory("TroveLibrary");
   const troveLibrary = troveLibaryAddress
     ? await ethers.getContractAt("TroveLibrary", troveLibaryAddress)

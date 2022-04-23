@@ -1,26 +1,27 @@
 import { ethers } from "hardhat";
+// eslint-disable-next-line node/no-missing-import
 import { wait } from "../../utils";
 
 async function main() {
   // We get the contract to deploy
   const instance = await ethers.getContractAt(
-    "ApeSwapLeverageBUSDUSDT",
-    "0x0569fBF08C0E3286d167FF9b9fE52eA8710955B2"
+    "ApeSwapBUSDUSDC",
+    "0x5C985f16657458d0F20B56af68F27eE149C9630B"
   );
 
-  // // // console.log(await instance.rewardsEarned("0xed77fd3f36535f26a072866ffead3db19bde9378"));
-  // await registerStrategy(instance.address, "0xBbA13eb45ed9aA4C1648BCfB23FC883088A35CEc");
-  // await approve(
-  //   "0xe9e7cea3dedca5984780bafc599bd69add087d56", // busd
-  //   "3000000000000000000000000",
-  //   instance.address
-  // );
+  // console.log(await instance.rewardsEarned("0xed77fd3f36535f26a072866ffead3db19bde9378"));
+  await registerStrategy(instance.address, "0xBbA13eb45ed9aA4C1648BCfB23FC883088A35CEc");
+  await approve(
+    "0xe9e7cea3dedca5984780bafc599bd69add087d56", // busd
+    "3000000000000000000000000",
+    instance.address
+  );
 
   const tx = await instance.estimateGas.openPosition(
-    ["110000000000000000000", "110000000000000000000"], // uint256 finalExposure,
-    ["100000000000000000000", "0"], // uint256 principalCollateral,
+    ["40000000000000000000", "40000000000000000000"], // uint256 finalExposure,
+    ["170000000000000000000", "0"], // uint256 principalCollateral,
     0,
-    10
+    0
   );
 
   console.log(tx);

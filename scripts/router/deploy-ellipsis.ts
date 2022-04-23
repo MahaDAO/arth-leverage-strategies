@@ -10,7 +10,8 @@ async function main() {
     "0x88fd584df3f97c64843cd474bdc6f78e398394f4", // address _arthUsd,
     "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d", // address _usdc,
     "0x55d398326f99059ff775485246999027b3197955", // address _usdt,
-    "0xe9e7cea3dedca5984780bafc599bd69add087d56" // address _busd
+    "0xe9e7cea3dedca5984780bafc599bd69add087d56", // address _busd,
+    "0x160CAed03795365F3A589f10C379FfA7d75d4E76" // address _pool3eps
   ];
 
   // We get the contract to deploy
@@ -23,7 +24,8 @@ async function main() {
     String(constructorArguments[4]),
     String(constructorArguments[5]),
     String(constructorArguments[6]),
-    String(constructorArguments[7])
+    String(constructorArguments[7]),
+    String(constructorArguments[8])
   );
 
   await instance.deployed();
