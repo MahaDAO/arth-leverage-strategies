@@ -101,34 +101,40 @@ contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
     // Take the principal.
     busd.transferFrom(msg.sender, address(this), principalCollateral[0]);
 
-    uint256[2] memory newExposure = finalExposure;
+    uint256 flashloanAmount = 0;
     uint256[2] memory newPrinicpalCollateral = principalCollateral;
     
     if (finalExposure[0] <= principalCollateral[0]) {  // We are taking leverage such that: `1 < leverage <= 1.9`.
       (
-        uint256[2] memory newPrinicpalSuggested,
-        uint256[2] memory newExposureSuggested
+        uint256 busdToSellForUsdc,
+        uint256 flashloanAmountSuggested,
+        uint256[2] memory newPrinicpalSuggested
       ) = estimateSwap(  // Estimate how much we should flashloan based on how much we want to borrow.
           principalCollateral[0],
           finalExposure[0],
           finalExposure[1]
         );
 
-      newExposure = newExposureSuggested;
-      newPrinicpalCollateral = newPrinicpalSuggested;
-    }
+      if (busdToSellForUsdc > 0) {
+        busd.approve(address(ellipsis), busdToSellForUsdc);
+        ellipsis.sellTokenForToken(busd, 0, 1, busdToSellForUsdc, 0, me, block.timestamp);
+      }
 
-    uint256 flashloanAmount = ellipsis  // Estimate how much we should flashloan based on how much we want to borrow.
-        .estimateARTHtoBuy(newExposure[0].sub(newPrinicpalCollateral[0]), newExposure[1], 0)
+      flashloanAmount = flashloanAmountSuggested;
+      newPrinicpalCollateral = newPrinicpalSuggested;
+    } else {
+      flashloanAmount = ellipsis  // Estimate how much we should flashloan based on how much we want to borrow.
+        .estimateARTHtoBuy(finalExposure[0].sub(newPrinicpalCollateral[0]), finalExposure[1], 0)
         .mul(102)
         .div(100);
+    }
 
     bytes memory flashloanData = abi.encode(
       msg.sender,
       uint256(0), // action = 0 -> open loan
       minExpectedCollateralRatio,
       maxBorrowingFee,
-      newExposure,
+      finalExposure,
       newPrinicpalCollateral
     );
 
@@ -346,23 +352,26 @@ contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
     uint256 usdcOut
   )
     public
-    pure
+    view
     returns (
-      uint256[2] memory newPrincipalCollateral,
-      uint256[2] memory newExposure
+      uint256 busdToSellForUsdc,
+      uint256 arthToFlashloan,
+      uint256[2] memory newPrincipalCollateral
     )
   {
-    uint256 dollarIn = busdIn;
-    uint256 dollarOut = busdOut.add(usdcOut);  // Price of. busd ~ Price of usdc via stable coin price stability.
+    busdToSellForUsdc = busdIn.sub(busdOut);
+    uint256 expectedUsdcOut = ellipsis.estimateTokenForToken(busd, 1, 2, busdToSellForUsdc);
     
-    require(dollarIn > dollarOut, "Leverage >= 2x but using <2x.");
+    arthToFlashloan = ellipsis.estimateARTHtoBuy(
+      0, 
+      expectedUsdcOut > usdcOut ? 0 : usdcOut.sub(expectedUsdcOut), 
+      0
+    ).mul(102).div(100);
 
-    uint256 dollarDiff = dollarIn.sub(dollarOut);
-    busdOut = dollarDiff.div(2);
-    usdcOut = dollarDiff.sub(busdOut);
-
-    newPrincipalCollateral = [busdIn, 0];
-    newExposure = [busdOut, usdcOut];
+    newPrincipalCollateral = [
+      busdIn.sub(busdToSellForUsdc),
+      0
+    ];
   }
 
   function _flush(address to) internal {
