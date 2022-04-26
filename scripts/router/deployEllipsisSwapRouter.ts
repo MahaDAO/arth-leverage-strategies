@@ -14,7 +14,7 @@ async function main() {
   ];
 
   // We get the contract to deploy
-  const CurveSwapRouter = await ethers.getContractFactory("CurveSwapRouter");
+  const CurveSwapRouter = await ethers.getContractFactory("EllipsisSwapRouter");
   const instance = await CurveSwapRouter.deploy(
     String(constructorArguments[0]),
     String(constructorArguments[1]),
