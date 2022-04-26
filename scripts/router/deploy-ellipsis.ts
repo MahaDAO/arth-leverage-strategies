@@ -4,8 +4,8 @@ import { wait } from "../utils";
 async function main() {
   const constructorArguments = [
     "0x5035cc9988f88f99cdef210d833957a80236c0a4", // address _zap,
-    "0xb38b49bae104bbb6a82640094fd61b341a858f78", // address _lp,
-    "0x98245Bfbef4e3059535232D68821a58abB265C45", // address _pool,
+    "0x4CfAaBd5920021359BB22bB6924CCe708773b6AC", // address _lp,
+    "0x1d4B4796853aEDA5Ab457644a18B703b6bA8b4aB", // address _pool,
     "0xb69a424df8c737a122d0e60695382b3eec07ff4b", // address _arth,
     "0x88fd584df3f97c64843cd474bdc6f78e398394f4", // address _arthUsd,
     "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d", // address _usdc,
