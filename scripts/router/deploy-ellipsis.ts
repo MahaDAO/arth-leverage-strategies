@@ -11,7 +11,7 @@ async function main() {
     "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d", // address _usdc,
     "0x55d398326f99059ff775485246999027b3197955", // address _usdt,
     "0xe9e7cea3dedca5984780bafc599bd69add087d56", // address _busd,
-    "0x160CAed03795365F3A589f10C379FfA7d75d4E76" // address _pool3eps
+    "0x19EC9e3F7B21dd27598E7ad5aAe7dC0Db00A806d" // address _pool3eps
   ];
 
   // We get the contract to deploy

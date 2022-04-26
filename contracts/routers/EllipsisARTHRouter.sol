@@ -8,6 +8,7 @@ import {IStableSwap} from "../interfaces/IStableSwap.sol";
 import {IERC20Wrapper} from "../interfaces/IERC20Wrapper.sol";
 import {IStableSwapRouter} from "../interfaces/IStableSwapRouter.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import { IOldStableSwap } from "../interfaces/IOldStableSwap.sol";
 
 contract EllipsisARTHRouter is IStableSwapRouter {
   using SafeMath for uint256;
@@ -178,10 +179,10 @@ contract EllipsisARTHRouter is IStableSwapRouter {
       fromToken.approve(pool3eps, fromToken.balanceOf(me));
       fromTokenId = fromTokenId - 1;
       toTokenId = toTokenId - 1;
-      IStableSwap pool3epsSwap = IStableSwap(pool3eps);
+      IOldStableSwap pool3epsSwap = IOldStableSwap(pool3eps);
       uint256 amountTokenOut = pool3epsSwap.get_dy(fromTokenId, toTokenId, amountInMax);
       require(amountTokenOut >= amountOutMin, "amountOutMin not met");
-      pool3epsSwap.exchange(fromTokenId, toTokenId, amountInMax, amountTokenOut, to);
+      pool3epsSwap.exchange(fromTokenId, toTokenId, amountInMax, amountTokenOut);
     }
 
     require(block.timestamp <= deadline, "swap deadline expired");
