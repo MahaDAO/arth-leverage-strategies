@@ -117,7 +117,7 @@ contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
 
       if (busdToSellForUsdc > 0) {
         busd.approve(address(ellipsis), busdToSellForUsdc);
-        ellipsis.sellTokenForToken(busd, 0, 1, busdToSellForUsdc, 0, me, block.timestamp);
+        ellipsis.sellTokenForToken(busd, 1, 2, busdToSellForUsdc, 0, me, block.timestamp);
       }
 
       flashloanAmount = flashloanAmountSuggested;
