@@ -159,31 +159,22 @@ contract EllipsisARTHRouter is IStableSwapRouter {
 
   function sellTokenForToken(
     IERC20 fromToken,
-    int128 fromTokenId, // 1 -> busd, 2 -> usdc, 3 -> usdt
-    int128 toTokenId, // 1 -> busd, 2 -> usdc, 3 -> usdt
+    int128 fromTokenId, // 0 -> busd, 1 -> usdc, 2 -> usdt
+    int128 toTokenId, // 0 -> busd, 1 -> usdc, 2 -> usdt
     uint256 amountInMax,
     uint256 amountOutMin,
     address to,
     uint256 deadline
   ) external override {
-    if (amountInMax > 0) fromToken.transferFrom(msg.sender, me, amountInMax);
+    require(amountInMax > 0, "in amount is 0");
 
-    // Check if any token involved is arth.usd or not.
-    if (fromTokenId == 0 || toTokenId == 0) {
-      fromToken.approve(pool, fromToken.balanceOf(me));
-      IStableSwap poolSwap = IStableSwap(pool);
-      uint256 amountTokenOut = poolSwap.get_dy_underlying(fromTokenId, toTokenId, amountInMax);
-      require(amountTokenOut >= amountOutMin, "amountOutMin not met");
-      poolSwap.exchange_underlying(fromTokenId, toTokenId, amountInMax, amountTokenOut, to);
-    } else { // If arth.usd is not involved then we use 3eps pool for swapping.
-      fromToken.approve(pool3eps, fromToken.balanceOf(me));
-      fromTokenId = fromTokenId - 1;
-      toTokenId = toTokenId - 1;
-      IOldStableSwap pool3epsSwap = IOldStableSwap(pool3eps);
-      uint256 amountTokenOut = pool3epsSwap.get_dy(fromTokenId, toTokenId, amountInMax);
-      require(amountTokenOut >= amountOutMin, "amountOutMin not met");
-      pool3epsSwap.exchange(fromTokenId, toTokenId, amountInMax, amountTokenOut);
-    }
+    fromToken.transferFrom(msg.sender, me, amountInMax);
+    fromToken.approve(pool3eps, fromToken.balanceOf(me));
+
+    IOldStableSwap pool3epsSwap = IOldStableSwap(pool3eps);
+    uint256 amountTokenOut = pool3epsSwap.get_dy(fromTokenId, toTokenId, amountInMax);
+    require(amountTokenOut >= amountOutMin, "amountOutMin not met");
+    pool3epsSwap.exchange(fromTokenId, toTokenId, amountInMax, amountTokenOut);
 
     require(block.timestamp <= deadline, "swap deadline expired");
     
