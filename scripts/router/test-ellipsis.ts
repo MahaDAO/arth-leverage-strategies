@@ -41,28 +41,28 @@ async function main() {
 
   console.log("i am", owner.address);
 
-  const tx = await instance.sellARTHForExact(
-    "20000000000000000", // uint256 amountArthInMax,
-    "38000000000000000", // uint256 amountBUSDOut,
-    "0", // uint256 amountUSDCOut,
-    "0", // uint256 amountUSDTOut,
-    owner.address, // address to,
-    Math.floor(Date.now() / 1000) + 3600 // uint256 deadline
-  );
-  console.log("sell", tx.hash);
-
-  // const tx2 = await instance.buyARTHForExact(
-  //   "10000000000000000", // uint256 amountBUSDIn,
-  //   "0", // uint256 amountUSDCIn,
-  //   "0", // uint256 amountUSDTIn,
-  //   "1900000000000000", // uint256 amountARTHOutMin,
+  // const tx = await instance.sellARTHForExact(
+  //   "20000000000000000", // uint256 amountArthInMax,
+  //   "10000000000000000", // uint256 amountBUSDOut,
+  //   "10000000000000000", // uint256 amountUSDCOut,
+  //   "0", // uint256 amountUSDTOut,
   //   owner.address, // address to,
   //   Math.floor(Date.now() / 1000) + 3600 // uint256 deadline
   // );
-  // console.log("buy", tx2.hash);
+  // console.log("sell", tx.hash);
+
+  const tx2 = await instance.buyARTHForExact(
+    "10000000000000000", // uint256 amountBUSDIn,
+    "0", // uint256 amountUSDCIn,
+    "0", // uint256 amountUSDTIn,
+    "4900000000000000", // uint256 amountARTHOutMin,
+    owner.address, // address to,
+    Math.floor(Date.now() / 1000) + 3600 // uint256 deadline
+  );
+  console.log("buy", tx2.hash);
 
   // const tx3 = await instance.sellTokenForToken(
-  //   "0xe9e7cea3dedca5984780bafc599bd69add087d56",
+  //   "0x88fd584dF3f97c64843CD474bDC6F78e398394f4",
   //   0,
   //   1,
   //   "1000000000000000000",
