@@ -3,7 +3,7 @@ import { wait } from "../utils";
 
 async function main() {
   const constructorArguments = [
-    "0x5035cc9988f88f99cdef210d833957a80236c0a4", // address _zap,
+    "0xB15bb89ed07D2949dfee504523a6A12F90117d18", // address _zap,
     "0x4CfAaBd5920021359BB22bB6924CCe708773b6AC", // address _lp,
     "0x1d4B4796853aEDA5Ab457644a18B703b6bA8b4aB", // address _pool,
     "0xb69a424df8c737a122d0e60695382b3eec07ff4b", // address _arth,

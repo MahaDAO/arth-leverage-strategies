@@ -6,7 +6,7 @@ async function main() {
   // We get the contract to deploy
   const instance = await ethers.getContractAt(
     "EllipsisARTHRouter",
-    "0xC0BC5163620C092D71E6eD09b4c07E21456B0672"
+    "0x8659F81100eB3151bB8BE7e9c095d2df1C105E72"
   );
 
   // await approve(
@@ -51,26 +51,26 @@ async function main() {
   // );
   // console.log("sell", tx.hash);
 
-  const tx2 = await instance.buyARTHForExact(
-    "10000000000000000", // uint256 amountBUSDIn,
-    "0", // uint256 amountUSDCIn,
-    "0", // uint256 amountUSDTIn,
-    "4900000000000000", // uint256 amountARTHOutMin,
-    owner.address, // address to,
-    Math.floor(Date.now() / 1000) + 3600 // uint256 deadline
-  );
-  console.log("buy", tx2.hash);
-
-  // const tx3 = await instance.sellTokenForToken(
-  //   "0x88fd584dF3f97c64843CD474bDC6F78e398394f4",
-  //   0,
-  //   1,
-  //   "1000000000000000000",
-  //   "0",
-  //   owner.address,
-  //   Math.floor((Date.now() + 5 * 60 * 60 * 1000) / 1000)
+  // const tx2 = await instance.buyARTHForExact(
+  //   "10000000000000000", // uint256 amountBUSDIn,
+  //   "0", // uint256 amountUSDCIn,
+  //   "0", // uint256 amountUSDTIn,
+  //   "4900000000000000", // uint256 amountARTHOutMin,
+  //   owner.address, // address to,
+  //   Math.floor(Date.now() / 1000) + 3600 // uint256 deadline
   // );
-  // console.log(tx3.hash);
+  // console.log("buy", tx2.hash);
+
+  const tx3 = await instance.sellTokenForToken(
+    "0xe9e7cea3dedca5984780bafc599bd69add087d56",
+    0,
+    2,
+    "1000000000000000000",
+    "0",
+    owner.address,
+    Math.floor((Date.now() + 5 * 60 * 60 * 1000) / 1000)
+  );
+  console.log(tx3.hash);
 }
 
 // eslint-disable-next-line no-unused-vars
