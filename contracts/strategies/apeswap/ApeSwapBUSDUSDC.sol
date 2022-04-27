@@ -124,7 +124,7 @@ contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
       newPrinicpalCollateral = newPrinicpalSuggested;
     } else {
       flashloanAmount = ellipsis  // Estimate how much we should flashloan based on how much we want to borrow.
-        .estimateARTHtoBuy(finalExposure[0].sub(newPrinicpalCollateral[0]), finalExposure[1], 0)
+        .estimateARTHtoSell(finalExposure[0].sub(newPrinicpalCollateral[0]), finalExposure[1], 0)
         .mul(102)
         .div(100);
     }
@@ -221,7 +221,7 @@ contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
     ellipsis.sellARTHForExact(
       flashloanAmount,
       finalExposure[0].sub(principalCollateral[0]), // amountBUSDOut,
-      finalExposure[1], // amountusdCOut,
+      finalExposure[1].sub(principalCollateral[1]), // amountusdCOut,
       0, // amountUSDTOut,
       me,
       block.timestamp
@@ -362,15 +362,15 @@ contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
     busdToSellForUsdc = busdIn.sub(busdOut);
     uint256 expectedUsdcOut = ellipsis.estimateTokenForToken(busd, 1, 2, busdToSellForUsdc);
     
-    arthToFlashloan = ellipsis.estimateARTHtoBuy(
+    arthToFlashloan = ellipsis.estimateARTHtoSell(
       0, 
       expectedUsdcOut > usdcOut ? 0 : usdcOut.sub(expectedUsdcOut), 
       0
-    ).mul(102).div(100);
+    ).mul(105).div(100);
 
     newPrincipalCollateral = [
       busdIn.sub(busdToSellForUsdc),
-      0
+      expectedUsdcOut
     ];
   }
 

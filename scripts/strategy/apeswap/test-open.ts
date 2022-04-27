@@ -6,7 +6,7 @@ async function main() {
   // We get the contract to deploy
   const instance = await ethers.getContractAt(
     "ApeSwapBUSDUSDC",
-    "0xf5c564e641F0003c39Ae2df8250769cfFb04e02d"
+    "0xcd8ec6471FD255f87c8B3c2231930b658c43449B"
   );
 
   await registerStrategy(instance.address, "0xBbA13eb45ed9aA4C1648BCfB23FC883088A35CEc");
@@ -17,8 +17,8 @@ async function main() {
   );
 
   const tx = await instance.estimateGas.openPosition(
-    ["50000000000000000000", "50000000000000000000"], // uint256 finalExposure,
-    ["100000000000000000000", "0"], // uint256 principalCollateral,
+    ["70000000000000000000", "70000000000000000000"], // uint256 finalExposure,
+    ["130000000000000000000", "0"], // uint256 principalCollateral,
     0,
     0
   );
