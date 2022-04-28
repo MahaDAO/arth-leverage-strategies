@@ -76,4 +76,6 @@ interface IBorrowerOperations {
   function claimCollateral() external;
 
   function getCompositeDebt(uint256 _debt) external view returns (uint256);
+
+  function MIN_NET_DEBT() external view returns (uint256);
 }

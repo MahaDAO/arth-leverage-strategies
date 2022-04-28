@@ -16,6 +16,7 @@ import {LeverageAccount, LeverageAccountRegistry} from "../../account/LeverageAc
 import {LeverageLibrary} from "../../helpers/LeverageLibrary.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {TroveLibrary} from "../../helpers/TroveLibrary.sol";
+import { IBorrowerOperations } from "../../interfaces/IBorrowerOperations.sol";
 
 contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
   using SafeMath for uint256;
@@ -43,6 +44,7 @@ contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
   IUniswapV2Factory public apeswapFactory;
 
   address private me;
+  uint256 public minNetDebt;
 
   constructor(bytes memory data1, bytes memory data2) {
     (
@@ -84,6 +86,8 @@ contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
     priceFeed = IPriceFeed(_priceFeed);
     stakingWrapper = IERC20Wrapper(_stakingWrapper);
     accountRegistry = LeverageAccountRegistry(_accountRegistry);
+
+    minNetDebt = IBorrowerOperations(borrowerOperations).MIN_NET_DEBT();
   }
 
   function getAccount(address who) public view returns (LeverageAccount) {
@@ -138,7 +142,19 @@ contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
       newPrinicpalCollateral
     );
 
-    flashLoan.flashLoan(address(this), flashloanAmount, flashloanData);
+    if (flashloanAmount > 0) {
+      flashLoan.flashLoan(address(this), flashloanAmount, flashloanData);
+    } else {
+      _onFlashloanOpenPosition(
+        msg.sender,
+        0,
+        finalExposure,
+        newPrinicpalCollateral,
+        minExpectedCollateralRatio,
+        maxBorrowingFee
+      );
+    }
+      
     _flush(msg.sender);
 
     emit PositionOpened(msg.sender, address(stakingWrapper), finalExposure, principalCollateral);
@@ -216,16 +232,18 @@ contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
   ) internal {
     LeverageAccount acct = getAccount(who);
 
-    // 1: sell arth for collateral
-    arth.approve(address(ellipsis), flashloanAmount);
-    ellipsis.sellARTHForExact(
-      flashloanAmount,
-      finalExposure[0].sub(principalCollateral[0]), // amountBUSDOut,
-      finalExposure[1].sub(principalCollateral[1]), // amountusdCOut,
-      0, // amountUSDTOut,
-      me,
-      block.timestamp
-    );
+    if (flashloanAmount > 0) {
+      // 1: sell arth for collateral
+      arth.approve(address(ellipsis), flashloanAmount);
+      ellipsis.sellARTHForExact(
+        flashloanAmount,
+        finalExposure[0].sub(principalCollateral[0]), // amountBUSDOut,
+        finalExposure[1].sub(principalCollateral[1]), // amountusdCOut,
+        0, // amountUSDTOut,
+        me,
+        block.timestamp
+      );
+    }
 
     // 2. LP all the collateral
     usdc.approve(address(apeswapRouter), usdc.balanceOf(me));
@@ -250,7 +268,10 @@ contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
     stakingWrapper.transfer(address(acct), collateralAmount);
 
     // 5: open loan using the collateral
-    uint256 debt = flashloanAmount.sub(arth.balanceOf(me));
+    uint256 debt = flashloanAmount.sub(arth.balanceOf(me)) < minNetDebt
+      ? minNetDebt
+      : flashloanAmount.sub(arth.balanceOf(me));
+    
     TroveLibrary.openLoan(
       acct,
       borrowerOperations,
@@ -361,12 +382,14 @@ contract ApeSwapBUSDUSDC is IFlashBorrower, ILeverageStrategy {
   {
     busdToSellForUsdc = busdIn.sub(busdOut);
     uint256 expectedUsdcOut = ellipsis.estimateTokenForToken(busd, 1, 2, busdToSellForUsdc);
-    
-    arthToFlashloan = ellipsis.estimateARTHtoSell(
-      0, 
-      expectedUsdcOut > usdcOut ? 0 : usdcOut.sub(expectedUsdcOut), 
-      0
-    ).mul(105).div(100);
+
+    arthToFlashloan = expectedUsdcOut >= usdcOut
+      ? 0
+      : ellipsis.estimateARTHtoSell(
+          0, 
+          usdcOut.sub(expectedUsdcOut), 
+          0
+        ).mul(105).div(100);
 
     newPrincipalCollateral = [
       busdIn.sub(busdToSellForUsdc),

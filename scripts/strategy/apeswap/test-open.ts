@@ -9,16 +9,16 @@ async function main() {
     "0x97e1CE64F91Da2ad2b938De468ab4F05d2Ed5298"
   );
 
-  await registerStrategy(instance.address, "0xBbA13eb45ed9aA4C1648BCfB23FC883088A35CEc");
-  await approve(
-    "0xe9e7cea3dedca5984780bafc599bd69add087d56", // busd
-    "3000000000000000000000000",
-    instance.address
-  );
+  // await registerStrategy(instance.address, "0xBbA13eb45ed9aA4C1648BCfB23FC883088A35CEc");
+  // await approve(
+  //   "0xe9e7cea3dedca5984780bafc599bd69add087d56", // busd
+  //   "3000000000000000000000000",
+  //   instance.address
+  // );
 
   const tx = await instance.estimateGas.openPosition(
-    ["70000000000000000000", "70000000000000000000"], // uint256 finalExposure,
-    ["100000000000000000000", "0"], // uint256 principalCollateral,
+    ["250000000000000000000", "250000000000000000000"], // uint256 finalExposure,
+    ["150000000000000000000", "0"], // uint256 principalCollateral,
     0,
     0
   );
