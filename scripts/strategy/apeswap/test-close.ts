@@ -5,12 +5,12 @@ async function main() {
   // We get the contract to deploy
   const instance = await ethers.getContractAt(
     "ApeSwapExposure",
-    "0x41969F40588C04b55fba4024f10045C6C1CB94C5"
+    "0x33611cb8bb7776b4e312e969ea933a1e1b9f087b"
   );
 
-  await registerStrategy(instance.address, "0xC442C29B7Cf9C6C09Fc821B8a4ebB85b6d40fAA0");
+  // await registerStrategy(instance.address, "0xC442C29B7Cf9C6C09Fc821B8a4ebB85b6d40fAA0");
 
-  const tx = await instance.closePosition(
+  const tx = await instance.estimateGas.closePosition(
     ["90000000000000000000", "0"] // uint256 minExpectedCollateral,
   );
 

@@ -30,8 +30,8 @@ async function main() {
   ];
 
   const args2 = [
-    "0xC1105fb83355596E3eC54588A87747391bBdc92e", // address _borrowerOperations,
-    "0xa920823d7F7Fc33222DF17E475567438B1e7F84c", // address _troveManager,
+    "0xB2516757Bc899e3FBe3C0ACcb506c18272d724C5", // address _borrowerOperations,
+    "0x1c52Fdc472a8029BfEd1C49F960C8719820a53BA", // address _troveManager,
     "0x120da5c69E7B00618AC648Da5ea33ec60aA210ed", // address _priceFeed,
     "0xBb9858603B1FB9375f6Df972650343e985186Ac5", // address _stakingWrapper,
     "0x3A076D0EBF9ff41473071864bf23Afdbd77A253E" // address _accountRegistry
