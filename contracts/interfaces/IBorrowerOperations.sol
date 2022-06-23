@@ -1,81 +1,78 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.0;
 
 // Common interface for the Trove Manager.
 interface IBorrowerOperations {
-  // --- Events ---
-  function setAddresses(
-    address _troveManagerAddress,
-    address _activePoolAddress,
-    address _defaultPoolAddress,
-    address _stabilityPoolAddress,
-    address _gasPoolAddress,
-    address _collSurplusPoolAddress,
-    address _sortedTrovesAddress,
-    address _lusdTokenAddress,
-    address _wethAddress,
-    address _governanceAddress
-  ) external;
+    enum BorrowerOperation {
+        openTrove,
+        closeTrove,
+        adjustTrove
+    }
 
-  function registerFrontEnd() external;
+    // --- Functions ---
 
-  function openTrove(
-    uint256 _maxFee,
-    uint256 _arthAmount,
-    uint256 _ethAmount,
-    address _upperHint,
-    address _lowerHint,
-    address _frontEndTag
-  ) external;
+    function setAddresses(
+        address _troveManagerAddress,
+        address _activePoolAddress,
+        address _defaultPoolAddress,
+        address _stabilityPoolAddress,
+        address _gasPoolAddress,
+        address _collSurplusPoolAddress,
+        address _governanceAddress,
+        address _sortedTrovesAddress,
+        address _arthTokenAddress
+    ) external;
 
-  function addColl(
-    uint256 _ethAmount,
-    address _upperHint,
-    address _lowerHint
-  ) external;
+    function registerFrontEnd() external;
 
-  function moveETHGainToTrove(
-    uint256 _ethAmount,
-    address _user,
-    address _upperHint,
-    address _lowerHint
-  ) external;
+    function openTrove(
+        uint256 _maxFee,
+        uint256 _ARTHAmount,
+        address _upperHint,
+        address _lowerHint,
+        address _frontEndTag
+    ) external payable;
 
-  function withdrawColl(
-    uint256 _amount,
-    address _upperHint,
-    address _lowerHint
-  ) external;
+    function addColl(address _upperHint, address _lowerHint) external payable;
 
-  function withdrawLUSD(
-    uint256 _maxFee,
-    uint256 _amount,
-    address _upperHint,
-    address _lowerHint
-  ) external;
+    function moveETHGainToTrove(
+        address _user,
+        address _upperHint,
+        address _lowerHint
+    ) external payable;
 
-  function repayLUSD(
-    uint256 _amount,
-    address _upperHint,
-    address _lowerHint
-  ) external;
+    function withdrawColl(
+        uint256 _amount,
+        address _upperHint,
+        address _lowerHint
+    ) external;
 
-  function closeTrove() external;
+    function withdrawARTH(
+        uint256 _maxFee,
+        uint256 _amount,
+        address _upperHint,
+        address _lowerHint
+    ) external;
 
-  function adjustTrove(
-    uint256 _maxFee,
-    uint256 _collWithdrawal,
-    uint256 _debtChange,
-    uint256 _ethAmount,
-    bool isDebtIncrease,
-    address _upperHint,
-    address _lowerHint
-  ) external;
+    function repayARTH(
+        uint256 _amount,
+        address _upperHint,
+        address _lowerHint
+    ) external;
 
-  function claimCollateral() external;
+    function closeTrove() external;
 
-  function getCompositeDebt(uint256 _debt) external view returns (uint256);
+    function adjustTrove(
+        uint256 _maxFee,
+        uint256 _collWithdrawal,
+        uint256 _debtChange,
+        bool isDebtIncrease,
+        address _upperHint,
+        address _lowerHint
+    ) external payable;
 
-  function MIN_NET_DEBT() external view returns (uint256);
+    function claimCollateral() external;
+
+    function getCompositeDebt(uint256 _debt) external pure returns (uint256);
 }
