@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.0;
 
-import {BNBDDDVault} from "./BNBDDDVault.sol";
+import {IDotDotLPStaker, BNBDDDVault} from "./BNBDDDVault.sol";
 
 contract BNBDDDVaultFactory {
     mapping(address => BNBDDDVault) public vaults;
@@ -15,6 +15,7 @@ contract BNBDDDVaultFactory {
     address private arthEPXStableSwap;
     address private borrowerOperations;
     address private troveManager;
+    address private epxZapper;
 
     constructor(
         address _ddd,
@@ -23,6 +24,7 @@ contract BNBDDDVaultFactory {
         address _arthUsd,
         address _arthEPXLP,
         address _arthEPXStableSwap,
+        address _epxZapper,
         address _borrowerOperations,
         address _troveManager
     ) {
@@ -34,6 +36,7 @@ contract BNBDDDVaultFactory {
         arthEPXStableSwap = _arthEPXStableSwap;
         borrowerOperations = _borrowerOperations;
         troveManager = _troveManager;
+        epxZapper = _epxZapper;
     }
 
     function deposit() external payable {
@@ -45,6 +48,7 @@ contract BNBDDDVaultFactory {
                 arthUsd,
                 arthEPXLP,
                 arthEPXStableSwap,
+                epxZapper,
                 borrowerOperations,
                 troveManager,
                 msg.sender
@@ -67,15 +71,17 @@ contract BNBDDDVaultFactory {
         vault.getReward();
     }
 
-    function earned(address who) external view returns (uint256) {
+    function earned(address who) external view returns (IDotDotLPStaker.Amounts[] memory) {
         BNBDDDVault vault = vaults[who];
         if (address(vault) != address(0)) return vault.earned();
-        return 0;
+
+        IDotDotLPStaker.Amounts[] memory blank;
+        return blank;
     }
 
-    function balanceOf(address who) external view returns (uint256) {
+    function balanceOf(address who) external view returns (IDotDotLPStaker.ExtraReward[] memory) {
         BNBDDDVault vault = vaults[who];
         if (address(vault) != address(0)) return vault.balanceOf();
-        return 0;
+        return [];
     }
 }
