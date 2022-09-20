@@ -2,10 +2,10 @@
 pragma solidity ^0.8.0;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC721Burnable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
 import {ERC721Pausable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Pausable.sol";
-import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
 import {IERC721, IERC721Metadata, ERC721, ERC721Enumerable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 
 import {IBorrowerOperations} from "../../interfaces/IBorrowerOperations.sol";
@@ -164,6 +164,6 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
         address to,
         uint256 tokenId
     ) internal virtual override(ERC721, ERC721Enumerable, ERC721Pausable) {
-        // nothing
+        super._beforeTokenTransfer(from, to, tokenId);
     }
 }
