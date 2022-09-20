@@ -3,16 +3,19 @@ pragma solidity ^0.8.0;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ERC721, ERC721Enumerable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import {ERC721Burnable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
 import {ERC721Pausable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Pausable.sol";
 import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
+import {IERC721, IERC721Metadata, ERC721, ERC721Enumerable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+
 import {IBorrowerOperations} from "../../interfaces/IBorrowerOperations.sol";
 import {INonfungiblePositionManager} from "../../interfaces/INonfungiblePositionManager.sol";
 
 contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Pausable {
-    event Deposit(address indexed dst, uint256 wad);
-    event Withdrawal(address indexed src, uint256 wad);
+    using Counters for Counters.Counter;
+
+    event Deposit(address indexed dst, uint256 wad, uint256 tokenId);
+    event Withdrawal(address indexed src, uint256 wad, uint256 tokenId);
 
     struct Position {
         uint256 uniswapNftId;
@@ -46,16 +49,16 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
         weth = IERC20(_weth);
         fee = _fee;
         borrowerOperations = IBorrowerOperations(_borrowerOperations);
-        uniswapNFTManager = INonfungiblePositionManager(uniswapNFTManager);
+        uniswapNFTManager = INonfungiblePositionManager(_uniswapNFTManager);
 
-        arth.approve(uniswapNFTManager, uint256.max);
+        arth.approve(_uniswapNFTManager, type(uint256).max);
     }
 
     function supportsInterface(bytes4 interfaceId)
         public
         view
         virtual
-        override(ERC165, IERC165)
+        override(ERC721, ERC721Enumerable)
         returns (bool)
     {
         return
@@ -107,7 +110,7 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
             coll: ethToLock,
             debt: arthToMint,
             uniswapNftId: tokenId,
-            liquidty: liquidity,
+            liquidity: liquidity,
             amount0: amount0,
             amount1: amount1
         });
@@ -125,7 +128,7 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
         INonfungiblePositionManager.CollectParams memory collectParams
     ) public {
         require(ERC721.ownerOf(tokenId) == msg.sender, "not owner");
-        _burn(msg.sender, tokenId);
+        _burn(tokenId);
 
         Position memory position = positions[tokenId];
 
@@ -160,11 +163,7 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
         address from,
         address to,
         uint256 tokenId
-    ) internal virtual {
+    ) internal virtual override(ERC721, ERC721Enumerable, ERC721Pausable) {
         // nothing
-    }
-
-    function fallbackCall(address target, bytes memory data) onlyOwner {
-        // todo
     }
 }

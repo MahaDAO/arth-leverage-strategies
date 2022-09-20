@@ -107,7 +107,7 @@ contract StabilityPoolStrategy is CropJoinAdapter, PriceFormula, Ownable {
             return 0;
         }
 
-        if (chainlinkTimestamp + 1 hours < now) return 0; // price is down
+        if (chainlinkTimestamp + 1 hours < block.timestamp) return 0; // price is down
 
         uint256 chainlinkFactor = 10**chainlinkDecimals;
         return chainlinkLatestAnswer.mul(PRECISION) / chainlinkFactor;
@@ -241,7 +241,7 @@ contract StabilityPoolStrategy is CropJoinAdapter, PriceFormula, Ownable {
         (bool success, ) = dest.call{value: ethAmount}(""); // re-entry is fine here
         require(success, "swap: sending ETH failed");
 
-        emit RebalanceSwap(msg.sender, arthAmount, ethAmount, now);
+        emit RebalanceSwap(msg.sender, arthAmount, ethAmount, block.timestamp);
 
         return ethAmount;
     }
