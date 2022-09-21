@@ -79,20 +79,50 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
             super.supportsInterface(interfaceId);
     }
 
-    /// @notice Open trove, and keep the ARTH minted in the contract itself.
-    function openTrove() external payable onlyOwner nonReentrant {
-        // borrowerOperations.openTrove{value: msg.value}(
-        //     _maxFee, 
-        //     _ARTHAmount, 
-        //     _upperHint, 
-        //     _lowerHint, 
-        //     _frontEndTag
-        // );
+    function openTrove(
+        uint256 _maxFee, 
+        uint256 _arthAmount, 
+        address _upperHint, 
+        address _lowerHint, 
+        address _frontEndTag
+    ) external payable onlyOwner nonReentrant {
+        require(msg.value > 0, "No ETH");
+        
+        // Open position and keep the ARTH mitned in the contract itself
+        // for later closing the loan.
+        borrowerOperations.openTrove{value: msg.value}(
+            _maxFee, 
+            _arthAmount, 
+            _upperHint, 
+            _lowerHint, 
+            _frontEndTag
+        );
     }
 
-    /// @notice Closes the trove, and keep the ETH returned in the contract itself.
-    function closeTrove() external payable onlyOwner nonReentrant {
+    function closeTrove(uint256 extraARTHNeeded) 
+        external 
+        payable 
+        onlyOwner 
+        nonReentrant 
+    {   
+        // Check if we need extra ARTH while closing to compensate for borrowing fee, liquidation reserve, etc
+        // that was charged to form total debt while minting.
+        if (extraARTHNeeded > 0) {
+            arth.transferFrom(owner(), address(this), extraARTHNeeded);
+        }
+
+        // Close the trove.
         borrowerOperations.closeTrove();
+
+        // Check if we still have some ARTH left and transfer to owner if yes.
+        uint256 arthBalance = arth.balanceOf(address(this));
+        if (arthBalance > 0) { 
+            arth.transfer(owner(), arthBalance);
+        }
+
+        // Finally, return the ETH back to the owner.
+        (bool success, /* bytes data */) = msg.sender.call{value: address(this).balance}("");
+        require(success, "Close failed");
     }
 
     function deposit(
