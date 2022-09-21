@@ -62,7 +62,7 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
         uniswapNFTManager = INonfungiblePositionManager(_uniswapNFTManager);
 
         IUniswapV3Pool _pool = IUniswapV3Pool(_uniswapV3Pool);
-        isARTHToken0 = _pool.token0() == arth;
+        isARTHToken0 = _pool.token0() == _arth;
         arth.approve(_uniswapNFTManager, type(uint256).max);
     }
 
