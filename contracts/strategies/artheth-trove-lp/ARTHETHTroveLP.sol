@@ -153,7 +153,16 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
             amount1: amount1
         });
         
-        // 5. Shouldn't we refund any dust ETH/WETH or ARTH that might be left after new LP position?
+        // 5. Refund any dust ETH/WETH or ARTH that might be left after new LP position?
+        if (amount0 < mintParams.amount0Desired) {
+            arth.transfer(msg.sender, amount0.sub(mintParams.amount0Desired));
+        }
+
+        if (amount1 < mintParams.amount1Desired) {
+            uint256 refundAmount = amount1.sub(mintParams.amount1Desired);
+            (bool success, /* bytes data */) = msg.sender.call{value: refundAmount}("");
+            require(success, "Refund failed");
+        }
 
         emit Deposit(msg.sender, msg.value, _tokenIdTracker.current());
     }
@@ -172,9 +181,10 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
     {
         require(ERC721.ownerOf(tokenId) == msg.sender, "Not owner");
 
-        // 1. Burn the strategy NFT and fetch position details.
-        _burn(tokenId);
+        // 1. Burn the strategy NFT and fetch position details and remove the position.
         Position memory position = positions[tokenId];
+        _burn(tokenId);
+        delete positions[tokenId];
 
         // 2. Claim the fees.
         _collectFees(position, collectParams);
@@ -187,10 +197,12 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
             decreaseLiquidityParams
         );
         
+        // 4. Check if we have less ARTH.
         if (amount0 < position.debt) {
-            // TODO: if we have less ARTH then we swap the ETH for ARTH in the ARTH/ETH pool
+            // TODO: If yes, then we swap the ETH for ARTH in the ARTH/ETH pool
         }
 
+        // 5. Adjust the trove, to remove collateral.
         borrowerOperations.adjustTrove(
             maxFee,
             position.coll,
@@ -200,9 +212,12 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
             lowerHint
         );
 
-        // todo: if we have more ARTH then we swap the ARTH for ETH in the ARTH/ETH pool
+        // 6. Check if we still have some ARTH left
+        if (amount0 > 0) {
+            // TODO: If yes, then swap ARTH for ETH
+        }
 
-        // Send the ether back.
+        // 7. Send the ether back.
         (bool success, /* bytes data */) = msg.sender.call{value: position.eth}("");
         require(success, "Withdraw failed");
 
