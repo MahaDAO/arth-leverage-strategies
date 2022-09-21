@@ -10,6 +10,7 @@ import {ERC721Burnable} from "@openzeppelin/contracts/token/ERC721/extensions/ER
 import {ERC721Pausable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Pausable.sol";
 import {IERC721, IERC721Metadata, ERC721, ERC721Enumerable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 
+import {IUniswapV3Pool} from "../../interfaces/IUniswapV3Pool.sol";
 import {IBorrowerOperations} from "../../interfaces/IBorrowerOperations.sol";
 import {INonfungiblePositionManager} from "../../interfaces/INonfungiblePositionManager.sol";
 
@@ -31,11 +32,13 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
     }
 
     uint24 public fee;
+    bool public isARTHToken0;
     Counters.Counter private _tokenIdTracker;
     mapping(uint256 => Position) public positions;
 
     IERC20 public arth;
     IERC20 public weth;
+    
     IBorrowerOperations public borrowerOperations;
     INonfungiblePositionManager public uniswapNFTManager;
 
@@ -46,16 +49,20 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
         address _uniswapNFTManager,
         address _arth,
         address _weth,
-        uint24 _fee
+        uint24 _fee,
+        address _uniswapV3Pool
     ) 
         ERC721("ARTH/ETH LP Strategy", "ARTHETH-lp") 
     {
         fee = _fee;
+
         arth = IERC20(_arth);
         weth = IERC20(_weth);
         borrowerOperations = IBorrowerOperations(_borrowerOperations);
         uniswapNFTManager = INonfungiblePositionManager(_uniswapNFTManager);
 
+        IUniswapV3Pool _pool = IUniswapV3Pool(_uniswapV3Pool);
+        isARTHToken0 = _pool.token0() == arth;
         arth.approve(_uniswapNFTManager, type(uint256).max);
     }
 
