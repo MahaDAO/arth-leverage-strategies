@@ -121,7 +121,7 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
         }
 
         // Finally, return the ETH back to the owner.
-        (bool success, /* bytes data */) = msg.sender.call{value: address(this).balance}("");
+        (bool success, /* bytes data */) = owner().call{value: address(this).balance}("");
         require(success, "Close failed");
     }
 
@@ -181,7 +181,7 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
 
         // 4. Record the position.
         positions[_tokenIdTracker.current()] = Position({
-            eth: msg.value,
+            eth: ethToLock.add(amount1),
             coll: ethToLock,
             debt: arthToMint,
             uniswapNftId: tokenId,
