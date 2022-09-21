@@ -97,7 +97,7 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
     {
         require(msg.value > 0, "No ETH");
         
-        // Open trove.
+        // Open the trove.
         borrowerOperations.openTrove{value: msg.value}(
             _maxFee, 
             _arthAmount, 
@@ -106,8 +106,8 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
             _frontEndTag
         );
 
-        // Return dust ETH or dust ARTH.
-        _flush(owner());
+        // Return dust ETH, ARTH.
+        _flush(owner(), false);
     }
 
     function closeTrove(uint256 arthNeeded) 
@@ -122,8 +122,8 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
         // Close the trove.
         borrowerOperations.closeTrove();
 
-        // Return any dust amount of ARTH or ETH left.
-        _flush(owner());
+        // Return dust ARTH, ETH.
+        _flush(owner(), false);
     }
 
     function deposit(
@@ -138,6 +138,7 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
         payable 
         nonReentrant 
     {
+        // TODO: validation that arth is infact token0.
         address _me = address(this);
 
         // Check that we are receiving appropriate amount of ETH and 
@@ -162,13 +163,14 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
         );
         uint256 arthAfterMinting = arth.balanceOf(_me);
 
-        // Check that appropriate amount of ARTH was minted.
+        // Check that appropriate amount of ARTH was minted. 
+        // Since we will need amount0Desired ARTH to add liquidity to LP.
         require(
             arthAfterMinting.sub(arthBeforeMinting) >= mintParams.amount0Desired, 
             "Not enough ARTH"
         );
 
-        // 3. LP the ARTH/ETH.
+        // 3. Adding liquidity in the ARTH/ETH pair.
         mintParams.fee = fee;
         mintParams.recipient = _me;
         mintParams.token0 = address(arth);
@@ -193,7 +195,7 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
         });
         
         // 5. Refund any dust left.
-        _flush(msg.sender);
+        _flush(msg.sender, false);
 
         emit Deposit(msg.sender, msg.value, _tokenIdTracker.current());
     }
@@ -210,9 +212,11 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
         payable 
         nonReentrant 
     {
+        // TODO: add validation for the fact that arth is token0 of the pair.
+
         require(ERC721.ownerOf(tokenId) == msg.sender, "Not owner");
 
-        // 1. Burn the strategy NFT and fetch position details and remove the position.
+        // 1. Burn the strategy NFT, fetch position details and remove the position.
         Position memory position = positions[tokenId];
         _burn(tokenId);
         delete positions[tokenId];
@@ -224,13 +228,14 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
         decreaseLiquidityParams.deadline = block.timestamp;
         decreaseLiquidityParams.liquidity = position.liquidity;
         decreaseLiquidityParams.tokenId = position.uniswapNftId;
-        (uint256 amount0, uint256 amount1) = uniswapNFTManager.decreaseLiquidity(
-            decreaseLiquidityParams
-        );
+        (
+            uint256 amount0, 
+            uint256 amount1
+        ) = uniswapNFTManager.decreaseLiquidity(decreaseLiquidityParams);
         
-        // 4. Check if we have less ARTH.
+        // 4. Check if the ARTH we received is less.
         if (amount0 < position.debt) {
-            // Then we swap the ETH for ARTH in the ARTH/ETH pool.
+            // Then we swap the ETH for remaining ARTH in the ARTH/ETH pool.
             uint256 arthNeeded = position.debt.sub(amount0);
             IUniswapV3SwapRouter.ExactOutputSingleParams memory params = IUniswapV3SwapRouter.ExactOutputSingleParams({
                 tokenIn: address(weth),
@@ -242,8 +247,8 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
                 amountInMaximum: amount1,
                 sqrtPriceLimitX96: 0
             });
-            uint256 amountInNeeded = swapRouter.exactOutputSingle(params);
-            amount1 = amount1.sub(amountInNeeded);
+            uint256 amountInNeeded = uniswapV3SwapRouter.exactOutputSingle(params);
+            amount1 = amount1.sub(amountInNeeded); // Decrease the amount of ETH we have, since we swapped it for ARTH.
         }
 
         // 5. Adjust the trove, to remove collateral.
@@ -255,30 +260,37 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
             upperHint,
             lowerHint
         );
-
-        // 6. Check if we still have some ARTH left.
-        if (amount0 > 0) {
-            // TODO: If yes, then swap ARTH for ETH
-        }
-
-        // 7. Send the ether back.
-        (bool success, /* bytes data */) = msg.sender.call{value: position.eth}("");
-        require(success, "Withdraw failed");
+        
+        // 6. Flush, send back the amount received with dust.
+        _flush(msg.sender, true);
 
         emit Withdrawal(msg.sender, position.eth, tokenId);
     }
 
-    function _flush(address to) internal {
-        uint256 ethBalance = address(this).balance;
-        uint256 arthBalance = arth.balanceOf(address(this));
+    function _flush(address to, bool shouldSwapARTHForETH) internal {
+        if (shouldSwapARTHForETH) {
+            IUniswapV3SwapRouter.ExactInputSingleParams memory params = IUniswapV3SwapRouter.ExactInputSingleParams({
+                tokenIn: address(arth),
+                tokenOut: address(weth),
+                fee: fee,
+                recipient: address(this),
+                deadline: block.timestamp,
+                amountIn: arth.balanceOf(address(this)),
+                amountOutMinimum: 1,
+                sqrtPriceLimitX96: 0
+            });
+            uniswapV3SwapRouter.exactInputSingle(params);
+        }
 
+        uint256 arthBalance = arth.balanceOf(address(this));
+        if (arthBalance > 0 && !shouldSwapARTHForETH) {
+            arth.transfer(to, arthBalance);
+        }
+
+        uint256 ethBalance = address(this).balance;
         if (ethBalance > 0) {
             (bool success, /* bytes memory data */) = to.call{value: ethBalance}("");
             require(success, "ETH transfer failed");
-        }
-
-        if (arthBalance > 0) {
-            arth.transfer(to, arthBalance);
         }
     }
 
