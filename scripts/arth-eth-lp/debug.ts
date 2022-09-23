@@ -1,9 +1,9 @@
 /* eslint-disable */
 
-import { BigNumber } from "ethers";
 import { ethers, network } from "hardhat";
+import { wait } from "../utils";
 
-import helpers from "@nomicfoundation/hardhat-network-helpers";
+const helpers = require("@nomicfoundation/hardhat-network-helpers");
 
 async function main() {
   console.log(`Debugging to ${network.name}...`);
@@ -38,8 +38,8 @@ async function main() {
     uniswapV3PoolAddr,
     uniswapV3SwapRouterAddr
   );
-  
-  await arthEthTroveLp.openTrove(
+  await wait(60 * 1000);
+  await arthEthTroveLp.connect(impersonatedSigner).openTrove(
     "1000000000000000000",
     "51000000000000000000",
     ZERO_ADDRESS,
