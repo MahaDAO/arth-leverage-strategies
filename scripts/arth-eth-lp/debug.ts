@@ -3,15 +3,16 @@
 import { ethers, network } from "hardhat";
 import { wait } from "../utils";
 
-const helpers = require("@nomicfoundation/hardhat-network-helpers");
-
 async function main() {
   console.log(`Debugging to ${network.name}...`);
 
   const [deployer] = await ethers.getSigners();
 
   const address = "0xeccE08c2636820a81FC0c805dBDC7D846636bbc4";
-  await helpers.impersonateAccount(address);
+  await network.provider.request({
+    method: "hardhat_impersonateAccount",
+    params: [address],
+  });
   const impersonatedSigner = await ethers.getSigner(address);
 
   console.log(`Deployer address is ${deployer.address}.`);
