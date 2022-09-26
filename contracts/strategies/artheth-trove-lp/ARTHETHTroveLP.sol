@@ -6,21 +6,17 @@ import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import {ERC721Burnable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
-import {ERC721Pausable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Pausable.sol";
-import {IERC721, IERC721Metadata, ERC721, ERC721Enumerable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 
 import {IUniswapV3Pool} from "../../interfaces/IUniswapV3Pool.sol";
 import {IBorrowerOperations} from "../../interfaces/IBorrowerOperations.sol";
 import {IUniswapV3SwapRouter} from "../../interfaces/IUniswapV3SwapRouter.sol";
 import {INonfungiblePositionManager} from "../../interfaces/INonfungiblePositionManager.sol";
 
-contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Pausable, ReentrancyGuard {
+contract ARTHETHTroveLP is Ownable, ReentrancyGuard {
     using SafeMath for uint256;
-    using Counters for Counters.Counter;
 
-    event Deposit(address indexed dst, uint256 wad, uint256 tokenId);
-    event Withdrawal(address indexed src, uint256 wad, uint256 tokenId);
+    event Deposit(address indexed dst, uint256 wad);
+    event Withdrawal(address indexed src, uint256 wad);
 
     struct Position {
         uint256 uniswapNftId;
@@ -33,10 +29,8 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
     }
 
     uint24 public fee;
-    bool public isARTHToken0;
-    Counters.Counter private _tokenIdTracker;
-    mapping(uint256 => Position) public positions;
-
+    mapping(address => Position) public positions;
+ 
     IERC20 public arth;
     IERC20 public weth;
     
@@ -52,11 +46,8 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
         address _arth,
         address _weth,
         uint24 _fee,
-        address _uniswapV3Pool,
         address _uniswapV3SwapRouter
-    ) 
-        ERC721("ARTH/ETH LP Strategy", "ARTHETH-lp") 
-    {
+    ) {
         fee = _fee;
 
         arth = IERC20(_arth);
@@ -65,22 +56,7 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
         uniswapV3SwapRouter = IUniswapV3SwapRouter(_uniswapV3SwapRouter);
         uniswapNFTManager = INonfungiblePositionManager(_uniswapNFTManager);
 
-        IUniswapV3Pool _pool = IUniswapV3Pool(_uniswapV3Pool);
-        isARTHToken0 = _pool.token0() == _arth;
         arth.approve(_uniswapNFTManager, type(uint256).max);
-    }
-
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        virtual
-        override(ERC721, ERC721Enumerable)
-        returns (bool)
-    {
-        return
-            interfaceId == type(IERC721).interfaceId ||
-            interfaceId == type(IERC721Metadata).interfaceId ||
-            super.supportsInterface(interfaceId);
     }
 
     function openTrove(
@@ -138,7 +114,11 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
         payable 
         nonReentrant 
     {
-        // TODO: validation that arth is infact token0.
+        require(
+            positions[msg.sender].uniswapNftId == 0,
+            "Position already open"
+        );
+
         address _me = address(this);
 
         // Check that we are receiving appropriate amount of ETH and 
@@ -148,8 +128,6 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
             msg.value == mintParams.amount1Desired.add(ethToLock), 
             "Invalid ETH amount"
         );
-        _tokenIdTracker.increment(); // Counters start from 0, hence initial increment is required.
-        _mint(msg.sender, _tokenIdTracker.current());
 
         // 2. Mint ARTH and track ARTH balance changes due to this current tx.
         uint256 arthBeforeMinting = arth.balanceOf(_me);
@@ -184,7 +162,7 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
         ) = uniswapNFTManager.mint{value: mintParams.amount1Desired}(mintParams);
 
         // 4. Record the position.
-        positions[_tokenIdTracker.current()] = Position({
+        positions[msg.sender] = Position({
             eth: ethToLock.add(amount1),
             coll: ethToLock,
             debt: arthToMint,
@@ -197,11 +175,10 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
         // 5. Refund any dust left.
         _flush(msg.sender, false);
 
-        emit Deposit(msg.sender, msg.value, _tokenIdTracker.current());
+        emit Deposit(msg.sender, msg.value);
     }
 
     function withdraw(
-        uint256 tokenId,
         uint256 maxFee,
         address upperHint,
         address lowerHint,
@@ -212,14 +189,14 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
         payable 
         nonReentrant 
     {
-        // TODO: add validation for the fact that arth is token0 of the pair.
-
-        require(ERC721.ownerOf(tokenId) == msg.sender, "Not owner");
+        require(
+            positions[msg.sender].uniswapNftId != 0,
+            "Position not open"
+        );
 
         // 1. Burn the strategy NFT, fetch position details and remove the position.
-        Position memory position = positions[tokenId];
-        _burn(tokenId);
-        delete positions[tokenId];
+        Position memory position = positions[msg.sender];
+        delete positions[msg.sender];
 
         // 2. Claim the fees.
         _collectFees(position, collectParams);
@@ -264,7 +241,7 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
         // 6. Flush, send back the amount received with dust.
         _flush(msg.sender, true);
 
-        emit Withdrawal(msg.sender, position.eth, tokenId);
+        emit Withdrawal(msg.sender, position.eth);
     }
 
     function _flush(address to, bool shouldSwapARTHForETH) internal {
@@ -311,17 +288,5 @@ contract ARTHETHTroveLP is Ownable, ERC721Enumerable, ERC721Burnable, ERC721Paus
 
         // Trigger the fee collection for the nft owner.
         uniswapNFTManager.collect(collectParams);
-    }
-
-    function _beforeTokenTransfer(
-        address from,
-        address to,
-        uint256 tokenId
-    ) 
-        internal 
-        virtual 
-        override(ERC721, ERC721Enumerable, ERC721Pausable) 
-    {
-        super._beforeTokenTransfer(from, to, tokenId);
     }
 }

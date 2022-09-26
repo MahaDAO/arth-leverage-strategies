@@ -36,7 +36,6 @@ async function main() {
     arthAddr,
     wethAddr,
     fee,
-    uniswapV3PoolAddr,
     uniswapV3SwapRouterAddr
   );
   await wait(60 * 1000);
