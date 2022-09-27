@@ -30,7 +30,7 @@ async function main() {
   const weth = await ethers.getContractAt("IERC20", wethAddr);
 
   const ARTHETHTroveLP = await ethers.getContractFactory("ARTHETHTroveLP");
-  const arthEthTroveLp = await ARTHETHTroveLP.deploy(
+  const arthEthTroveLp = await ARTHETHTroveLP.connect(impersonatedSigner).deploy(
     borrowerOperationsAddr,
     uniswapNFTPositionMangerAddr,
     arthAddr,
@@ -41,11 +41,20 @@ async function main() {
   await wait(60 * 1000);
   await arthEthTroveLp.connect(impersonatedSigner).openTrove(
     "1000000000000000000",
-    "51000000000000000000",
+    "251000000000000000000",
     ZERO_ADDRESS,
     ZERO_ADDRESS,
     ZERO_ADDRESS,
-    { value: "100000000000000000"}
+    { value: "1000000000000000000"}
+  );
+
+  await arthEthTroveLp.connect(impersonatedSigner).openTrove(
+    "1000000000000000000",
+    "251000000000000000000",
+    ZERO_ADDRESS,
+    ZERO_ADDRESS,
+    ZERO_ADDRESS,
+    { value: "1000000000000000000"}
   );
 }
 
