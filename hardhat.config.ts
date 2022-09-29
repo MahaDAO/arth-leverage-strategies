@@ -23,12 +23,15 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
 // Go to https://hardhat.org/config/ to learn more
 
 const config: HardhatUserConfig = {
-  solidity: "0.8.4",
-  networks: {
+    solidity: "0.8.4",
+    networks: {
     hardhat: {
       forking: {
         url: `https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
       },
+    },
+    hardhatServer: {
+        url: "http://127.0.0.1:8545",
     },
     ropsten: {
       url: process.env.ROPSTEN_URL || "",
