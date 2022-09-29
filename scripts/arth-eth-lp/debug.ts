@@ -8,7 +8,7 @@ async function main() {
 
   const [deployer] = await ethers.getSigners();
 
-  const address = "0xeccE08c2636820a81FC0c805dBDC7D846636bbc4";
+  const address = "0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B";
   await network.provider.request({
     method: "hardhat_impersonateAccount",
     params: [address],
@@ -30,6 +30,7 @@ async function main() {
   const weth = await ethers.getContractAt("IERC20", wethAddr);
 
   const ARTHETHTroveLP = await ethers.getContractFactory("ARTHETHTroveLP");
+  console.log('Deploying...')
   const arthEthTroveLp = await ARTHETHTroveLP.connect(impersonatedSigner).deploy(
     borrowerOperationsAddr,
     uniswapNFTPositionMangerAddr,
@@ -39,6 +40,7 @@ async function main() {
     uniswapV3SwapRouterAddr
   );
   await wait(60 * 1000);
+  console.log('Opening trove...')
   await arthEthTroveLp.connect(impersonatedSigner).openTrove(
     "1000000000000000000",
     "251000000000000000000",
@@ -47,14 +49,27 @@ async function main() {
     ZERO_ADDRESS,
     { value: "1000000000000000000"}
   );
-
-  await arthEthTroveLp.connect(impersonatedSigner).openTrove(
+  console.log('Depositing trove...')
+  await arthEthTroveLp.connect(impersonatedSigner).deposit(
+    "351000000000000000000",
     "1000000000000000000",
-    "251000000000000000000",
+    "1000000000000000000",
     ZERO_ADDRESS,
     ZERO_ADDRESS,
-    ZERO_ADDRESS,
-    { value: "1000000000000000000"}
+    {
+        token0: arthAddr,
+        token1: wethAddr,
+        fee: "3000",
+        tickLower: "-73260",
+        tickUpper: "-62160",
+        amount0Desired: "50000000000000000000",
+        amount1Desired: "1000000000000000000",
+        amount0Min: "5000000000000000000",
+        amount1Min: "100000000000000000",
+        recipient: impersonatedSigner.address,
+        deadline: Math.floor(Date.now() / 1000) + 10 * 60,
+    },
+    { value: "2000000000000000000"}
   );
 }
 
