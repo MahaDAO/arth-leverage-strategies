@@ -74,7 +74,14 @@ const config: HardhatUserConfig = {
       mainnet: process.env.ETHERSCAN_API_KEY,
       goerli: process.env.ETHERSCAN_API_KEY
     }
+  },
+  abiExporter: {
+    path: './output/abis',
+    flat: true,
+    spacing: 2,
+    pretty: true,
   }
+  
 };
 
 export default config;
