@@ -40,6 +40,16 @@ async function main() {
     uniswapV3SwapRouterAddr
   );
   console.log("ARTHETHTRoveLp deployed at", arthEthTroveLp.address);
+  await wait(60 * 1000);
+  console.log('Opening trove...')
+  await arthEthTroveLp.connect(impersonatedSigner).openTrove(
+    "1000000000000000000",
+    "251000000000000000000",
+    ZERO_ADDRESS,
+    ZERO_ADDRESS,
+    ZERO_ADDRESS,
+    { value: "1000000000000000000"}
+  );
 }
 
 main().catch((error) => {
