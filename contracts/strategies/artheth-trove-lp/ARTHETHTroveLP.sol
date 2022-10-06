@@ -11,6 +11,8 @@ import {IUniswapV3SwapRouter} from "../../interfaces/IUniswapV3SwapRouter.sol";
 import {StakingRewardsChild} from "./StakingRewardsChild.sol";
 import {INonfungiblePositionManager} from "../../interfaces/INonfungiblePositionManager.sol";
 import {MerkleWhitelist} from "./MerkleWhitelist.sol";
+import {IPriceFeed} from "../../interfaces/IPriceFeed.sol";
+import {ITroveManager} from "../../interfaces/ITroveManager.sol";
 
 contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
     using SafeMath for uint256;
@@ -42,14 +44,16 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
 
     address private _arth;
     address private _weth;
+    address private me;
 
-    uint256 public mintCollateralRatio = 300 * 1e18; // 300% CR
+    uint256 public mintCollateralRatio = 3 * 1e18; // 300% CR
 
+    IPriceFeed public priceFeed;
+    ITroveManager public troveManager;
     IBorrowerOperations public borrowerOperations;
     IUniswapV3SwapRouter public uniswapV3SwapRouter;
     INonfungiblePositionManager public uniswapNFTManager;
-    address private me;
-
+    
     // TODO: the scenario when the trove gets liquidated?
 
     constructor(
@@ -59,7 +63,9 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
         address __maha,
         address __weth,
         uint24 _fee,
-        address _uniswapV3SwapRouter
+        address _uniswapV3SwapRouter,
+        address _priceFeed,
+        address _troveManager
     ) StakingRewardsChild(__maha) {
         fee = _fee;
 
@@ -71,6 +77,8 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
         borrowerOperations = IBorrowerOperations(_borrowerOperations);
         uniswapV3SwapRouter = IUniswapV3SwapRouter(_uniswapV3SwapRouter);
         uniswapNFTManager = INonfungiblePositionManager(_uniswapNFTManager);
+        priceFeed = IPriceFeed(_priceFeed);
+        troveManager = ITroveManager(_troveManager);
 
         arth.approve(_uniswapNFTManager, type(uint256).max);
 
@@ -129,8 +137,12 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
         // the loan and adding liquidity in the uni v3 pool.
         require(msg.value == mintParams.amount1Desired.add(ethToLock), "Invalid ETH amount");
 
-        // TODO: we need to make sure that the collateral ratio is exactly 300%
-        // require(....)
+        // Need to make sure that the collateral ratio is exactly 300%
+        uint256 price = priceFeed.fetchPrice();
+        (uint256 debt, uint256 coll,,) = troveManager.getEntireDebtAndColl(me);
+        coll = coll.add(ethToLock);
+        debt = debt.add(arthToMint);
+        require(price.mul(coll).div(debt) >= mintCollateralRatio, "CR must be > 299%");
 
         // 2. Mint ARTH and track ARTH balance changes due to this current tx.
         borrowerOperations.adjustTrove{value: ethToLock}(
