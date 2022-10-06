@@ -55,7 +55,7 @@ contract StabilityPoolStrategy is CropJoinAdapter, PriceFormula, Ownable {
         uint256 _maxDiscount,
         address payable _feePool,
         address _fronEndTag
-    ) public CropJoinAdapter(_MAHA) {
+    ) CropJoinAdapter(_MAHA) {
         priceAggregator = AggregatorV3Interface(_priceAggregator);
         arth2UsdPriceAggregator = AggregatorV3Interface(_arth2UsdPriceAggregator);
         ARTH = IERC20(_ARTH);

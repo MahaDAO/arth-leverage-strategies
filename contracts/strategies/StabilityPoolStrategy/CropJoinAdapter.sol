@@ -13,7 +13,6 @@ contract CropJoinAdapter is CropJoin {
     event Transfer(address indexed _from, address indexed _to, uint256 _value);
 
     constructor(address _lqty)
-        public
         CropJoin(
             address(new Dummy()),
             "Stability Pool ARTH-ETH Strategy",
