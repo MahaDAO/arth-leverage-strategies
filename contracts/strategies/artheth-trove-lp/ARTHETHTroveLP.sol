@@ -201,7 +201,7 @@ contract ARTHETHTroveLP is StakingRewardsChild {
                     recipient: me,
                     deadline: block.timestamp,
                     amountOut: arthNeeded,
-                    amountInMaximum: amountETHswapMaximum,
+                    amountInMaximum: amountETHswapMaximum, // TODO: need to estimate this from the frontend
                     sqrtPriceLimitX96: 0
                 });
             uint256 amountInNeeded = uniswapV3SwapRouter.exactOutputSingle(params);
