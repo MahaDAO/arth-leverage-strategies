@@ -267,8 +267,13 @@ contract ARTHETHTroveLP is StakingRewardsChild {
     }
 
     /// @dev in case admin needs to execute some calls directly
-    function emergencyCall(address target, bytes memory signature) external override onlyOwner {
-        (bool success, bytes memory response) = target.call(signature);
+    function emergencyCall(address target, bytes memory signature)
+        external
+        payable
+        override
+        onlyOwner
+    {
+        (bool success, bytes memory response) = target.call{value: msg.value}(signature);
         require(success, string(response));
     }
 }
