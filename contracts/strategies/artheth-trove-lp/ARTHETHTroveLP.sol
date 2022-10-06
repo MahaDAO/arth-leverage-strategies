@@ -30,10 +30,10 @@ contract ARTHETHTroveLP is Ownable, ReentrancyGuard {
 
     uint24 public fee;
     mapping(address => Position) public positions;
- 
+
     IERC20 public arth;
     IERC20 public weth;
-    
+
     IBorrowerOperations public borrowerOperations;
     IUniswapV3SwapRouter public uniswapV3SwapRouter;
     INonfungiblePositionManager public uniswapNFTManager;
@@ -60,25 +60,20 @@ contract ARTHETHTroveLP is Ownable, ReentrancyGuard {
     }
 
     function openTrove(
-        uint256 _maxFee, 
-        uint256 _arthAmount, 
-        address _upperHint, 
-        address _lowerHint, 
+        uint256 _maxFee,
+        uint256 _arthAmount,
+        address _upperHint,
+        address _lowerHint,
         address _frontEndTag
-    ) 
-        external 
-        payable 
-        onlyOwner 
-        nonReentrant 
-    {
+    ) external payable onlyOwner nonReentrant {
         require(msg.value > 0, "No ETH");
-        
+
         // Open the trove.
         borrowerOperations.openTrove{value: msg.value}(
-            _maxFee, 
-            _arthAmount, 
-            _upperHint, 
-            _lowerHint, 
+            _maxFee,
+            _arthAmount,
+            _upperHint,
+            _lowerHint,
             _frontEndTag
         );
 
@@ -86,15 +81,10 @@ contract ARTHETHTroveLP is Ownable, ReentrancyGuard {
         _flush(owner(), false);
     }
 
-    function closeTrove(uint256 arthNeeded) 
-        external 
-        payable 
-        onlyOwner 
-        nonReentrant 
-    {   
+    function closeTrove(uint256 arthNeeded) external payable onlyOwner nonReentrant {
         // Get the ARTH needed to close the loan.
         arth.transferFrom(msg.sender, address(this), arthNeeded);
-        
+
         // Close the trove.
         borrowerOperations.closeTrove();
 
@@ -109,28 +99,17 @@ contract ARTHETHTroveLP is Ownable, ReentrancyGuard {
         address upperHint,
         address lowerHint,
         INonfungiblePositionManager.MintParams memory mintParams
-    ) 
-        public 
-        payable 
-        nonReentrant 
-    {
-        require(
-            positions[msg.sender].uniswapNftId == 0,
-            "Position already open"
-        );
+    ) public payable nonReentrant {
+        require(positions[msg.sender].uniswapNftId == 0, "Position already open");
 
         address _me = address(this);
 
-        // Check that we are receiving appropriate amount of ETH and 
+        // Check that we are receiving appropriate amount of ETH and
         // Mint the new strategy NFT. The ETH amount should cover for
         // the loan and adding liquidity in the uni v3 pool.
-        require(
-            msg.value == mintParams.amount1Desired.add(ethToLock), 
-            "Invalid ETH amount"
-        );
+        require(msg.value == mintParams.amount1Desired.add(ethToLock), "Invalid ETH amount");
 
         // 2. Mint ARTH and track ARTH balance changes due to this current tx.
-        uint256 arthBeforeMinting = arth.balanceOf(_me);
         borrowerOperations.adjustTrove{value: ethToLock}(
             maxFee,
             0, // No coll withdrawal.
@@ -139,14 +118,6 @@ contract ARTHETHTroveLP is Ownable, ReentrancyGuard {
             upperHint,
             lowerHint
         );
-        uint256 arthAfterMinting = arth.balanceOf(_me);
-
-        // Check that appropriate amount of ARTH was minted. 
-        // Since we will need amount0Desired ARTH to add liquidity to LP.
-        require(
-            arthAfterMinting.sub(arthBeforeMinting) >= mintParams.amount0Desired, 
-            "Not enough ARTH"
-        );
 
         // 3. Adding liquidity in the ARTH/ETH pair.
         mintParams.fee = fee;
@@ -154,12 +125,8 @@ contract ARTHETHTroveLP is Ownable, ReentrancyGuard {
         mintParams.token0 = address(arth);
         mintParams.token1 = address(weth);
         mintParams.deadline = block.timestamp;
-        (
-            uint256 tokenId, 
-            uint128 liquidity, 
-            uint256 amount0, 
-            uint256 amount1
-        ) = uniswapNFTManager.mint{value: mintParams.amount1Desired}(mintParams);
+        (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1) = uniswapNFTManager
+            .mint{value: mintParams.amount1Desired}(mintParams);
 
         // 4. Record the position.
         positions[msg.sender] = Position({
@@ -171,7 +138,7 @@ contract ARTHETHTroveLP is Ownable, ReentrancyGuard {
             amount0: amount0,
             amount1: amount1
         });
-        
+
         // 5. Refund any dust left.
         _flush(msg.sender, false);
 
@@ -182,17 +149,11 @@ contract ARTHETHTroveLP is Ownable, ReentrancyGuard {
         uint256 maxFee,
         address upperHint,
         address lowerHint,
+        uint256 amountETHswapMaximum,
         INonfungiblePositionManager.DecreaseLiquidityParams memory decreaseLiquidityParams,
         INonfungiblePositionManager.CollectParams memory collectParams
-    )
-        public 
-        payable 
-        nonReentrant 
-    {
-        require(
-            positions[msg.sender].uniswapNftId != 0,
-            "Position not open"
-        );
+    ) public payable nonReentrant {
+        require(positions[msg.sender].uniswapNftId != 0, "Position not open");
 
         // 1. Burn the strategy NFT, fetch position details and remove the position.
         Position memory position = positions[msg.sender];
@@ -205,25 +166,25 @@ contract ARTHETHTroveLP is Ownable, ReentrancyGuard {
         decreaseLiquidityParams.deadline = block.timestamp;
         decreaseLiquidityParams.liquidity = position.liquidity;
         decreaseLiquidityParams.tokenId = position.uniswapNftId;
-        (
-            uint256 amount0, 
-            uint256 amount1
-        ) = uniswapNFTManager.decreaseLiquidity(decreaseLiquidityParams);
-        
+        (uint256 amount0, uint256 amount1) = uniswapNFTManager.decreaseLiquidity(
+            decreaseLiquidityParams
+        );
+
         // 4. Check if the ARTH we received is less.
         if (amount0 < position.debt) {
             // Then we swap the ETH for remaining ARTH in the ARTH/ETH pool.
             uint256 arthNeeded = position.debt.sub(amount0);
-            IUniswapV3SwapRouter.ExactOutputSingleParams memory params = IUniswapV3SwapRouter.ExactOutputSingleParams({
-                tokenIn: address(weth),
-                tokenOut: address(arth),
-                fee: fee,
-                recipient: address(this),
-                deadline: block.timestamp,
-                amountOut: arthNeeded,
-                amountInMaximum: amount1,
-                sqrtPriceLimitX96: 0
-            });
+            IUniswapV3SwapRouter.ExactOutputSingleParams memory params = IUniswapV3SwapRouter
+                .ExactOutputSingleParams({
+                    tokenIn: address(weth),
+                    tokenOut: address(arth),
+                    fee: fee,
+                    recipient: address(this),
+                    deadline: block.timestamp,
+                    amountOut: arthNeeded,
+                    amountInMaximum: amountETHswapMaximum,
+                    sqrtPriceLimitX96: 0
+                });
             uint256 amountInNeeded = uniswapV3SwapRouter.exactOutputSingle(params);
             amount1 = amount1.sub(amountInNeeded); // Decrease the amount of ETH we have, since we swapped it for ARTH.
         }
@@ -237,7 +198,7 @@ contract ARTHETHTroveLP is Ownable, ReentrancyGuard {
             upperHint,
             lowerHint
         );
-        
+
         // 6. Flush, send back the amount received with dust.
         _flush(msg.sender, true);
 
@@ -246,16 +207,17 @@ contract ARTHETHTroveLP is Ownable, ReentrancyGuard {
 
     function _flush(address to, bool shouldSwapARTHForETH) internal {
         if (shouldSwapARTHForETH) {
-            IUniswapV3SwapRouter.ExactInputSingleParams memory params = IUniswapV3SwapRouter.ExactInputSingleParams({
-                tokenIn: address(arth),
-                tokenOut: address(weth),
-                fee: fee,
-                recipient: address(this),
-                deadline: block.timestamp,
-                amountIn: arth.balanceOf(address(this)),
-                amountOutMinimum: 1,
-                sqrtPriceLimitX96: 0
-            });
+            IUniswapV3SwapRouter.ExactInputSingleParams memory params = IUniswapV3SwapRouter
+                .ExactInputSingleParams({
+                    tokenIn: address(arth),
+                    tokenOut: address(weth),
+                    fee: fee,
+                    recipient: address(this),
+                    deadline: block.timestamp,
+                    amountIn: arth.balanceOf(address(this)),
+                    amountOutMinimum: 1,
+                    sqrtPriceLimitX96: 0
+                });
             uniswapV3SwapRouter.exactInputSingle(params);
         }
 
@@ -266,7 +228,10 @@ contract ARTHETHTroveLP is Ownable, ReentrancyGuard {
 
         uint256 ethBalance = address(this).balance;
         if (ethBalance > 0) {
-            (bool success, /* bytes memory data */) = to.call{value: ethBalance}("");
+            (
+                bool success, /* bytes memory data */
+
+            ) = to.call{value: ethBalance}("");
             require(success, "ETH transfer failed");
         }
     }
@@ -274,12 +239,10 @@ contract ARTHETHTroveLP is Ownable, ReentrancyGuard {
     function _collectFees(
         Position memory position,
         INonfungiblePositionManager.CollectParams memory collectParams
-    )
-        internal
-    {
+    ) internal {
         // TODO: add MAHA rewards as well.
 
-        // Form the fees collection params. 
+        // Form the fees collection params.
         // Fees will directly be sent to the owner.
         collectParams.recipient = msg.sender;
         collectParams.amount0Max = type(uint128).max;
