@@ -22,7 +22,7 @@ contract CropJoinAdapter is CropJoin {
     {}
 
     // adapter to cropjoin
-    function nav() public override returns (uint256) {
+    function nav() public view override returns (uint256) {
         return total;
     }
 
