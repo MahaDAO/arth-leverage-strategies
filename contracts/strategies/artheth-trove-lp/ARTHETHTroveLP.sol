@@ -10,8 +10,9 @@ import {IBorrowerOperations} from "../../interfaces/IBorrowerOperations.sol";
 import {IUniswapV3SwapRouter} from "../../interfaces/IUniswapV3SwapRouter.sol";
 import {StakingRewardsChild} from "./StakingRewardsChild.sol";
 import {INonfungiblePositionManager} from "../../interfaces/INonfungiblePositionManager.sol";
+import {MerkleWhitelist} from "./MerkleWhitelist.sol";
 
-contract ARTHETHTroveLP is StakingRewardsChild {
+contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
     using SafeMath for uint256;
 
     event Deposit(address indexed dst, uint256 wad);
@@ -25,6 +26,12 @@ contract ARTHETHTroveLP is StakingRewardsChild {
         uint128 liquidity;
         uint256 amount0;
         uint256 amount1;
+    }
+
+    struct TroveParams {
+        uint256 maxFee;
+        address upperHint;
+        address lowerHint;
     }
 
     uint24 public fee;
@@ -110,11 +117,11 @@ contract ARTHETHTroveLP is StakingRewardsChild {
     function deposit(
         uint256 arthToMint,
         uint256 ethToLock,
-        uint256 maxFee,
-        address upperHint,
-        address lowerHint,
-        INonfungiblePositionManager.MintParams memory mintParams
-    ) public payable nonReentrant {
+        TroveParams memory troveParams,
+        INonfungiblePositionManager.MintParams memory mintParams,
+        uint256 rootId,
+        bytes32[] memory proof
+    ) public payable checkWhitelist(msg.sender, rootId, proof) nonReentrant {
         require(positions[msg.sender].uniswapNftId == 0, "Position already open");
 
         // Check that we are receiving appropriate amount of ETH and
@@ -127,12 +134,12 @@ contract ARTHETHTroveLP is StakingRewardsChild {
 
         // 2. Mint ARTH and track ARTH balance changes due to this current tx.
         borrowerOperations.adjustTrove{value: ethToLock}(
-            maxFee,
+            troveParams.maxFee,
             0, // No coll withdrawal.
             arthToMint, // Mint ARTH.
             true, // Debt increasing.
-            upperHint,
-            lowerHint
+            troveParams.upperHint,
+            troveParams.lowerHint
         );
 
         // 3. Adding liquidity in the ARTH/ETH pair.
@@ -146,7 +153,7 @@ contract ARTHETHTroveLP is StakingRewardsChild {
 
         // 4. Record the position.
         positions[msg.sender] = Position({
-            eth: ethToLock.add(amount1),
+            eth: (ethToLock + amount1),
             coll: ethToLock,
             debt: arthToMint,
             uniswapNftId: tokenId,
@@ -165,9 +172,7 @@ contract ARTHETHTroveLP is StakingRewardsChild {
     }
 
     function withdraw(
-        uint256 maxFee,
-        address upperHint,
-        address lowerHint,
+        TroveParams memory troveParams,
         uint256 amountETHswapMaximum,
         INonfungiblePositionManager.DecreaseLiquidityParams memory decreaseLiquidityParams
     ) public payable nonReentrant {
@@ -179,7 +184,7 @@ contract ARTHETHTroveLP is StakingRewardsChild {
         delete positions[msg.sender];
 
         // 2. Claim the fees.
-        _collectFees(position, collectParams);
+        _collectFees(position.uniswapNftId);
 
         // 3. Remove the LP for ARTH/ETH.
         decreaseLiquidityParams.deadline = block.timestamp;
@@ -210,12 +215,12 @@ contract ARTHETHTroveLP is StakingRewardsChild {
 
         // 5. Adjust the trove, to remove collateral.
         borrowerOperations.adjustTrove(
-            maxFee,
+            troveParams.maxFee,
             position.coll,
             position.debt,
             false,
-            upperHint,
-            lowerHint
+            troveParams.upperHint,
+            troveParams.lowerHint
         );
 
         // 6. Flush, send back the amount received with dust.
@@ -267,12 +272,7 @@ contract ARTHETHTroveLP is StakingRewardsChild {
     }
 
     /// @dev in case admin needs to execute some calls directly
-    function emergencyCall(address target, bytes memory signature)
-        external
-        payable
-        override
-        onlyOwner
-    {
+    function emergencyCall(address target, bytes memory signature) external payable onlyOwner {
         (bool success, bytes memory response) = target.call{value: msg.value}(signature);
         require(success, string(response));
     }
