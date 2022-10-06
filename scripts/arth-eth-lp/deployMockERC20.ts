@@ -8,9 +8,9 @@ async function main() {
   // We get the contract to deploy
   const MockERC20Factory = await ethers.getContractFactory("MockERC20");
 
-  const instance = await MockERC20Factory.deploy("ARTH", "ARTH", "18");
+  const instance = await MockERC20Factory.deploy("MahaDAO", "MAHA", "18");
   await instance.deployed();
-  console.log("ARTH deployed to:", instance.address);
+  console.log("MAHA deployed to:", instance.address);
 
   await wait(60 * 1000); // wait for a minute
 
