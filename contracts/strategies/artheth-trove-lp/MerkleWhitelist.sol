@@ -16,6 +16,15 @@ contract MerkleWhitelist is Ownable {
         merkleRoots.push(root);
     }
 
+    function isWhitelisted(
+        address _who,
+        uint256 _proofIndex,
+        bytes32[] memory proof
+    ) public view returns (bool) {
+        bytes32 leaf = keccak256(abi.encode(_who));
+        return MerkleProof.verify(proof, merkleRoots[_proofIndex], leaf);
+    }
+
     modifier checkWhitelist(
         address _who,
         uint256 _proofIndex,
@@ -30,14 +39,5 @@ contract MerkleWhitelist is Ownable {
         require(isWhitelisted(_who, _proofIndex, proof), "not in whitelist");
         whitelist[_who] = true;
         _;
-    }
-
-    function isWhitelisted(
-        address _who,
-        uint256 _proofIndex,
-        bytes32[] memory proof
-    ) public view returns (bool) {
-        bytes32 leaf = keccak256(abi.encode(_who));
-        return MerkleProof.verify(proof, merkleRoots[_proofIndex], leaf);
     }
 }
