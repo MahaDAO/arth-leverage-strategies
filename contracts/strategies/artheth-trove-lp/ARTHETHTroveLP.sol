@@ -215,7 +215,7 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
                     amountInMaximum: amountETHswapMaximum, // TODO: need to estimate this from the frontend
                     sqrtPriceLimitX96: 0
                 });
-            uint256 amountInNeeded = uniswapV3SwapRouter.exactOutputSingle(params);
+            uint256 amountInNeeded = uniswapV3SwapRouter.exactOutputSingle{value: amountETHswapMaximum}(params);
             amount1 = amount1.sub(amountInNeeded); // Decrease the amount of ETH we have, since we swapped it for ARTH.
         }
 
