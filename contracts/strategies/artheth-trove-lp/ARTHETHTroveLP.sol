@@ -12,7 +12,6 @@ import {StakingRewardsChild} from "./StakingRewardsChild.sol";
 import {INonfungiblePositionManager} from "../../interfaces/INonfungiblePositionManager.sol";
 import {MerkleWhitelist} from "./MerkleWhitelist.sol";
 import {IPriceFeed} from "../../interfaces/IPriceFeed.sol";
-import {ITroveManager} from "../../interfaces/ITroveManager.sol";
 
 contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
     using SafeMath for uint256;
@@ -49,7 +48,6 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
     uint256 public mintCollateralRatio = 3 * 1e18; // 300% CR
 
     IPriceFeed public priceFeed;
-    ITroveManager public troveManager;
     IBorrowerOperations public borrowerOperations;
     IUniswapV3SwapRouter public uniswapV3SwapRouter;
     INonfungiblePositionManager public uniswapNFTManager;
@@ -64,8 +62,7 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
         address __weth,
         uint24 _fee,
         address _uniswapV3SwapRouter,
-        address _priceFeed,
-        address _troveManager
+        address _priceFeed
     ) StakingRewardsChild(__maha) {
         fee = _fee;
 
@@ -78,7 +75,6 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
         uniswapV3SwapRouter = IUniswapV3SwapRouter(_uniswapV3SwapRouter);
         uniswapNFTManager = INonfungiblePositionManager(_uniswapNFTManager);
         priceFeed = IPriceFeed(_priceFeed);
-        troveManager = ITroveManager(_troveManager);
 
         arth.approve(_uniswapNFTManager, type(uint256).max);
 
@@ -136,7 +132,7 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
         // Mint the new strategy NFT. The ETH amount should cover for
         // the loan and adding liquidity in the uni v3 pool.
         require(msg.value == mintParams.amount1Desired.add(ethToLock), "Invalid ETH amount");
-        _checkMinCr(ethToLock, arthToMint);
+        require(priceFeed.fetchPrice().mul(ethToLock).div(arthToMint) >= mintCollateralRatio, "CR must be > 299%");
 
         // 2. Mint ARTH and track ARTH balance changes due to this current tx.
         borrowerOperations.adjustTrove{value: ethToLock}(
@@ -262,18 +258,6 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
             ) = to.call{value: ethBalance}("");
             require(success, "ETH transfer failed");
         }
-    }
-
-    function _checkMinCr(uint256 ethToLock, uint256 arthToMint) internal view {
-        // Need to make sure that the collateral ratio is exactly 300%
-        uint256 debt;
-        uint256 coll;
-        {
-            (debt,coll,,) = troveManager.getEntireDebtAndColl(me);
-            coll = coll.add(ethToLock);
-            debt = debt.add(arthToMint);
-        }
-        require(priceFeed.fetchPrice().mul(coll).div(debt) >= mintCollateralRatio, "CR must be > 299%");
     }
 
     function _collectFees(uint256 uniswapNftId) internal {
