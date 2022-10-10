@@ -125,7 +125,7 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
         INonfungiblePositionManager.MintParams memory mintParams,
         uint256 rootId,
         bytes32[] memory proof
-    ) public payable nonReentrant {
+    ) public payable checkWhitelist(msg.sender, rootId, proof) nonReentrant {
         require(positions[msg.sender].uniswapNftId == 0, "Position already open");
 
         // Check that we are receiving appropriate amount of ETH and
