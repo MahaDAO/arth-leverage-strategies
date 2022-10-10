@@ -17,7 +17,7 @@ async function main() {
 
   console.log(`Deployer address is ${deployer.address}.`);
 
-  const fee = "3000";
+  const fee = "10000";
   const mahaAddr = "0xb4d930279552397bba2ee473229f89ec245bc365";
   const arthAddr = "0x8CC0F052fff7eaD7f2EdCCcaC895502E884a8a71";
   const wethAddr = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
@@ -42,26 +42,25 @@ async function main() {
     wethAddr,
     fee,
     uniswapV3SwapRouterAddr,
-    priceFeed,
-    troveManager
+    priceFeed
   );
   console.log("ARTHETHTRoveLp deployed at", arthEthTroveLp.address);
   console.log('Opening trove...')
   const a = {
-        maxFee: "1000000000000000000", 
-        upperHint: "0x0000000000000000000000000000000000000000",
-        lowerHint: "0x0000000000000000000000000000000000000000",
+    maxFee: "1000000000000000000", 
+    upperHint: "0x0000000000000000000000000000000000000000",
+    lowerHint: "0x0000000000000000000000000000000000000000",
   }
   const b = {
-    amount0Desired:  "238666666666666666666",
+    amount0Desired: "251000000000000000000",
     amount0Min: "0",
-    amount1Desired: "1000000000000000000",
+    amount1Desired: "1500000000000000000",
     amount1Min: "0",
-    deadline: 16651024459,
-    fee: "3000",
+    deadline: Math.floor(Date.now() / 1000) + 10 * 60,
+    fee,
     recipient: "0x1904c4712ae18b0adf985c9102f54127b0455e35",
-    tickLower: "-73260",
-    tickUpper: "-62160",
+    tickLower: "-76000",
+    tickUpper: "-60000",
     token0: "0x8CC0F052fff7eaD7f2EdCCcaC895502E884a8a71",
     token1: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
 };
@@ -71,17 +70,17 @@ await arthEthTroveLp.connect(impersonatedSigner).openTrove(
     ZERO_ADDRESS,
     ZERO_ADDRESS,
     ZERO_ADDRESS,
-    { value: "1000000000000000000"}
+    { value: "2000000000000000000"}
   );
   console.log('Depositing');
-  await arthEthTroveLp.connect(impersonatedSigner).deposit(
-    "448666666666666666666",
-    "1000000000000000000",
+  const tx = await arthEthTroveLp.connect(impersonatedSigner).deposit(
+    "251000000000000000000",
+    "1500000000000000000",
     a,
     b,
     1,
     [],
-    { value: "2000000000000000000"}
+    { value: "3000000000000000000"}
   );
 }
 

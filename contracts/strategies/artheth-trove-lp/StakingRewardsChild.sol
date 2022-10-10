@@ -73,14 +73,14 @@ contract StakingRewardsChild is Ownable, ReentrancyGuard {
 
     /* ========== MUTATIVE FUNCTIONS ========== */
 
-    function _stake(address who, uint256 amount) internal nonReentrant updateReward(who) {
+    function _stake(address who, uint256 amount) internal updateReward(who) {
         require(amount > 0, "Cannot stake 0");
         _totalSupply = _totalSupply.add(amount);
         _balances[who] = _balances[who].add(amount);
         emit Staked(who, amount);
     }
 
-    function _withdraw(address who, uint256 amount) internal nonReentrant updateReward(who) {
+    function _withdraw(address who, uint256 amount) internal updateReward(who) {
         require(amount > 0, "Cannot withdraw 0");
         _totalSupply = _totalSupply.sub(amount);
         _balances[who] = _balances[who].sub(amount);

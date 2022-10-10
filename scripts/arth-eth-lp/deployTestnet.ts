@@ -24,22 +24,21 @@ async function main() {
   const weth = await ethers.getContractAt("IERC20", wethAddr);
   const maha = await ethers.getContractAt("MockERC20", mahaAddr);
 
-  const arthEthTroveLp = await ethers.getContractAt("ARTHETHTroveLP", "0x1904c4712ae18b0adf985c9102f54127b0455e35");
-//   console.log('Deploying...')
-//   const arthEthTroveLp = await ARTHETHTroveLP.connect(deployer).deploy(
-//     borrowerOperationsAddr,
-//     uniswapNFTPositionMangerAddr,
-//     arthAddr,
-//     mahaAddr,
-//     wethAddr,
-//     fee,
-//     uniswapV3SwapRouterAddr,
-//     priceFeedAddr,
-//     troveManagerAddr
-//   );
-//   await arthEthTroveLp.deployed();
-//   console.log("ARTHETHTRoveLP deployed at", arthEthTroveLp.address);
-//   console.log('Opening trove...')
+  const ARTHETHTroveLP = await ethers.getContractFactory("ARTHETHTroveLP");
+  console.log('Deploying...')
+  const arthEthTroveLp = await ARTHETHTroveLP.connect(deployer).deploy(
+    borrowerOperationsAddr,
+    uniswapNFTPositionMangerAddr,
+    arthAddr,
+    mahaAddr,
+    wethAddr,
+    fee,
+    uniswapV3SwapRouterAddr,
+    priceFeedAddr
+  );
+  await arthEthTroveLp.deployed();
+  console.log("ARTHETHTRoveLP deployed at", arthEthTroveLp.address);
+  console.log('Opening trove...')
   const tx = await arthEthTroveLp.connect(deployer).openTrove(
     "1000000000000000000",
     "251000000000000000000",
@@ -49,21 +48,19 @@ async function main() {
     { value: "1000000000000000000" }
   );
   await tx.wait();
-
-//   await hre.run("verify:verify", {
-//     address: arthEthTroveLp.address,
-//     constructorArguments: [
-//         borrowerOperationsAddr,
-//         uniswapNFTPositionMangerAddr,
-//         arthAddr,
-//         mahaAddr,
-//         wethAddr,
-//         fee,
-//         uniswapV3SwapRouterAddr,
-//         priceFeedAddr,
-//         troveManagerAddr
-//     ]
-//   });
+  await hre.run("verify:verify", {
+    address: arthEthTroveLp.address,
+    constructorArguments: [
+        borrowerOperationsAddr,
+        uniswapNFTPositionMangerAddr,
+        arthAddr,
+        mahaAddr,
+        wethAddr,
+        fee,
+        uniswapV3SwapRouterAddr,
+        priceFeedAddr
+    ]
+  });
 }
 
 main().catch((error) => {
