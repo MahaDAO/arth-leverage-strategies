@@ -59,6 +59,11 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
         uint256 ethOutMin;
     }
 
+    struct WhitelistParams {
+        uint256 rootId;
+        bytes32[] proof;
+    }
+
     uint24 public fee;
     bool public isARTHToken0;
     mapping(address => Position) public positions;
@@ -148,9 +153,8 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
     function deposit(
         TroveParams memory troveParams,
         UniswapPositionMintParams memory uniswapPoisitionMintParams,
-        uint256 rootId,
-        bytes32[] memory proof
-    ) public payable checkWhitelist(msg.sender, rootId, proof) nonReentrant {
+        WhitelistParams memory whitelistParams
+    ) public payable checkWhitelist(msg.sender, whitelistParams.rootId, whitelistParams.proof) nonReentrant {
         // Check that position is not already open.
         require(positions[msg.sender].uniswapNftId == 0, "Position already open");
 
