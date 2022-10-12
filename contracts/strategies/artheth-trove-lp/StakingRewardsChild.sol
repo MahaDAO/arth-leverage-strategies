@@ -87,13 +87,17 @@ contract StakingRewardsChild is Ownable, ReentrancyGuard {
         emit Withdrawn(who, amount);
     }
 
-    function getReward() external nonReentrant updateReward(msg.sender) {
+    function _getReward() internal updateReward(msg.sender) {
         uint256 reward = rewards[msg.sender];
         if (reward > 0) {
             rewards[msg.sender] = 0;
             rewardsToken.transfer(msg.sender, reward);
             emit RewardPaid(msg.sender, reward);
         }
+    }
+
+    function getReward() external nonReentrant {
+        _getReward();
     }
 
     /* ========== RESTRICTED FUNCTIONS ========== */
