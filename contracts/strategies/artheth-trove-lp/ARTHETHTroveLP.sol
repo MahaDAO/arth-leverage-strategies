@@ -12,8 +12,9 @@ import {StakingRewardsChild} from "./StakingRewardsChild.sol";
 import {INonfungiblePositionManager} from "../../interfaces/INonfungiblePositionManager.sol";
 import {MerkleWhitelist} from "./MerkleWhitelist.sol";
 import {IPriceFeed} from "../../interfaces/IPriceFeed.sol";
+import {Multicall} from "../../Multicall.sol";
 
-contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
+contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist, Multicall {
     using SafeMath for uint256;
 
     event Deposit(address indexed dst, uint256 wad);
