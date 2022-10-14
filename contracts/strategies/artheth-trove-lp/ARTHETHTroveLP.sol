@@ -106,7 +106,7 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
         );
 
         // Return dust ETH, ARTH.
-        _flush(owner(), false, 0);
+        _flush(owner());
     }
 
     /// @notice admin-only function to close the trove; normally not needed if the campaign keeps on running
@@ -118,7 +118,7 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
         borrowerOperations.closeTrove();
 
         // Return dust ARTH, ETH.
-        _flush(owner(), false, 0);
+        _flush(owner());
     }
 
     function depositInTrove(
@@ -157,7 +157,7 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
         _stake(msg.sender, position.ethInLoan);
 
         // Refund any dust left.
-        _flush(msg.sender, false, 0);
+        _flush(msg.sender);
 
         // TODO: update events.
         emit Deposit(msg.sender, msg.value);
@@ -192,7 +192,7 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
         _stake(msg.sender, position.ethInLp);
         
         // Refund any dust left.
-        _flush(msg.sender, false, 0);
+        _flush(msg.sender);
 
         require(
             positions[msg.sender].openLoanBlkNumber == positions[msg.sender].liqProvideBlkNumber,
@@ -204,12 +204,10 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
     }
 
     function withdraw(
-        uint256 maxFee,
-        address upperHint,
-        address lowerHint,
+        TroveParams memory troveParams,
         uint256 amountETHswapMaximum,
-        uint256 ethOutMin,
-        INonfungiblePositionManager.DecreaseLiquidityParams memory decreaseLiquidityParams
+        INonfungiblePositionManager.DecreaseLiquidityParams memory decreaseLiquidityParams,
+        INonfungiblePositionManager.CollectParams memory collectFeesparams
     ) public payable nonReentrant {
         Position memory position = positions[msg.sender];
         
@@ -225,7 +223,9 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
 
         // 2. Claim rewards & fees.
         _getReward();
-        _collectFees(position.lpTokenId);
+        require(collectFeesparams.recipient == me, "invalid fee receiver");
+        // Trigger the fee collection for the nft owner.
+        uniswapNFTManager.collect(collectFeesparams);
 
         // 3. Remove the LP for ARTH/ETH.
         require(decreaseLiquidityParams.tokenId == position.lpTokenId, "Token id not same");
@@ -255,36 +255,21 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
        
         // 5. Adjust the trove, to remove collateral.
         borrowerOperations.adjustTrove(
-            maxFee,
+            troveParams.maxFee,
             position.ethInLoan,
             position.arthFromLoan,
             false,
-            upperHint,
-            lowerHint
+            troveParams.upperHint,
+            troveParams.lowerHint
         );
       
         // 6. Flush, send back the amount received with dust.
-        _flush(msg.sender, true, ethOutMin);
+        _flush(msg.sender);
         
         emit Withdrawal(msg.sender, position.ethInLoan.add(position.ethInLp));
     }
 
-    function _flush(address to, bool shouldSwapARTHForETH, uint256 amountOutMin) internal {
-        if (shouldSwapARTHForETH) {
-            IUniswapV3SwapRouter.ExactInputSingleParams memory params = IUniswapV3SwapRouter
-                .ExactInputSingleParams({
-                    tokenIn: _arth,
-                    tokenOut: _weth,
-                    fee: fee,
-                    recipient: me,
-                    deadline: block.timestamp,
-                    amountIn: arth.balanceOf(me),
-                    amountOutMinimum: amountOutMin,
-                    sqrtPriceLimitX96: 0
-                });
-            uniswapV3SwapRouter.exactInputSingle(params);
-        }
-
+    function _flush(address to) internal {
         uint256 arthBalance = arth.balanceOf(me);
         if (arthBalance > 0) arth.transfer(to, arthBalance);
 
@@ -296,26 +281,6 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
             ) = to.call{value: ethBalance}("");
             require(success, "ETH transfer failed");
         }
-    }
-
-    function collectRewards() external payable nonReentrant {
-        Position memory position = positions[msg.sender];
-        require(position.lpTokenId != 0, "Position not open");
-        _getReward();
-        _collectFees(position.lpTokenId);
-    }
-
-    function _collectFees(uint256 lpTokenId) internal {
-        INonfungiblePositionManager.CollectParams memory params = INonfungiblePositionManager
-            .CollectParams({
-                recipient: me,
-                amount0Max: type(uint128).max,
-                amount1Max: type(uint128).max,
-                tokenId: lpTokenId
-            });
-
-        // Trigger the fee collection for the nft owner.
-        uniswapNFTManager.collect(params);
     }
 
     /// @dev in case admin needs to execute some calls directly
