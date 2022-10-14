@@ -194,6 +194,11 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
         // Refund any dust left.
         _flush(msg.sender, false, 0);
 
+        require(
+            positions[msg.sender].openLoanBlkNumber == positions[msg.sender].liqProvideBlkNumber,
+            "Block diff >0"
+        );
+
         // TODO: update events.
         emit Deposit(msg.sender, msg.value);
     }
@@ -207,9 +212,11 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
         INonfungiblePositionManager.DecreaseLiquidityParams memory decreaseLiquidityParams
     ) public payable nonReentrant {
         Position memory position = positions[msg.sender];
+        
         require(position.lpTokenId != 0, "Position not open");
         require(position.openLoanBlkNumber != 0, "Position loan not open");
         require(position.liqProvideBlkNumber != 0, "Position lp not added");
+        require(position.liqProvideBlkNumber == position.openLoanBlkNumber, "Block diff > 0");
 
         // Remove the position and withdraw your stake 
         // for stopping further rewards.
