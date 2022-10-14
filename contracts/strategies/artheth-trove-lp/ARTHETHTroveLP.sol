@@ -172,12 +172,17 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist, Multicall {
         // Check that position is not already open.
         require(position.openLoanBlkNumber != 0, "Position loan not open");
         require(position.liqProvideBlkNumber == 0, "Position liqudity already provided");
-        
         // Check that the block is the same as the one in which we depositedInLoans
         require(block.number == position.openLoanBlkNumber, "Block diff > 0");
 
-        // Provide liquidity in the lp.
         uint256 ethAmountDesired = isARTHToken0 ? lpMintParams.amount1Desired : lpMintParams.amount0Desired;
+        uint256 arthAmountDesired = isARTHToken0 ? lpMintParams.amount0Desired : lpMintParams.amount1Desired;
+        // Check that a user is not able to deposit or use someone else's debt to increase his position
+        require(arthAmountDesired == position.arthFromLoan, "ARTH not same");
+        // Fetch arth from user, to be used in depositInLp
+        arth.transferFrom(msg.sender, address(this), position.arthFromLoan);
+
+        // Provide liquidity in the lp.
         (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1) = uniswapNFTManager
             .mint{value: ethAmountDesired}(lpMintParams);
 
