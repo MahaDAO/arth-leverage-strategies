@@ -30,6 +30,17 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
         uint256 liqProvideBlkNumber;
     }
 
+    struct TroveParams {
+        uint256 maxFee;
+        address upperHint;
+        address lowerHint;
+    }
+
+    struct WhitelistParams {
+        uint256 rootId;
+        bytes32[] proof;
+    }
+
     bool public isARTHToken0;
     uint24 public fee;
     uint256 public minCollateralRatio = 3 * 1e18; // 300% CR
@@ -111,36 +122,34 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
     }
 
     function depositInTrove(
-        uint256 maxFee,
-        address upperHint,
-        address lowerHint,
+        TroveParams memory troveParams,
         uint256 arthAmount,
-        uint256 rootId,
-        bytes32[] proof
-    ) public payable checkWhitelist(msg.sender, rootId, proof) nonReentrant {
+        WhitelistParams memory whitelistParams
+    ) public payable checkWhitelist(msg.sender, whitelistParams.rootId, whitelistParams.proof) nonReentrant {
         Position memory position = positions[msg.sender];
         // Check that position is not already open.
         require(position.openLoanBlkNumber == 0, "Position loan already open");
         require(position.liqProvideBlkNumber == 0, "Position lp already provided");
 
         // The collateral ratio should be > minCollateralRatio.
-        uint256 price = priceFeed.fetchPrice();
-        uint256 currenctCollateralRatio = price.mul(msg.value).div(arthAmount);
-        require(currenctCollateralRatio >= mintCollateralRatio, "CR must be > 299%");
+        require(
+            priceFeed.fetchPrice().mul(msg.value).div(arthAmount) >= minCollateralRatio, 
+            "CR must be > 299%"
+        );
 
         // Mint ARTH and track ARTH balance changes due to this current tx.
         borrowerOperations.adjustTrove{value: msg.value}(
-            maxFee,
+            troveParams.maxFee,
             0, // No coll withdrawal.
             arthAmount, // Mint ARTH.
             true, // Debt increasing.
-            upperHint,
-            lowerHint
+            troveParams.upperHint,
+            troveParams.lowerHint
         );
 
         // Record the status of position in troves.
         position.ethInLoan = msg.value;
-        positoin.arthFromLoan = arthAmount;
+        position.arthFromLoan = arthAmount;
         position.openLoanBlkNumber = block.number;
         positions[msg.sender] = position;
 
@@ -156,9 +165,8 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
 
     function depositInLp(
         INonfungiblePositionManager.MintParams memory lpMintParams,
-        uint256 rootId,
-        bytes32[] proof
-    ) public payable checkWhitelist(msg.sender, rootId, proof) nonReentrant {
+        WhitelistParams memory whitelistParams
+    ) public payable checkWhitelist(msg.sender, whitelistParams.rootId, whitelistParams.proof) nonReentrant {
         Position memory position = positions[msg.sender];
         // Check that position is not already open.
         require(position.openLoanBlkNumber != 0, "Position loan not open");
@@ -168,13 +176,14 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
         require(block.number == position.openLoanBlkNumber, "Block diff > 0");
 
         // Provide liquidity in the lp.
+        uint256 ethAmountDesired = isARTHToken0 ? lpMintParams.amount1Desired : lpMintParams.amount0Desired;
         (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1) = uniswapNFTManager
-            .mint{value: uniswapPoisitionMintParams.ethAmountDesired}(lpMintParams);
+            .mint{value: ethAmountDesired}(lpMintParams);
 
         // Record the status of position in lp pool.
         position.liqProvideBlkNumber = block.number;
         position.arthInLp = isARTHToken0 ? amount0 : amount1;
-        position.ethInLp = isARTHToken0 ? amoun1 : amount0; 
+        position.ethInLp = isARTHToken0 ? amount1 : amount0; 
         position.liquidityInLp = liquidity;
         position.lpTokenId = tokenId;
         positions[msg.sender] = position;
@@ -189,30 +198,39 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
         emit Deposit(msg.sender, msg.value);
     }
 
-    function withdrawFromLp(
-        INonfungiblePositionManager memory lpDecreaseParams
+    function withdraw(
+        uint256 maxFee,
+        address upperHint,
+        address lowerHint,
+        uint256 amountETHswapMaximum,
+        uint256 ethOutMin,
+        INonfungiblePositionManager.DecreaseLiquidityParams memory decreaseLiquidityParams
     ) public payable nonReentrant {
         Position memory position = positions[msg.sender];
-
+        require(position.lpTokenId != 0, "Position not open");
         require(position.openLoanBlkNumber != 0, "Position loan not open");
-        require(position.lpTokenId != 0, "Position liquidity not provided");
-        require(position.liqProvideBlkNumber != 0, "Position liquidity not provided");
-        
-        // Claim the rewards.
+        require(position.liqProvideBlkNumber != 0, "Position lp not added");
+
+        // Remove the position and withdraw your stake 
+        // for stopping further rewards.
+        _withdraw(msg.sender, position.ethInLoan.add(position.ethInLp));
+        delete positions[msg.sender];
+
+        // 2. Claim rewards & fees.
         _getReward();
-        // Claim the LP fees.
         _collectFees(position.lpTokenId);
 
-        // Decrease the MAHA staking.
-        _withdraw(msg.sender, position.ethInLp);
-        
-        require(lpDecreaseParams.tokenId == position.lpTokenId, "Lp Token Id not same");
-        (uint256 amount0, uint256 amount1) = uniswapNFTManager.decreaseLiquidity(lpDecreaseParams);
+        // 3. Remove the LP for ARTH/ETH.
+        require(decreaseLiquidityParams.tokenId == position.lpTokenId, "Token id not same");
+        require(decreaseLiquidityParams.liquidity == position.liquidityInLp, "Liquidity not same");
+        (uint256 amount0, uint256 amount1) = uniswapNFTManager.decreaseLiquidity(decreaseLiquidityParams);
+        uint256 ethAmountOut = isARTHToken0 ? amount0 : amount1;
+        uint256 arthAmountOut = isARTHToken0 ? amount1 : amount0;
 
         // 4. Check if the ARTH we received is less.
-        if (arthAmountOut < position.debt) {
+        if (arthAmountOut < position.arthFromLoan) {
             // Then we swap the ETH for remaining ARTH in the ARTH/ETH pool.
-            uint256 arthNeeded = position.debt.sub(arthAmountOut);
+            uint256 arthNeeded = position.arthFromLoan.sub(arthAmountOut);
             IUniswapV3SwapRouter.ExactOutputSingleParams memory params = IUniswapV3SwapRouter
                 .ExactOutputSingleParams({
                     tokenIn: _weth,
@@ -227,11 +245,21 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
             uint256 ethUsed = uniswapV3SwapRouter.exactOutputSingle{value: amountETHswapMaximum}(params);
             ethAmountOut = ethAmountOut.sub(ethUsed); // Decrease the amount of ETH we have, since we swapped it for ARTH.
         }
+       
+        // 5. Adjust the trove, to remove collateral.
+        borrowerOperations.adjustTrove(
+            maxFee,
+            position.ethInLoan,
+            position.arthFromLoan,
+            false,
+            upperHint,
+            lowerHint
+        );
       
         // 6. Flush, send back the amount received with dust.
         _flush(msg.sender, true, ethOutMin);
         
-        emit Withdrawal(msg.sender, position.eth);
+        emit Withdrawal(msg.sender, position.ethInLoan.add(position.ethInLp));
     }
 
     function _flush(address to, bool shouldSwapARTHForETH, uint256 amountOutMin) internal {
@@ -267,7 +295,7 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
         Position memory position = positions[msg.sender];
         require(position.lpTokenId != 0, "Position not open");
         _getReward();
-        _collectFees(position.uniswapNftId);
+        _collectFees(position.lpTokenId);
     }
 
     function _collectFees(uint256 lpTokenId) internal {
