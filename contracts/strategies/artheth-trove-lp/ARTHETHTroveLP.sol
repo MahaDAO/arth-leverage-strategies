@@ -81,7 +81,7 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
     IBorrowerOperations public borrowerOperations;
     IUniswapV3SwapRouter public uniswapV3SwapRouter;
     INonfungiblePositionManager public uniswapNFTManager;
-    
+
     // TODO: the scenario when the trove gets liquidated?
 
     constructor(
@@ -133,9 +133,6 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
             _lowerHint,
             _frontEndTag
         );
-
-        // Return dust ETH, ARTH.
-        _flush(owner(), false, 0);
     }
 
     /// @notice admin-only function to close the trove; normally not needed if the campaign keeps on running
@@ -145,9 +142,6 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
 
         // Close the trove.
         borrowerOperations.closeTrove();
-
-        // Return dust ARTH, ETH.
-        _flush(owner(), false, 0);
     }
 
     function deposit(
@@ -202,9 +196,6 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
             ethInUniswap: isARTHToken0 ? amount1 : amount0
         });
 
-        // 5. Refund any dust left.
-        _flush(msg.sender, false, 0);
-
         // 6. Record the staking in the staking contract for maha rewards
         _stake(msg.sender, positions[msg.sender].eth);
 
@@ -254,8 +245,9 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
         // 4. Check if the ARTH we received is less.
         if (arthAmountOut < position.debt) {
             // Then we swap the ETH for remaining ARTH in the ARTH/ETH pool.
+            // TODO: this needs to be outsourced; what if there's better liquidity elsewhere?
             uint256 arthNeeded = position.debt.sub(arthAmountOut);
-            IUniswapV3SwapRouter.ExactOutputSingleParams memory params = IUniswapV3SwapRouter
+            IUniswapV3SwapRouter.ExactOutputSingleParams memory _params = IUniswapV3SwapRouter
                 .ExactOutputSingleParams({
                     tokenIn: _weth,
                     tokenOut: _arth,
@@ -266,10 +258,10 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
                     amountInMaximum: amountETHswapMaximum,
                     sqrtPriceLimitX96: 0
                 });
-            uint256 ethUsed = uniswapV3SwapRouter.exactOutputSingle{value: amountETHswapMaximum}(params);
+            uint256 ethUsed = uniswapV3SwapRouter.exactOutputSingle{value: amountETHswapMaximum}(_params);
             ethAmountOut = ethAmountOut.sub(ethUsed); // Decrease the amount of ETH we have, since we swapped it for ARTH.
         }
-       
+
         // 5. Adjust the trove, to remove collateral.
         borrowerOperations.adjustTrove(
             troveParams.maxFee,
@@ -279,15 +271,14 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
             troveParams.upperHint,
             troveParams.lowerHint
         );
-      
-        // 6. Flush, send back the amount received with dust.
-        _flush(msg.sender, true, ethOutMin);
-        
+
+        require(ethAmountOut >= ethOutMin, "not enough eth out");
         emit Withdrawal(msg.sender, position.eth);
     }
 
-    function _flush(address to, bool shouldSwapARTHForETH, uint256 amountOutMin) internal {
+    function flush(address to, bool shouldSwapARTHForETH, uint256 amountOutMin) external {
         if (shouldSwapARTHForETH) {
+            // TODO: this needs to be outsourced; what if there's better liquidity elsewhere?
             IUniswapV3SwapRouter.ExactInputSingleParams memory params = IUniswapV3SwapRouter
                 .ExactInputSingleParams({
                     tokenIn: _arth,
