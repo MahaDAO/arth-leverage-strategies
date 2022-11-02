@@ -12,6 +12,8 @@ import {StakingRewardsChild} from "./StakingRewardsChild.sol";
 import {INonfungiblePositionManager} from "../../interfaces/INonfungiblePositionManager.sol";
 import {MerkleWhitelist} from "./MerkleWhitelist.sol";
 import {IPriceFeed} from "../../interfaces/IPriceFeed.sol";
+import {IARTHETHRouter} from "../../interfaces/IARTHETHRouter.sol";
+import "hardhat/console.sol";
 
 contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
     using SafeMath for uint256;
@@ -70,6 +72,7 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
 
     IERC20 public arth;
     IERC20 public weth;
+    IUniswapV3Pool public pool;
 
     address private _arth;
     address private _weth;
@@ -79,7 +82,7 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
 
     IPriceFeed public priceFeed;
     IBorrowerOperations public borrowerOperations;
-    IUniswapV3SwapRouter public uniswapV3SwapRouter;
+    IARTHETHRouter public arthRouter;
     INonfungiblePositionManager public uniswapNFTManager;
 
     // TODO: the scenario when the trove gets liquidated?
@@ -91,9 +94,9 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
         address __maha,
         address __weth,
         uint24 _fee,
-        address _uniswapV3SwapRouter,
+        address _arthRouter,
         address _priceFeed,
-        bool _isARTHToken0
+        address _pool
     ) StakingRewardsChild(__maha) {
         fee = _fee;
 
@@ -103,15 +106,15 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
         _weth = __weth;
 
         borrowerOperations = IBorrowerOperations(_borrowerOperations);
-        uniswapV3SwapRouter = IUniswapV3SwapRouter(_uniswapV3SwapRouter);
+        arthRouter = IARTHETHRouter(_arthRouter);
         uniswapNFTManager = INonfungiblePositionManager(_uniswapNFTManager);
         priceFeed = IPriceFeed(_priceFeed);
+        pool = IUniswapV3Pool(_pool);
 
         arth.approve(_uniswapNFTManager, type(uint256).max);
+        arth.approve(_arthRouter, type(uint256).max);
 
-        // assuming token1 = weth; token0 = arth
-
-        isARTHToken0 = _isARTHToken0;
+        isARTHToken0 = pool.token0() == _arth;
         me = address(this);
     }
 
@@ -146,19 +149,33 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
 
     function deposit(
         TroveParams memory troveParams,
-        UniswapPositionMintParams memory uniswapPoisitionMintParams,
-        WhitelistParams memory whitelistParams
-    ) public payable checkWhitelist(msg.sender, whitelistParams.rootId, whitelistParams.proof) nonReentrant {
+        UniswapPositionMintParams memory uniswapPoisitionMintParams
+    )
+        public
+        payable
+        // WhitelistParams memory whitelistParams
+        /* checkWhitelist(msg.sender, whitelistParams.rootId, whitelistParams.proof)*/
+        nonReentrant
+    {
         // Check that position is not already open.
+        console.log("entering deposit(...)");
         require(positions[msg.sender].uniswapNftId == 0, "Position already open");
 
         // Check that we are receiving appropriate amount of ETH and
         // Mint the new strategy NFT. The ETH amount should cover for
         // the loan and adding liquidity in the uni v3 pool.
-        require(msg.value == uniswapPoisitionMintParams.ethAmountDesired.add(troveParams.ethAmount), "Invalid ETH amount");
-        require(priceFeed.fetchPrice().mul(troveParams.ethAmount).div(troveParams.arthAmount) >= mintCollateralRatio, "CR must be > 299%");
+        require(
+            msg.value == uniswapPoisitionMintParams.ethAmountDesired.add(troveParams.ethAmount),
+            "Invalid ETH amount"
+        );
+        require(
+            priceFeed.fetchPrice().mul(troveParams.ethAmount).div(troveParams.arthAmount) >=
+                mintCollateralRatio,
+            "CR must be > 299%"
+        );
 
         // 2. Mint ARTH and track ARTH balance changes due to this current tx.
+        console.log("deposit(...) - adjustTrove");
         borrowerOperations.adjustTrove{value: troveParams.ethAmount}(
             troveParams.maxFee,
             0, // No coll withdrawal.
@@ -169,23 +186,34 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
         );
 
         // 3. Adding liquidity in the ARTH/ETH pair.
-        INonfungiblePositionManager.MintParams memory mintParams = INonfungiblePositionManager.MintParams({
-            token0: isARTHToken0 ? _arth :  _weth,
-            token1: isARTHToken0 ? _weth : _arth,
-            fee: fee,
-            tickLower: uniswapPoisitionMintParams.tickLower,
-            tickUpper: uniswapPoisitionMintParams.tickUpper,
-            amount0Desired: isARTHToken0 ? uniswapPoisitionMintParams.arthAmountDesired : uniswapPoisitionMintParams.ethAmountDesired,
-            amount1Desired: isARTHToken0 ? uniswapPoisitionMintParams.ethAmountDesired : uniswapPoisitionMintParams.arthAmountDesired,
-            amount0Min: isARTHToken0 ? uniswapPoisitionMintParams.arthAmountMin : uniswapPoisitionMintParams.ethAmountMin,
-            amount1Min: isARTHToken0 ? uniswapPoisitionMintParams.ethAmountMin : uniswapPoisitionMintParams.arthAmountMin,
-            recipient: me,
-            deadline: block.timestamp
-        });
+        console.log("deposit(...) - uniswapNFTManager.mint");
+        INonfungiblePositionManager.MintParams memory mintParams = INonfungiblePositionManager
+            .MintParams({
+                token0: isARTHToken0 ? _arth : _weth,
+                token1: isARTHToken0 ? _weth : _arth,
+                fee: fee,
+                tickLower: uniswapPoisitionMintParams.tickLower,
+                tickUpper: uniswapPoisitionMintParams.tickUpper,
+                amount0Desired: isARTHToken0
+                    ? uniswapPoisitionMintParams.arthAmountDesired
+                    : uniswapPoisitionMintParams.ethAmountDesired,
+                amount1Desired: isARTHToken0
+                    ? uniswapPoisitionMintParams.ethAmountDesired
+                    : uniswapPoisitionMintParams.arthAmountDesired,
+                amount0Min: isARTHToken0
+                    ? uniswapPoisitionMintParams.arthAmountMin
+                    : uniswapPoisitionMintParams.ethAmountMin,
+                amount1Min: isARTHToken0
+                    ? uniswapPoisitionMintParams.ethAmountMin
+                    : uniswapPoisitionMintParams.arthAmountMin,
+                recipient: me,
+                deadline: block.timestamp
+            });
         (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1) = uniswapNFTManager
             .mint{value: uniswapPoisitionMintParams.ethAmountDesired}(mintParams);
 
         // 4. Record the position.
+        console.log("deposit(...) - Position");
         positions[msg.sender] = Position({
             eth: troveParams.ethAmount.add(isARTHToken0 ? amount1 : amount0),
             coll: troveParams.ethAmount,
@@ -197,6 +225,7 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
         });
 
         // 6. Record the staking in the staking contract for maha rewards
+        console.log("deposit(...) - _stake");
         _stake(msg.sender, positions[msg.sender].eth);
 
         emit Deposit(msg.sender, msg.value);
@@ -225,40 +254,31 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
         uint256 arthAmountOut;
         require(decreaseLiquidityParams.liquidity == position.liquidity, "Liquidity not same");
         require(decreaseLiquidityParams.tokenId == position.uniswapNftId, "Token id not same");
-        INonfungiblePositionManager.DecreaseLiquidityParams memory params = INonfungiblePositionManager.DecreaseLiquidityParams({
-            tokenId: decreaseLiquidityParams.tokenId,
-            liquidity: decreaseLiquidityParams.liquidity,
-            amount0Min: isARTHToken0 ? decreaseLiquidityParams.arthOutMin : decreaseLiquidityParams.ethOutMin,
-            amount1Min: isARTHToken0 ? decreaseLiquidityParams.ethOutMin : decreaseLiquidityParams.arthOutMin,
-            deadline: block.timestamp
-        });
+        INonfungiblePositionManager.DecreaseLiquidityParams
+            memory params = INonfungiblePositionManager.DecreaseLiquidityParams({
+                tokenId: decreaseLiquidityParams.tokenId,
+                liquidity: decreaseLiquidityParams.liquidity,
+                amount0Min: isARTHToken0
+                    ? decreaseLiquidityParams.arthOutMin
+                    : decreaseLiquidityParams.ethOutMin,
+                amount1Min: isARTHToken0
+                    ? decreaseLiquidityParams.ethOutMin
+                    : decreaseLiquidityParams.arthOutMin,
+                deadline: block.timestamp
+            });
         if (isARTHToken0) {
-            (arthAmountOut, ethAmountOut) = uniswapNFTManager.decreaseLiquidity(
-                params
-            );
+            (arthAmountOut, ethAmountOut) = uniswapNFTManager.decreaseLiquidity(params);
         } else {
-            (ethAmountOut, arthAmountOut) = uniswapNFTManager.decreaseLiquidity(
-                params
-            );
+            (ethAmountOut, arthAmountOut) = uniswapNFTManager.decreaseLiquidity(params);
         }
 
         // 4. Check if the ARTH we received is less.
         if (arthAmountOut < position.debt) {
             // Then we swap the ETH for remaining ARTH in the ARTH/ETH pool.
-            // TODO: this needs to be outsourced; what if there's better liquidity elsewhere?
-            uint256 arthNeeded = position.debt.sub(arthAmountOut);
-            IUniswapV3SwapRouter.ExactOutputSingleParams memory _params = IUniswapV3SwapRouter
-                .ExactOutputSingleParams({
-                    tokenIn: _weth,
-                    tokenOut: _arth,
-                    fee: fee,
-                    recipient: me,
-                    deadline: block.timestamp,
-                    amountOut: arthNeeded,
-                    amountInMaximum: amountETHswapMaximum,
-                    sqrtPriceLimitX96: 0
-                });
-            uint256 ethUsed = uniswapV3SwapRouter.exactOutputSingle{value: amountETHswapMaximum}(_params);
+            uint256 ethUsed = arthRouter.swapETHtoARTH{value: amountETHswapMaximum}(
+                me,
+                amountETHswapMaximum
+            );
             ethAmountOut = ethAmountOut.sub(ethUsed); // Decrease the amount of ETH we have, since we swapped it for ARTH.
         }
 
@@ -276,22 +296,12 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
         emit Withdrawal(msg.sender, position.eth);
     }
 
-    function flush(address to, bool shouldSwapARTHForETH, uint256 amountOutMin) external {
-        if (shouldSwapARTHForETH) {
-            // TODO: this needs to be outsourced; what if there's better liquidity elsewhere?
-            IUniswapV3SwapRouter.ExactInputSingleParams memory params = IUniswapV3SwapRouter
-                .ExactInputSingleParams({
-                    tokenIn: _arth,
-                    tokenOut: _weth,
-                    fee: fee,
-                    recipient: me,
-                    deadline: block.timestamp,
-                    amountIn: arth.balanceOf(me),
-                    amountOutMinimum: amountOutMin,
-                    sqrtPriceLimitX96: 0
-                });
-            uniswapV3SwapRouter.exactInputSingle(params);
-        }
+    function flush(
+        address to,
+        bool shouldSwapARTHForETH,
+        uint256 amountOutMin
+    ) external {
+        if (shouldSwapARTHForETH) arthRouter.swapARTHtoETH(me, arth.balanceOf(me), amountOutMin);
 
         uint256 arthBalance = arth.balanceOf(me);
         if (arthBalance > 0) arth.transfer(to, arthBalance);
@@ -327,9 +337,29 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
         uniswapNFTManager.collect(collectParams);
     }
 
+    function setRouter(address target) external payable onlyOwner {
+        arthRouter = IARTHETHRouter(target);
+    }
+
     /// @dev in case admin needs to execute some calls directly
     function emergencyCall(address target, bytes memory signature) external payable onlyOwner {
         (bool success, bytes memory response) = target.call{value: msg.value}(signature);
         require(success, string(response));
+    }
+
+    function getSlot0()
+        external
+        view
+        returns (
+            uint160 sqrtPriceX96,
+            int24 tick,
+            uint16 observationIndex,
+            uint16 observationCardinality,
+            uint16 observationCardinalityNext,
+            uint8 feeProtocol,
+            bool unlocked
+        )
+    {
+        return pool.slot0();
     }
 }

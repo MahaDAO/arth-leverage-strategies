@@ -1,0 +1,11 @@
+export const fee = "10000";
+export const mahaAddr = "0xb4d930279552397bba2ee473229f89ec245bc365";
+export const arthAddr = "0x8CC0F052fff7eaD7f2EdCCcaC895502E884a8a71";
+export const wethAddr = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
+export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+export const uniswapV3PoolAddr = "0xE7cDba5e9b0D5E044AaB795cd3D659aAc8dB869B";
+export const borrowerOperationsAddr = "0xD3761E54826837B8bBd6eF0A278D5b647B807583";
+export const uniswapV3SwapRouterAddr = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
+export const uniswapNFTPositionMangerAddr = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88";
+export const priceFeed = "0x15726a29c398e65Ae5dA551DFf3BBC26D767d0F7";
+export const deployer = "0x6b41d394e2DfF2DE63f62959A79Dac372379Dd54";
