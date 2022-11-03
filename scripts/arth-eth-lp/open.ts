@@ -1,7 +1,7 @@
 import { BigNumber } from "ethers";
 import { task } from "hardhat/config";
 import * as config from "./constants";
-import { reportBalances } from "./utils";
+import { nearestUsableTick, reportBalances } from "./utils";
 
 task("arth-eth:open", "Open ARTH/ETH Loan").setAction(async (_taskArgs, hre) => {
     console.log(`Debugging to ${hre.network.name}...`);
@@ -12,8 +12,12 @@ task("arth-eth:open", "Open ARTH/ETH Loan").setAction(async (_taskArgs, hre) => 
         method: "hardhat_impersonateAccount",
         params: [config.deployer]
     });
-    const deployer = await hre.ethers.getSigner(config.deployer);
+    hre.network.provider.request({
+        method: "hardhat_setBalance",
+        params: [config.deployer, e18.mul(1000).toHexString()]
+    });
 
+    const deployer = await hre.ethers.getSigner(config.deployer);
     console.log(`Deployer address is ${deployer.address}.`);
     await reportBalances(hre, deployer.address);
 
@@ -80,13 +84,27 @@ task("arth-eth:open", "Open ARTH/ETH Loan").setAction(async (_taskArgs, hre) => 
         ethAmount: e18.mul(15).div(10) // uint256
     };
 
+    const slot0 = await arthEthTroveLp.getSlot0();
+    const tickSpacing = await arthEthTroveLp.getTickSpacing();
+
+    const currentSqrtPriceX96 = slot0[0];
+    const currentTick = slot0[1];
+    console.log("slot0", slot0);
+
+    // if we say 20% above current price and 80% below current price
+    const tickLower = nearestUsableTick(currentTick, tickSpacing) + tickSpacing * 2;
+    const tickUpper = nearestUsableTick(currentTick, tickSpacing) + tickSpacing * 2;
+
+    console.log("SqrtPriceX96", currentSqrtPriceX96.toString());
+    console.log("tick", currentTick, tickLower, tickUpper, tickSpacing);
+
     const uniswapPoisitionMintParams = {
         arthAmountDesired: e18.mul(251), // amount0Desired: string;
         ethAmountMin: "0", // amount0Min: string;
         ethAmountDesired: e18.mul(15).div(10), // amount1Desired: string;
         arthAmountMin: "0", // amount1Min: string;
-        tickLower: "-76000", // tickLower: string;
-        tickUpper: "-60000" // tickUpper: string;
+        tickLower: tickLower, // "-76000", // tickLower: string;
+        tickUpper: tickUpper // "-60000" // tickUpper: string;
     };
 
     console.log("deposit", troveParams, uniswapPoisitionMintParams);
@@ -96,6 +114,8 @@ task("arth-eth:open", "Open ARTH/ETH Loan").setAction(async (_taskArgs, hre) => 
 
     console.log("flushing contract");
     await arthEthTroveLp.connect(deployer).flush(deployer.address, false, 0);
+
+    console.log(await arthEthTroveLp.positions(deployer.address));
 
     await reportBalances(hre, arthEthTroveLp.address);
     await reportBalances(hre, deployer.address);

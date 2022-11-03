@@ -31,7 +31,7 @@ const config: HardhatUserConfig & any = {
                 url: `https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`
             }
         },
-        hardhatServer: {
+        dev: {
             url: "http://127.0.0.1:8545"
         },
         ropsten: {

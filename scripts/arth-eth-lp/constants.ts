@@ -8,4 +8,4 @@ export const borrowerOperationsAddr = "0xD3761E54826837B8bBd6eF0A278D5b647B80758
 export const uniswapV3SwapRouterAddr = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
 export const uniswapNFTPositionMangerAddr = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88";
 export const priceFeed = "0x15726a29c398e65Ae5dA551DFf3BBC26D767d0F7";
-export const deployer = "0x6b41d394e2DfF2DE63f62959A79Dac372379Dd54";
+export const deployer = "0x67c569F960C1Cc0B9a7979A851f5a67018c5A3b0";
