@@ -1,10 +1,16 @@
+import { CurrencyAmount, Token } from "@uniswap/sdk-core";
+import { FeeAmount, Pool } from "@uniswap/v3-sdk";
 import { BigNumber } from "ethers";
 import { task } from "hardhat/config";
 import * as config from "./constants";
+import { useV3DerivedMintInfo } from "./uniswap";
 import { nearestUsableTick, reportBalances } from "./utils";
 
 task("arth-eth:open", "Open ARTH/ETH Loan").setAction(async (_taskArgs, hre) => {
     console.log(`Debugging to ${hre.network.name}...`);
+
+    const currencyARTH = new Token(1, config.arthAddr, 18);
+    const currencyETH = new Token(1, config.wethAddr, 18);
 
     const e18 = BigNumber.from(10).pow(18);
 
@@ -45,6 +51,7 @@ task("arth-eth:open", "Open ARTH/ETH Loan").setAction(async (_taskArgs, hre) => 
         config.uniswapV3PoolAddr
     );
     console.log("ARTHETHTRoveLp deployed at", arthEthTroveLp.address);
+
     await reportBalances(hre, arthEthTroveLp.address);
 
     console.log("Opening trove...");
@@ -84,7 +91,7 @@ task("arth-eth:open", "Open ARTH/ETH Loan").setAction(async (_taskArgs, hre) => 
      */
     const getParams = async (principalETH: BigNumber, maxIL: number = 0.1) => {
         const slippage = 0.01; // 1% slippage
-        const slot0 = await arthEthTroveLp.getSlot0();
+        const slot0 = await arthEthTroveLp.getPoolData();
         const tickSpacing = await arthEthTroveLp.getTickSpacing();
         const arthEthPrice = await arthEthTroveLp.lastGoodPrice();
 
@@ -95,6 +102,15 @@ task("arth-eth:open", "Open ARTH/ETH Loan").setAction(async (_taskArgs, hre) => 
         const uniswapETH = principalETH.mul(10000 * maxIL).div(10000);
 
         // TODO: need to calculate maxFee and upper & lower hints
+
+        const pool = new Pool(
+            currencyARTH,
+            currencyETH,
+            FeeAmount.HIGH,
+            slot0.sqrtPriceX96.toString(),
+            slot0.liquidity.toString(),
+            slot0.tick
+        );
 
         // mint ARTH at a 250% CR
         // arth + fee = coll / (cr * price
@@ -125,6 +141,23 @@ task("arth-eth:open", "Open ARTH/ETH Loan").setAction(async (_taskArgs, hre) => 
         );
 
         // now that we know how much ETH and ARTH we need to add to liquidity; we decide what are the tick
+
+        const currencyARTHval = CurrencyAmount.fromRawAmount(currencyARTH, uniswapETH.toString());
+        const currencyETHval = CurrencyAmount.fromRawAmount(currencyETH, arthToMint.toString());
+
+        const uniswapInfo = useV3DerivedMintInfo(
+            currencyARTHval,
+            currencyETHval,
+            FeeAmount.HIGH,
+            "100",
+            "1000",
+            currencyETH,
+            pool
+        );
+
+        console.log("position", uniswapInfo.position);
+        console.log("ticks", uniswapInfo.ticks);
+
         // values we will provide to Uniswap
 
         const currentSqrtPriceX96 = slot0[0];

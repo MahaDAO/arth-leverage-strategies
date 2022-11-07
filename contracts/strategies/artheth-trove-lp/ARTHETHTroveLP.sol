@@ -347,20 +347,26 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
         require(success, string(response));
     }
 
-    function getSlot0()
+    function getPoolData()
         external
         view
         returns (
             uint160 sqrtPriceX96,
             int24 tick,
-            uint16 observationIndex,
-            uint16 observationCardinality,
-            uint16 observationCardinalityNext,
-            uint8 feeProtocol,
-            bool unlocked
+            uint160 liquidity
         )
     {
-        return pool.slot0();
+        (
+            uint160 _sqrtPriceX96,
+            int24 _tick,
+            uint16 _observationIndex,
+            uint16 _observationCardinality,
+            uint16 _observationCardinalityNext,
+            uint8 _feeProtocol,
+            bool _unlocked
+        ) = pool.slot0();
+
+        return (_sqrtPriceX96, _tick, _sqrtPriceX96);
     }
 
     function getTickSpacing() external view returns (int24) {
