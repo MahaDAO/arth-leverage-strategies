@@ -366,4 +366,8 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
     function getTickSpacing() external view returns (int24) {
         return pool.tickSpacing();
     }
+
+    function lastGoodPrice() external view returns (uint256) {
+        return priceFeed.lastGoodPrice();
+    }
 }

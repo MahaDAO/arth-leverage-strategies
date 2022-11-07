@@ -76,41 +76,92 @@ task("arth-eth:open", "Open ARTH/ETH Loan").setAction(async (_taskArgs, hre) => 
 
     console.log("depositing 3 eth, opening a loan and adding to LP");
 
-    const troveParams = {
-        maxFee: e18, // uint256 maxFee;
-        upperHint: "0x0000000000000000000000000000000000000000", // address upperHint;
-        lowerHint: "0x0000000000000000000000000000000000000000", // address lowerHint;
-        arthAmount: e18.mul(251), // uint256
-        ethAmount: e18.mul(15).div(10) // uint256
+    /**
+     * A helper fn to calculate all the params to feed into the contract; things like debt, tick values etc..
+     *
+     * @param principalETH how much ETH is being added to the protocol
+     * @param maxIL the max IL the user would like to take on. default is 10%
+     */
+    const getParams = async (principalETH: BigNumber, maxIL: number = 0.1) => {
+        const slippage = 0.01; // 1% slippage
+        const slot0 = await arthEthTroveLp.getSlot0();
+        const tickSpacing = await arthEthTroveLp.getTickSpacing();
+        const arthEthPrice = await arthEthTroveLp.lastGoodPrice();
+
+        // understand how much ETH we will put into liquidty and how much we will
+        // use to mint ARTH with. Ideally if we are expecting to put 10% of ARTH into
+        // liquidty, then we use 90% into a trove to mint ARTH
+        const troveETH = principalETH.mul(10000 * (1 - maxIL)).div(10000);
+        const uniswapETH = principalETH.mul(10000 * maxIL).div(10000);
+
+        // TODO: need to calculate maxFee and upper & lower hints
+
+        // mint ARTH at a 250% CR
+        // arth + fee = coll / (cr * price
+        const gasFee = e18.mul(50);
+        const cr = 250; // 250%
+        const arthToMint = troveETH.mul(100).div(cr).mul(arthEthPrice).div(e18).sub(gasFee);
+
+        const troveParams = {
+            maxFee: e18, // uint256 maxFee;
+            upperHint: "0x0000000000000000000000000000000000000000", // address upperHint;
+            lowerHint: "0x0000000000000000000000000000000000000000", // address lowerHint;
+            arthAmount: arthToMint, // uint256
+            ethAmount: troveETH
+        };
+
+        console.log(
+            `\tgetParams() > opening a loan at 250% cr with ${
+                troveETH.mul(100).div(e18).toNumber() / 100
+            }` + ` eth for ${arthToMint.mul(100).div(e18).toNumber() / 100} arth`
+        );
+
+        console.log(
+            `\tgetParams() > adding liquidity with ${
+                uniswapETH.mul(100).div(e18).toNumber() / 100
+            } eth and ${arthToMint.mul(100).div(e18).toNumber() / 100} arth (~${
+                arthToMint.mul(e18).div(arthEthPrice).mul(100).div(e18).toNumber() / 100
+            } eth)`
+        );
+
+        // now that we know how much ETH and ARTH we need to add to liquidity; we decide what are the tick
+        // values we will provide to Uniswap
+
+        const currentSqrtPriceX96 = slot0[0];
+        const currentTick = slot0[1];
+        console.log("slot0", slot0);
+
+        // if we say 20% above current price and 80% below current price
+        const tickLower = nearestUsableTick(currentTick, tickSpacing) + tickSpacing * 2;
+        const tickUpper = nearestUsableTick(currentTick, tickSpacing) + tickSpacing * 2;
+
+        console.log("SqrtPriceX96", currentSqrtPriceX96.toString());
+        console.log("tick", currentTick, tickLower, tickUpper, tickSpacing);
+
+        const uniswapPoisitionMintParams = {
+            arthAmountDesired: arthToMint, // amount0Desired: string;
+            ethAmountMin: uniswapETH.mul((1 - slippage) * 10000).div(10000), // amount0Min: string;
+            ethAmountDesired: uniswapETH, // amount1Desired: string;
+            arthAmountMin: arthToMint.mul((1 - slippage) * 10000).div(10000), // amount1Min: string;
+            tickLower: tickLower, // "-76000", // tickLower: string;
+            tickUpper: tickUpper // "-60000" // tickUpper: string;
+        };
+
+        return {
+            eth: principalETH,
+            troveParams,
+            uniswapPoisitionMintParams
+        };
     };
 
-    const slot0 = await arthEthTroveLp.getSlot0();
-    const tickSpacing = await arthEthTroveLp.getTickSpacing();
+    const params = await getParams(e18.mul(3));
 
-    const currentSqrtPriceX96 = slot0[0];
-    const currentTick = slot0[1];
-    console.log("slot0", slot0);
-
-    // if we say 20% above current price and 80% below current price
-    const tickLower = nearestUsableTick(currentTick, tickSpacing) + tickSpacing * 2;
-    const tickUpper = nearestUsableTick(currentTick, tickSpacing) + tickSpacing * 2;
-
-    console.log("SqrtPriceX96", currentSqrtPriceX96.toString());
-    console.log("tick", currentTick, tickLower, tickUpper, tickSpacing);
-
-    const uniswapPoisitionMintParams = {
-        arthAmountDesired: e18.mul(251), // amount0Desired: string;
-        ethAmountMin: "0", // amount0Min: string;
-        ethAmountDesired: e18.mul(15).div(10), // amount1Desired: string;
-        arthAmountMin: "0", // amount1Min: string;
-        tickLower: tickLower, // "-76000", // tickLower: string;
-        tickUpper: tickUpper // "-60000" // tickUpper: string;
-    };
-
-    console.log("deposit", troveParams, uniswapPoisitionMintParams);
-    await arthEthTroveLp.connect(deployer).deposit(troveParams, uniswapPoisitionMintParams, {
-        value: e18.mul(3)
-    });
+    console.log("deposit", params.troveParams, params.uniswapPoisitionMintParams);
+    await arthEthTroveLp
+        .connect(deployer)
+        .deposit(params.troveParams, params.uniswapPoisitionMintParams, {
+            value: params.eth
+        });
 
     console.log("flushing contract");
     await arthEthTroveLp.connect(deployer).flush(deployer.address, false, 0);
