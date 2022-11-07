@@ -34,22 +34,6 @@ export enum PoolState {
 export type FullRange = true;
 export const BIG_INT_ZERO = JSBI.BigInt(0);
 
-interface MintState {
-    readonly independentField: Field;
-    readonly typedValue: string;
-    readonly startPriceTypedValue: string; // for the case when there's no liquidity
-    readonly leftRangeTypedValue: string | FullRange;
-    readonly rightRangeTypedValue: string | FullRange;
-}
-
-const initialState: MintState = {
-    independentField: Field.CURRENCY_A,
-    typedValue: "",
-    startPriceTypedValue: "",
-    leftRangeTypedValue: "",
-    rightRangeTypedValue: ""
-};
-
 export function getTickToPrice(
     baseToken?: Token,
     quoteToken?: Token,
@@ -101,21 +85,15 @@ export function useV3DerivedMintInfo(
         [bound in Bound]?: Price<Token, Token> | undefined;
     };
     currencies: { [field in Field]?: Currency };
-    dependentField: Field;
     parsedAmounts: { [field in Field]?: CurrencyAmount<Currency> };
     position: Position | undefined;
     ticksAtLimit: { [bound in Bound]?: boolean | undefined };
 } {
-    const { independentField, startPriceTypedValue } = initialState;
-
-    const dependentField =
-        independentField === Field.CURRENCY_A ? Field.CURRENCY_B : Field.CURRENCY_A;
-
     const currencyA = currencyAval.currency;
     const currencyB = currencyBval.currency;
 
     // currencies
-    const currencies: { [field in Field]?: Currency } = {
+    const currencies = {
         [Field.CURRENCY_A]: currencyA,
         [Field.CURRENCY_B]: currencyB
     };
@@ -129,48 +107,17 @@ export function useV3DerivedMintInfo(
 
     const [token0, token1] = tokenA.sortsBefore(tokenB) ? [tokenA, tokenB] : [tokenB, tokenA];
 
-    // pool
-    const poolState = PoolState.EXISTS;
-    const noLiquidity = false; // poolState === PoolState.NOT_EXISTS;
-
     // note to parse inputs in reverse
     const invertPrice = Boolean(baseToken && token0 && !baseToken.equals(token0));
 
     // always returns the price with 0 as base token
-    const price: Price<Token, Token> | undefined = (() => {
-        // if no liquidity use typed value
-        if (noLiquidity) {
-            const parsedQuoteAmount = tryParseCurrencyAmount(
-                startPriceTypedValue,
-                invertPrice ? token0 : token1
-            );
-            if (parsedQuoteAmount && token0 && token1) {
-                const baseAmount = tryParseCurrencyAmount("1", invertPrice ? token1 : token0);
-                const price =
-                    baseAmount && parsedQuoteAmount
-                        ? new Price(
-                              baseAmount.currency,
-                              parsedQuoteAmount.currency,
-                              baseAmount.quotient,
-                              parsedQuoteAmount.quotient
-                          )
-                        : undefined;
-                return (invertPrice ? price?.invert() : price) ?? undefined;
-            }
-            return undefined;
-        } else {
-            // get the amount of quote currency
-            return pool && token0 ? pool.priceOf(token0) : undefined;
-        }
-    })();
+    const price: Price<Token, Token> = pool.priceOf(token0);
 
     // if pool exists use it, if not use the mock pool
     const poolForPosition: Pool | undefined = pool;
 
     // lower and upper limits in the tick space for `feeAmoun<Trans>
-    const tickSpaceLimits: {
-        [bound in Bound]: number | undefined;
-    } = {
+    const tickSpaceLimits = {
         [Bound.LOWER]: feeAmount
             ? nearestUsableTick(TickMath.MIN_TICK, TICK_SPACINGS[feeAmount])
             : undefined,
@@ -225,58 +172,10 @@ export function useV3DerivedMintInfo(
         [Bound.UPPER]: getTickToPrice(token0, token1, ticks[Bound.UPPER])
     };
 
-    // const dependentAmount: CurrencyAmount<Currency> | undefined = (() => {
-    //     // we wrap the currencies just to get the price in terms of the other token
-    //     const wrappedIndependentAmount = independentAmount?.wrapped;
-    //     const dependentCurrency = dependentField === Field.CURRENCY_B ? currencyB : currencyA;
-    //     if (
-    //         independentAmount &&
-    //         wrappedIndependentAmount &&
-    //         typeof tickLower === "number" &&
-    //         typeof tickUpper === "number" &&
-    //         poolForPosition
-    //     ) {
-    //         const position: Position | undefined = wrappedIndependentAmount.currency.equals(
-    //             poolForPosition.token0
-    //         )
-    //             ? Position.fromAmount0({
-    //                   pool: poolForPosition,
-    //                   tickLower,
-    //                   tickUpper,
-    //                   amount0: independentAmount.quotient,
-    //                   useFullPrecision: true // we want full precision for the theoretical position
-    //               })
-    //             : Position.fromAmount1({
-    //                   pool: poolForPosition,
-    //                   tickLower,
-    //                   tickUpper,
-    //                   amount1: independentAmount.quotient
-    //               });
-    //         const dependentTokenAmount = wrappedIndependentAmount.currency.equals(
-    //             poolForPosition.token0
-    //         )
-    //             ? position.amount1
-    //             : position.amount0;
-    //         return (
-    //             dependentCurrency &&
-    //             CurrencyAmount.fromRawAmount(dependentCurrency, dependentTokenAmount.quotient)
-    //         );
-    //     }
-    //     return undefined;
-    // })();
-
-    const parsedAmounts: { [field in Field]: CurrencyAmount<Currency> | undefined } = {
+    const parsedAmounts = {
         [Field.CURRENCY_A]: currencyAval,
         [Field.CURRENCY_B]: currencyBval
     };
-
-    // single deposit only if price is out of range
-    const deposit0Disabled = Boolean(
-        typeof tickUpper === "number" && poolForPosition && poolForPosition.tickCurrent >= tickUpper
-    );
-    const deposit1Disabled = Boolean(
-        typeof tickLower === "number" && poolForPosition && poolForPosition.tickCurrent <= tickLower
-    );
 
     // create position entity based on users selection
     const position: Position | undefined = (() => {
@@ -291,16 +190,14 @@ export function useV3DerivedMintInfo(
             return undefined;
 
         // mark as 0 if disabled because out of range
-        const amount0 = !deposit0Disabled
-            ? parsedAmounts?.[
-                  tokenA.equals(poolForPosition.token0) ? Field.CURRENCY_A : Field.CURRENCY_B
-              ]?.quotient
-            : BIG_INT_ZERO;
-        const amount1 = !deposit1Disabled
-            ? parsedAmounts?.[
-                  tokenA.equals(poolForPosition.token0) ? Field.CURRENCY_B : Field.CURRENCY_A
-              ]?.quotient
-            : BIG_INT_ZERO;
+        const amount0 =
+            parsedAmounts?.[
+                tokenA.equals(poolForPosition.token0) ? Field.CURRENCY_A : Field.CURRENCY_B
+            ]?.quotient;
+        const amount1 =
+            parsedAmounts?.[
+                tokenA.equals(poolForPosition.token0) ? Field.CURRENCY_B : Field.CURRENCY_A
+            ]?.quotient;
 
         if (amount0 !== undefined && amount1 !== undefined) {
             return Position.fromAmounts({
@@ -315,7 +212,6 @@ export function useV3DerivedMintInfo(
     })();
 
     return {
-        dependentField,
         currencies,
         pool,
         parsedAmounts,
