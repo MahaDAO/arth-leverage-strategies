@@ -88,8 +88,9 @@ task("arth-eth:open", "Open ARTH/ETH Loan").setAction(async (_taskArgs, hre) => 
      *
      * @param principalETH how much ETH is being added to the protocol
      * @param maxIL the max IL the user would like to take on. default is 10%
+     * @param multiplier by how much should the liquidity position be multiplied by
      */
-    const getParams = async (principalETH: BigNumber, maxIL: number = 0.1) => {
+    const getParams = async (principalETH: BigNumber, maxIL: number = 0.1, multiplier = 2) => {
         const slippage = 0.01; // 1% slippage
         const slot0 = await arthEthTroveLp.getPoolData();
         const tickSpacing = await arthEthTroveLp.getTickSpacing();
