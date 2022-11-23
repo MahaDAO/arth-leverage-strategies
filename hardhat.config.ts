@@ -32,7 +32,8 @@ const config: HardhatUserConfig & any = {
             }
         },
         dev: {
-            url: "http://127.0.0.1:8545"
+            url: "http://127.0.0.1:8545",
+            accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : []
         },
         ropsten: {
             url: process.env.ROPSTEN_URL || "",
