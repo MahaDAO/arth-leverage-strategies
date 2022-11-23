@@ -14,8 +14,9 @@ import {MerkleWhitelist} from "./MerkleWhitelist.sol";
 import {IPriceFeed} from "../../interfaces/IPriceFeed.sol";
 import {IARTHETHRouter} from "../../interfaces/IARTHETHRouter.sol";
 import "hardhat/console.sol";
+import {Multicall} from "../../utils/Multicall.sol";
 
-contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist {
+contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist, Multicall {
     using SafeMath for uint256;
 
     event Deposit(address indexed dst, uint256 wad);
