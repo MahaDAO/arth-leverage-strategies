@@ -193,9 +193,9 @@ task("arth-eth:open", "Open ARTH/ETH Loan").setAction(async (_taskArgs, hre) => 
     console.log("deposit", params.troveParams, params.uniswapPoisitionMintParams);
     await arthEthTroveLp
         .connect(deployer)
-        .deposit(params.troveParams, params.uniswapPoisitionMintParams, {
-            value: params.eth
-        });
+        // .deposit(params.troveParams, params.uniswapPoisitionMintParams, {
+        //     value: params.eth
+        // });
 
     console.log("flushing contract");
     await arthEthTroveLp.connect(deployer).flush(deployer.address, false, 0);

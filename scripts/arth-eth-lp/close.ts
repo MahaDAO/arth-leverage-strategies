@@ -85,9 +85,9 @@ task("arth-eth:close", "Close ARTH/ETH Loan").setAction(async (pramas, hre) => {
     };
 
     console.log(troveParams, uniswapPoisitionMintParams);
-    await arthEthTroveLp
-        .connect(impersonatedSigner)
-        .deposit(troveParams, uniswapPoisitionMintParams, {
-            value: e18.mul(3)
-        });
+    // await arthEthTroveLp
+    //     .connect(impersonatedSigner)
+    //     .deposit(troveParams, uniswapPoisitionMintParams, {
+    //         value: e18.mul(3)
+    //     });
 });
