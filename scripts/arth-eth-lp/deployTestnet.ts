@@ -52,14 +52,17 @@ async function main() {
   await arthEthTroveLp.deployed();
   console.log("ARTHETHTRoveLP deployed at", arthEthTroveLp.address);
   console.log('Opening trove...')
-  const tx = await arthEthTroveLp.connect(deployer).openTrove(
+  let tx = await arthEthTroveLp.connect(deployer).openTrove(
     "1000000000000000000",
-    "351000000000000000000",
+    "251000000000000000000",
     ZERO_ADDRESS,
     ZERO_ADDRESS,
     ZERO_ADDRESS,
-    { value: "150000000000000000" }
+    { value: "500000000000000000" }
   );
+  await tx.wait();
+  console.log("Flusing...");
+  tx = await arthEthTroveLp.connect(deployer).flush(deployer.address, false, 0);
   await tx.wait();
 //   await hre.run("verify:verify", {
 //     address: arthEthTroveLp.address,

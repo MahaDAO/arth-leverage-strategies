@@ -27,11 +27,13 @@ const config: HardhatUserConfig & any = {
     solidity: "0.8.4",
     networks: {
         hardhat: {
+            chainId: 1337,
             forking: {
                 url: `https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`
             }
         },
         dev: {
+            chainId: 1337,
             url: "http://127.0.0.1:8545",
             accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : []
         },

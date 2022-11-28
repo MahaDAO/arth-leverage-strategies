@@ -301,7 +301,7 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist, Multicall {
         address to,
         bool shouldSwapARTHForETH,
         uint256 amountOutMin
-    ) external {
+    ) external payable {
         if (shouldSwapARTHForETH) arthRouter.swapARTHtoETH(me, arth.balanceOf(me), amountOutMin);
 
         uint256 arthBalance = arth.balanceOf(me);
