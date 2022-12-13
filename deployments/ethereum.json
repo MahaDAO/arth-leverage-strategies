@@ -1,1 +1,12 @@
-{}
+{
+  "ARTHETHTroveLPImpl": {
+    "abi": "ARTHETHTroveLP",
+    "verified": true,
+    "address": "0x94cdc9fbD3a4b8517e94Ea9B5d2Af509633E6Dfa"
+  },
+  "ARTHETHTroveLP": {
+    "abi": "TransparentUpgradeableProxy",
+    "verified": true,
+    "address": "0xA9735E594624339f8fbc8a99c57C13C7B4E8BCaC"
+  }
+}
