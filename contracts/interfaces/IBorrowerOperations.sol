@@ -75,4 +75,6 @@ interface IBorrowerOperations {
     function claimCollateral() external;
 
     function getCompositeDebt(uint256 _debt) external pure returns (uint256);
+
+    function activePool() external view returns (address);
 }
