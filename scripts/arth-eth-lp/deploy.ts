@@ -29,6 +29,8 @@ async function main() {
         config.mahaAddr,
         config.priceFeed,
         config.lendingPool,
+        86400 * 30,
+        deployer.address,
         deployer.address
     ]);
 

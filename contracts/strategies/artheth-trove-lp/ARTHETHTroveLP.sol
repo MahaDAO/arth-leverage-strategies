@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 import {IBorrowerOperations} from "../../interfaces/IBorrowerOperations.sol";
@@ -13,7 +12,7 @@ import {Multicall} from "../../utils/Multicall.sol";
 import {ILendingPool} from "../../interfaces/ILendingPool.sol";
 import {console} from "hardhat/console.sol";
 
-contract ARTHETHTroveLP is Ownable, Initializable, StakingRewardsChild, Multicall {
+contract ARTHETHTroveLP is Initializable, StakingRewardsChild, Multicall {
     using SafeMath for uint256;
 
     event Deposit(address indexed src, uint256 wad);
@@ -55,6 +54,8 @@ contract ARTHETHTroveLP is Ownable, Initializable, StakingRewardsChild, Multical
         address __maha,
         address _priceFeed,
         address _pool,
+        uint256 _rewardsDuration,
+        address _operator,
         address _owner
     ) external initializer {
         arth = IERC20(__arth);
@@ -70,7 +71,7 @@ contract ARTHETHTroveLP is Ownable, Initializable, StakingRewardsChild, Multical
 
         minCollateralRatio = 3 * 1e18; // 300% CR
 
-        _stakingRewardsChildInit(__maha);
+        _stakingRewardsChildInit(__maha, _rewardsDuration, _operator);
         _transferOwnership(_owner);
     }
 

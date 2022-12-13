@@ -37,6 +37,8 @@ task("arth-eth:close", "Close ARTH/ETH Loan").setAction(async (pramas, hre) => {
         config.mahaAddr,
         config.priceFeed,
         config.lendingPool,
+        86400 * 30,
+        deployer.address,
         deployer.address
     ]);
     const proxy = await ProxyFactory.deploy(arthEthTroveImpl.address, config.gnosisSafe, initDecode);

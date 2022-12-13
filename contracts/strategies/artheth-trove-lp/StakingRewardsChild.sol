@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Operator} from "../../utils/Operator.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
@@ -9,15 +9,15 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 // NOTE: V2 allows setting of rewardsDuration in constructor
-contract StakingRewardsChild is Ownable, ReentrancyGuard {
+contract StakingRewardsChild is Operator, ReentrancyGuard {
     using SafeMath for uint256;
 
     /* ========== STATE VARIABLES ========== */
 
     IERC20 public rewardsToken;
-    uint256 public periodFinish = 0;
-    uint256 public rewardRate = 0;
-    uint256 public rewardsDuration = 7 days;
+    uint256 public periodFinish;
+    uint256 public rewardRate;
+    uint256 public rewardsDuration;
     uint256 public lastUpdateTime;
     uint256 public rewardPerTokenStored;
 
@@ -27,8 +27,14 @@ contract StakingRewardsChild is Ownable, ReentrancyGuard {
     uint256 private _totalSupply;
     mapping(address => uint256) private _balances;
 
-    function _stakingRewardsChildInit(address _rewardsToken) internal {
+    function _stakingRewardsChildInit(
+        address _rewardsToken,
+        uint256 _rewardsDuration,
+        address _operator
+    ) internal {
         rewardsToken = IERC20(_rewardsToken);
+        rewardsDuration = _rewardsDuration;
+        _transferOperator(_operator);
     }
 
     /* ========== VIEWS ========== */
@@ -100,7 +106,7 @@ contract StakingRewardsChild is Ownable, ReentrancyGuard {
 
     /* ========== RESTRICTED FUNCTIONS ========== */
 
-    function notifyRewardAmount(uint256 reward) external onlyOwner updateReward(address(0)) {
+    function notifyRewardAmount(uint256 reward) external onlyOperator updateReward(address(0)) {
         if (block.timestamp >= periodFinish) {
             rewardRate = reward.div(rewardsDuration);
         } else {
