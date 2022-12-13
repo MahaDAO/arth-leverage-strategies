@@ -9,3 +9,4 @@ export const uniswapV3SwapRouterAddr = "0xE592427A0AEce92De3Edee1F18E0157C058615
 export const uniswapNFTPositionMangerAddr = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88";
 export const priceFeed = "0xCB056C17ce063F20a8D0650F30550B20Ff1f04c1";
 export const deployer = "0x67c569F960C1Cc0B9a7979A851f5a67018c5A3b0";
+export const lendingPool = "0x76F0C94Ced5B48020bf0D7f3D0CEabC877744cB5";

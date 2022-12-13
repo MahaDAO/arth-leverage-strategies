@@ -36,7 +36,6 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist, Multicall {
         bytes32[] proof;
     }
 
-    uint24 public fee;
     uint256 public mintCollateralRatio = 3 * 1e18; // 300% CR
 
     address private me;
@@ -54,11 +53,9 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist, Multicall {
         address _borrowerOperations,
         address __arth,
         address __maha,
-        uint24 _fee,
         address _priceFeed,
         address _pool
     ) StakingRewardsChild(__maha) {
-        fee = _fee;
         arth = IERC20(__arth);
         _arth = __arth;
         borrowerOperations = IBorrowerOperations(_borrowerOperations);
@@ -66,6 +63,15 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist, Multicall {
         pool = ILendingPool(_pool);
         arth.approve(_pool, type(uint256).max);
         me = address(this);
+    }
+
+    // --- Fallback function ---
+
+    receive() external payable {
+        // Fetch the active pool.
+        address activePool = borrowerOperations.activePool();
+        // Only active pool can send eth to the contract.
+        require(msg.sender == activePool, "Not active pool");
     }
 
     /// @notice admin-only function to open a trove; needed to initialize the contract
@@ -86,6 +92,9 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist, Multicall {
             _lowerHint,
             _frontEndTag
         );
+
+        // Send the dust back to onlyOwner.
+        _flush(msg.sender);
     }
 
     /// @notice admin-only function to close the trove; normally not needed if the campaign keeps on running
@@ -95,6 +104,9 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist, Multicall {
 
         // Close the trove.
         borrowerOperations.closeTrove();
+
+        // Send the dust back to onlyOwner.
+        _flush(msg.sender);
     }
 
     function deposit(LoanParams memory loanParams, uint16 lendingReferralCode)
@@ -111,10 +123,10 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist, Multicall {
         require(!positions[msg.sender].isActive, "Position already open");
 
         // Check that min. cr for the strategy is met.
-        require(
-            priceFeed.fetchPrice().mul(msg.value).div(loanParams.arthAmount) >= mintCollateralRatio,
-            "CR must be > 299%"
-        );
+        // require(
+        //     priceFeed.fetchPrice().mul(msg.value).div(loanParams.arthAmount) >= mintCollateralRatio,
+        //     "CR must be > 299%"
+        // );
 
         // 2. Mint ARTH and track ARTH balance changes due to this current tx.
         uint256 arthBeforeLoaning = arth.balanceOf(me);
@@ -129,6 +141,7 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist, Multicall {
         uint256 arthAfterLoaning = arth.balanceOf(me);
         uint256 arthFromLoan = arthAfterLoaning.sub(arthBeforeLoaning);
 
+        uint256 arthBeforeLending = arth.balanceOf(me);
         // 3. Supply ARTH in the lending pool.
         pool.supply(
             _arth,
@@ -136,18 +149,21 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist, Multicall {
             me, // On behalf of this contract
             lendingReferralCode
         );
+        uint256 arthAfterLending = arth.balanceOf(me);
+        uint256 arthInLendingPool = arthBeforeLending.sub(arthAfterLending);
 
         // 4. Record the position.
         positions[msg.sender] = Position({
             isActive: true,
             ethForLoan: msg.value,
             arthFromLoan: arthFromLoan,
-            arthInLendingPool: arthFromLoan
+            arthInLendingPool: arthInLendingPool
         });
 
         // 5. Record the staking in the staking contract for maha rewards
         _stake(msg.sender, msg.value);
 
+        // Send the dust back.
         _flush(msg.sender);
         emit Deposit(msg.sender, msg.value);
     }
@@ -178,11 +194,12 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist, Multicall {
             loanParams.lowerHint
         );
 
+        // Send the dust back.
         _flush(msg.sender);
         emit Withdrawal(msg.sender, position.ethForLoan);
     }
 
-    function _flush(address to) internal payable {
+    function _flush(address to) internal {
         uint256 arthBalance = arth.balanceOf(me);
         if (arthBalance > 0) arth.transfer(to, arthBalance);
 
