@@ -68,6 +68,7 @@ contract ARTHETHTroveLP is Ownable, Initializable, StakingRewardsChild, MerkleWh
         me = address(this);
 
         _stakingRewardsChildInit(__maha);
+        _transferOwnership(_owner);
     }
 
     // --- Fallback function ---
