@@ -3,6 +3,8 @@ pragma solidity ^0.8.0;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 import {IBorrowerOperations} from "../../interfaces/IBorrowerOperations.sol";
 import {StakingRewardsChild} from "./StakingRewardsChild.sol";
@@ -11,7 +13,7 @@ import {IPriceFeed} from "../../interfaces/IPriceFeed.sol";
 import {Multicall} from "../../utils/Multicall.sol";
 import {ILendingPool} from "../../interfaces/ILendingPool.sol";
 
-contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist, Multicall {
+contract ARTHETHTroveLP is Ownable, Initializable, StakingRewardsChild, MerkleWhitelist, Multicall {
     using SafeMath for uint256;
 
     event Deposit(address indexed src, uint256 wad);
@@ -49,13 +51,14 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist, Multicall {
 
     // TODO: the scenario when the trove gets liquidated?
 
-    constructor(
+    function initialize(
         address _borrowerOperations,
         address __arth,
         address __maha,
         address _priceFeed,
-        address _pool
-    ) StakingRewardsChild(__maha) {
+        address _pool,
+        address _owner
+    ) initializer {
         arth = IERC20(__arth);
         _arth = __arth;
         borrowerOperations = IBorrowerOperations(_borrowerOperations);
@@ -63,6 +66,8 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist, Multicall {
         pool = ILendingPool(_pool);
         arth.approve(_pool, type(uint256).max);
         me = address(this);
+
+        _stakingRewardsChildInit(__maha);
     }
 
     // --- Fallback function ---
@@ -141,8 +146,8 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist, Multicall {
         uint256 arthAfterLoaning = arth.balanceOf(me);
         uint256 arthFromLoan = arthAfterLoaning.sub(arthBeforeLoaning);
 
-        uint256 arthBeforeLending = arth.balanceOf(me);
         // 3. Supply ARTH in the lending pool.
+        uint256 arthBeforeLending = arth.balanceOf(me);
         pool.supply(
             _arth,
             arthFromLoan,
@@ -164,7 +169,7 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist, Multicall {
         _stake(msg.sender, msg.value);
 
         // Send the dust back.
-        _flush(msg.sender);
+        // _flush(msg.sender);
         emit Deposit(msg.sender, msg.value);
     }
 
@@ -195,7 +200,7 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist, Multicall {
         );
 
         // Send the dust back.
-        _flush(msg.sender);
+        // _flush(msg.sender);
         emit Withdrawal(msg.sender, position.ethForLoan);
     }
 
@@ -211,6 +216,10 @@ contract ARTHETHTroveLP is StakingRewardsChild, MerkleWhitelist, Multicall {
             ) = to.call{value: ethBalance}("");
             require(success, "ETH transfer failed");
         }
+    }
+
+    function flush(address to) external {
+        _flush(to);
     }
 
     function collectRewards() public payable nonReentrant {

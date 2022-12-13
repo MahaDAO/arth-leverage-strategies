@@ -27,9 +27,7 @@ contract StakingRewardsChild is Ownable, ReentrancyGuard {
     uint256 private _totalSupply;
     mapping(address => uint256) private _balances;
 
-    /* ========== CONSTRUCTOR ========== */
-
-    constructor(address _rewardsToken) {
+    function _stakingRewardsChildInit(address _rewardsToken) internal {
         rewardsToken = IERC20(_rewardsToken);
     }
 
