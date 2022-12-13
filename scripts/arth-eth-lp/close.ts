@@ -20,7 +20,7 @@ task("arth-eth:close", "Close ARTH/ETH Loan").setAction(async (pramas, hre) => {
 
     const deployer = await hre.ethers.getSigner(config.deployer);
     console.log(`Deployer address is ${deployer.address}.`);
-    await reportBalances(hre, deployer.address);
+    await reportBalances(hre, deployer.address, "deployer");
 
     console.log("Deploying ARTHETHTroveLP...");
     const ARTHETHTroveLP = await hre.ethers.getContractFactory("ARTHETHTroveLP");
@@ -41,7 +41,7 @@ task("arth-eth:close", "Close ARTH/ETH Loan").setAction(async (pramas, hre) => {
     const arthEthTroveLp = await hre.ethers.getContractAt("ARTHETHTroveLP", proxy.address);
     console.log("ARTHETHTRoveLp deployed at", arthEthTroveLp.address);
 
-    await reportBalances(hre, arthEthTroveLp.address);
+    await reportBalances(hre, arthEthTroveLp.address, "contract");
 
     console.log("Opening trove...");
     console.log("funding contract and opening trove");
@@ -58,28 +58,37 @@ task("arth-eth:close", "Close ARTH/ETH Loan").setAction(async (pramas, hre) => {
             }
         );
 
-    await reportBalances(hre, arthEthTroveLp.address);
-    await reportBalances(hre, deployer.address);
+    await reportBalances(hre, arthEthTroveLp.address, "contract");
+    await reportBalances(hre, deployer.address, "deployer");
 
-    console.log("depositing 2 eth, opening a loan and adding to LP");
+    console.log("depositing 1 eth, opening a loan and adding to mahalend");
+    await arthEthTroveLp.connect(deployer).deposit(
+        {
+            maxFee: e18,
+            upperHint: config.ZERO_ADDRESS,
+            lowerHint: config.ZERO_ADDRESS,
+            arthAmount: e18.mul(251)
+        },
+        0,
+        {
+            value: e18.mul(2)
+        }
+    );
+    await reportBalances(hre, arthEthTroveLp.address, "contract");
+    await reportBalances(hre, deployer.address, "deployer");
 
-    const loanParams = {
+    console.log("withdrawing position");
+    await arthEthTroveLp.connect(deployer).withdraw({
         maxFee: e18,
         upperHint: config.ZERO_ADDRESS,
         lowerHint: config.ZERO_ADDRESS,
         arthAmount: e18.mul(251)
-    };
-
-    await arthEthTroveLp.connect(deployer).deposit(loanParams, 0, {
-        value: e18.mul(2)
     });
+    await reportBalances(hre, arthEthTroveLp.address, "contract");
+    await reportBalances(hre, deployer.address, "deployer");
 
-    await reportBalances(hre, arthEthTroveLp.address);
-    await reportBalances(hre, deployer.address);
-
-    console.log("withdrawing position");
-
-    await arthEthTroveLp.connect(deployer).withdraw(loanParams);
-    await reportBalances(hre, arthEthTroveLp.address);
-    await reportBalances(hre, deployer.address);
+    console.log("closing contract");
+    await arthEthTroveLp.connect(deployer).closeTrove(e18.mul(251));
+    await reportBalances(hre, arthEthTroveLp.address, "contract");
+    await reportBalances(hre, deployer.address, "deployer");
 });

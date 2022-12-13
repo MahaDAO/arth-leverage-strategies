@@ -8,12 +8,12 @@ import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.s
 
 import {IBorrowerOperations} from "../../interfaces/IBorrowerOperations.sol";
 import {StakingRewardsChild} from "./StakingRewardsChild.sol";
-import {MerkleWhitelist} from "./MerkleWhitelist.sol";
 import {IPriceFeed} from "../../interfaces/IPriceFeed.sol";
 import {Multicall} from "../../utils/Multicall.sol";
 import {ILendingPool} from "../../interfaces/ILendingPool.sol";
+import {console} from "hardhat/console.sol";
 
-contract ARTHETHTroveLP is Ownable, Initializable, StakingRewardsChild, MerkleWhitelist, Multicall {
+contract ARTHETHTroveLP is Ownable, Initializable, StakingRewardsChild, Multicall {
     using SafeMath for uint256;
 
     event Deposit(address indexed src, uint256 wad);
@@ -38,7 +38,7 @@ contract ARTHETHTroveLP is Ownable, Initializable, StakingRewardsChild, MerkleWh
         bytes32[] proof;
     }
 
-    uint256 public mintCollateralRatio = 3 * 1e18; // 300% CR
+    uint256 public minCollateralRatio;
 
     address private me;
     address private _arth;
@@ -48,8 +48,6 @@ contract ARTHETHTroveLP is Ownable, Initializable, StakingRewardsChild, MerkleWh
     ILendingPool public pool;
     IPriceFeed public priceFeed;
     IBorrowerOperations public borrowerOperations;
-
-    // TODO: the scenario when the trove gets liquidated?
 
     function initialize(
         address _borrowerOperations,
@@ -64,8 +62,13 @@ contract ARTHETHTroveLP is Ownable, Initializable, StakingRewardsChild, MerkleWh
         borrowerOperations = IBorrowerOperations(_borrowerOperations);
         priceFeed = IPriceFeed(_priceFeed);
         pool = ILendingPool(_pool);
+
         arth.approve(_pool, type(uint256).max);
+        arth.approve(_borrowerOperations, type(uint256).max);
+
         me = address(this);
+
+        minCollateralRatio = 3 * 1e18; // 300% CR
 
         _stakingRewardsChildInit(__maha);
         _transferOwnership(_owner);
@@ -116,21 +119,31 @@ contract ARTHETHTroveLP is Ownable, Initializable, StakingRewardsChild, MerkleWh
     }
 
     function deposit(LoanParams memory loanParams, uint16 lendingReferralCode)
-        public
+        external
         payable
-        /*, WhitelistParams memory whitelistParam */
-        /* checkWhitelist(msg.sender, whitelistParams.rootId, whitelistParams.proof) */
         nonReentrant
     {
+        _deposit(msg.sender, loanParams, lendingReferralCode);
+    }
+
+    function withdraw(LoanParams memory loanParams) external payable {
+        _withdraw(msg.sender, loanParams);
+    }
+
+    function _deposit(
+        address who,
+        LoanParams memory loanParams,
+        uint16 lendingReferralCode
+    ) internal nonReentrant {
         // Check that we are getting ETH.
         require(msg.value > 0, "no eth");
 
         // Check that position is not already open.
-        require(!positions[msg.sender].isActive, "Position already open");
+        require(!positions[who].isActive, "Position already open");
 
         // Check that min. cr for the strategy is met.
         require(
-            priceFeed.fetchPrice().mul(msg.value).div(loanParams.arthAmount) >= mintCollateralRatio,
+            priceFeed.fetchPrice().mul(msg.value).div(loanParams.arthAmount) >= minCollateralRatio,
             "min CR not met"
         );
 
@@ -159,7 +172,7 @@ contract ARTHETHTroveLP is Ownable, Initializable, StakingRewardsChild, MerkleWh
         uint256 arthInLendingPool = arthBeforeLending.sub(arthAfterLending);
 
         // 4. Record the position.
-        positions[msg.sender] = Position({
+        positions[who] = Position({
             isActive: true,
             ethForLoan: msg.value,
             arthFromLoan: arthFromLoan,
@@ -167,30 +180,28 @@ contract ARTHETHTroveLP is Ownable, Initializable, StakingRewardsChild, MerkleWh
         });
 
         // 5. Record the staking in the staking contract for maha rewards
-        _stake(msg.sender, msg.value);
+        _stake(who, msg.value);
 
         // Send the dust back.
-        _flush(msg.sender);
-        emit Deposit(msg.sender, msg.value);
+        _flush(who);
+        emit Deposit(who, msg.value);
     }
 
-    function withdraw(LoanParams memory loanParams) public payable nonReentrant {
-        require(positions[msg.sender].isActive, "Position not open");
+    function _withdraw(address who, LoanParams memory loanParams) internal nonReentrant {
+        require(positions[who].isActive, "Position not open");
 
         // 1. Remove the position and withdraw you stake for stopping further rewards.
-        Position memory position = positions[msg.sender];
-        _withdraw(msg.sender, position.ethForLoan);
-        delete positions[msg.sender];
+        Position memory position = positions[who];
+        _withdraw(who, position.ethForLoan);
+        delete positions[who];
 
-        // 2. TODO- Claim the fees.
-
-        // 3. Withdraw from the lending pool.
+        // 2. Withdraw from the lending pool.
         uint256 arthWithdrawn = pool.withdraw(_arth, position.arthInLendingPool, me);
 
-        // 4. Ensure that we received correct amount of arth to remove collateral from loan.
+        // 3. Ensure that we received correct amount of arth to remove collateral from loan.
         require(arthWithdrawn >= position.arthFromLoan, "withdrawn is less");
 
-        // 5. Adjust the trove, to remove collateral.
+        // 4. Adjust the trove, to remove collateral.
         borrowerOperations.adjustTrove(
             loanParams.maxFee,
             position.ethForLoan,
@@ -200,9 +211,9 @@ contract ARTHETHTroveLP is Ownable, Initializable, StakingRewardsChild, MerkleWh
             loanParams.lowerHint
         );
 
-        // Send the dust back.
-        _flush(msg.sender);
-        emit Withdrawal(msg.sender, position.ethForLoan);
+        // Send the dust back to the sender
+        _flush(who);
+        emit Withdrawal(who, position.ethForLoan);
     }
 
     function _flush(address to) internal {
@@ -210,13 +221,7 @@ contract ARTHETHTroveLP is Ownable, Initializable, StakingRewardsChild, MerkleWh
         if (arthBalance > 0) arth.transfer(to, arthBalance);
 
         uint256 ethBalance = me.balance;
-        if (ethBalance > 0) {
-            (
-                bool success, /* bytes memory data */
-
-            ) = to.call{value: ethBalance}("");
-            require(success, "ETH transfer failed");
-        }
+        if (ethBalance > 0) payable(to).transfer(ethBalance);
     }
 
     function flush(address to) external {
@@ -233,6 +238,11 @@ contract ARTHETHTroveLP is Ownable, Initializable, StakingRewardsChild, MerkleWh
     function emergencyCall(address target, bytes memory signature) external payable onlyOwner {
         (bool success, bytes memory response) = target.call{value: msg.value}(signature);
         require(success, string(response));
+    }
+
+    /// @dev in case admin needs to rebalance the trove
+    function rebalance() external payable onlyOwner {
+        // TODO: write code over here
     }
 
     function lastGoodPrice() external view returns (uint256) {
