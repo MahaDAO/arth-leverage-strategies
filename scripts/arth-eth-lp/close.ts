@@ -6,6 +6,8 @@ import * as config from "./constants";
 import { reportBalances } from "./utils";
 
 task("arth-eth:close", "Close ARTH/ETH Loan").setAction(async (pramas, hre) => {
+    hre.run("compile");
+
     console.log(`Debugging to ${hre.network.name}...`);
     const e18 = BigNumber.from(10).pow(18);
 
@@ -88,6 +90,8 @@ task("arth-eth:close", "Close ARTH/ETH Loan").setAction(async (pramas, hre) => {
     await reportBalances(hre, deployer.address, "deployer");
 
     console.log("closing contract");
+    const arth = await hre.ethers.getContractAt("IERC20", config.arthAddr);
+    await arth.connect(deployer).approve(arthEthTroveLp.address, e18.mul(251));
     await arthEthTroveLp.connect(deployer).closeTrove(e18.mul(251));
     await reportBalances(hre, arthEthTroveLp.address, "contract");
     await reportBalances(hre, deployer.address, "deployer");

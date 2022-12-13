@@ -118,11 +118,7 @@ contract ARTHETHTroveLP is Ownable, Initializable, StakingRewardsChild, Multical
         _flush(msg.sender);
     }
 
-    function deposit(LoanParams memory loanParams, uint16 lendingReferralCode)
-        external
-        payable
-        nonReentrant
-    {
+    function deposit(LoanParams memory loanParams, uint16 lendingReferralCode) external payable {
         _deposit(msg.sender, loanParams, lendingReferralCode);
     }
 

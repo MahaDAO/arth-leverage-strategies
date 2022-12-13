@@ -6,6 +6,7 @@ import * as config from "./constants";
 import { reportBalances } from "./utils";
 
 task("arth-eth:open", "Open ARTH/ETH Loan").setAction(async (_taskArgs, hre) => {
+    hre.run("compile");
     console.log(`Debugging to ${hre.network.name}...`);
 
     const e18 = BigNumber.from(10).pow(18);
