@@ -7,8 +7,6 @@ import { reportBalances } from "./utils";
 
 task("arth-eth:close", "Close ARTH/ETH Loan").setAction(async (pramas, hre) => {
     console.log(`Debugging to ${hre.network.name}...`);
-
-    const [deployer] = await hre.ethers.getSigners();
     const e18 = BigNumber.from(10).pow(18);
 
     await hre.network.provider.request({
@@ -20,20 +18,30 @@ task("arth-eth:close", "Close ARTH/ETH Loan").setAction(async (pramas, hre) => {
         params: [config.deployer, e18.mul(1000).toHexString()]
     });
 
-    const impersonatedSigner = await hre.ethers.getSigner(config.deployer);
-
+    const deployer = await hre.ethers.getSigner(config.deployer);
     console.log(`Deployer address is ${deployer.address}.`);
+    await reportBalances(hre, deployer.address);
 
     console.log("Deploying ARTHETHTroveLP...");
     const ARTHETHTroveLP = await hre.ethers.getContractFactory("ARTHETHTroveLP");
-    const arthEthTroveLp = await ARTHETHTroveLP.connect(deployer).deploy(
+    const arthEthTroveImpl = await ARTHETHTroveLP.connect(deployer).deploy();
+
+    // deploy as proxy
+    console.log("Deploying proxy...");
+    const ProxyFactory = await hre.ethers.getContractFactory("TransparentUpgradeableProxy");
+    const initDecode = ARTHETHTroveLP.interface.encodeFunctionData("initialize", [
         config.borrowerOperationsAddr,
         config.arthAddr,
         config.mahaAddr,
         config.priceFeed,
-        config.lendingPool
-    );
+        config.lendingPool,
+        deployer.address
+    ]);
+    const proxy = await ProxyFactory.deploy(arthEthTroveImpl.address, config.gnosisSafe, initDecode);
+    const arthEthTroveLp = await hre.ethers.getContractAt("ARTHETHTroveLP", proxy.address);
     console.log("ARTHETHTRoveLp deployed at", arthEthTroveLp.address);
+
+    await reportBalances(hre, arthEthTroveLp.address);
 
     console.log("Opening trove...");
     console.log("funding contract and opening trove");
@@ -66,8 +74,6 @@ task("arth-eth:close", "Close ARTH/ETH Loan").setAction(async (pramas, hre) => {
         value: e18.mul(2)
     });
 
-    console.log(await arthEthTroveLp.positions(deployer.address));
-
     await reportBalances(hre, arthEthTroveLp.address);
     await reportBalances(hre, deployer.address);
 
@@ -76,5 +82,4 @@ task("arth-eth:close", "Close ARTH/ETH Loan").setAction(async (pramas, hre) => {
     await arthEthTroveLp.connect(deployer).withdraw(loanParams);
     await reportBalances(hre, arthEthTroveLp.address);
     await reportBalances(hre, deployer.address);
-
 });

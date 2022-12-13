@@ -58,7 +58,7 @@ contract ARTHETHTroveLP is Ownable, Initializable, StakingRewardsChild, MerkleWh
         address _priceFeed,
         address _pool,
         address _owner
-    ) initializer {
+    ) external initializer {
         arth = IERC20(__arth);
         _arth = __arth;
         borrowerOperations = IBorrowerOperations(_borrowerOperations);
@@ -129,10 +129,10 @@ contract ARTHETHTroveLP is Ownable, Initializable, StakingRewardsChild, MerkleWh
         require(!positions[msg.sender].isActive, "Position already open");
 
         // Check that min. cr for the strategy is met.
-        // require(
-        //     priceFeed.fetchPrice().mul(msg.value).div(loanParams.arthAmount) >= mintCollateralRatio,
-        //     "CR must be > 299%"
-        // );
+        require(
+            priceFeed.fetchPrice().mul(msg.value).div(loanParams.arthAmount) >= mintCollateralRatio,
+            "min CR not met"
+        );
 
         // 2. Mint ARTH and track ARTH balance changes due to this current tx.
         uint256 arthBeforeLoaning = arth.balanceOf(me);
@@ -170,7 +170,7 @@ contract ARTHETHTroveLP is Ownable, Initializable, StakingRewardsChild, MerkleWh
         _stake(msg.sender, msg.value);
 
         // Send the dust back.
-        // _flush(msg.sender);
+        _flush(msg.sender);
         emit Deposit(msg.sender, msg.value);
     }
 
@@ -201,7 +201,7 @@ contract ARTHETHTroveLP is Ownable, Initializable, StakingRewardsChild, MerkleWh
         );
 
         // Send the dust back.
-        // _flush(msg.sender);
+        _flush(msg.sender);
         emit Withdrawal(msg.sender, position.ethForLoan);
     }
 
