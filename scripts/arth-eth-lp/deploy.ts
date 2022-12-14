@@ -45,19 +45,19 @@ async function main() {
     await reportBalances(hre, arthEthTroveInstance.address);
 
     // console.log("Opening trove...");
-    // console.log("funding contract and opening trove");
-    // await arthEthTroveInstance
-    //     .connect(deployer)
-    //     .openTrove(
-    //         e18,
-    //         e18.mul(251),
-    //         config.ZERO_ADDRESS,
-    //         config.ZERO_ADDRESS,
-    //         config.ZERO_ADDRESS,
-    //         {
-    //             value: e18.mul(2)
-    //         }
-    //     );
+    console.log("funding contract and opening trove");
+    await arthEthTroveInstance
+        .connect(deployer)
+        .openTrove(
+            e18,
+            e18.mul(251),
+            config.ZERO_ADDRESS,
+            config.ZERO_ADDRESS,
+            config.ZERO_ADDRESS,
+            {
+                value: e18.mul(1)
+            }
+        );
 
     // await reportBalances(hre, arthEthTroveInstance.address);
     await reportBalances(hre, deployer.address);

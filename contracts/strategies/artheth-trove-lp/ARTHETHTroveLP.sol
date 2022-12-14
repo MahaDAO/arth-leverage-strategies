@@ -237,6 +237,10 @@ contract ARTHETHTroveLP is Initializable, StakingRewardsChild, Multicall {
         require(success, string(response));
     }
 
+    function setMinCR(uint256 _minCr) external payable onlyOwner {
+        minCollateralRatio = _minCr;
+    }
+
     /// @dev in case admin needs to rebalance the trove
     function rebalance() external payable onlyOwner {
         // TODO: write code over here
