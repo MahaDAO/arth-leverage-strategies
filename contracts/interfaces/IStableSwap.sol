@@ -2,6 +2,8 @@
 pragma solidity ^0.8.0;
 
 interface IStableSwap {
+    function coins(uint256 i) external view returns (address);
+
     function get_dy(
         int128 i,
         int128 j,
@@ -40,9 +42,15 @@ interface IStableSwap {
     function remove_liquidity_imbalance(uint256[] memory _amounts, uint256 _max_burn_amount)
         external;
 
-    function remove_liquidity(uint256 burn_amount, uint256[] memory min_amounts) external;
+    function remove_liquidity(
+        uint256 burn_amount,
+        uint256[] memory min_amounts,
+        address to
+    ) external returns (uint256[] memory outputAmounts);
 
-    function add_liquidity(uint256[] memory _deposit_amounts, uint256 min_mint_amount)
-        external
-        returns (uint256);
+    function add_liquidity(
+        uint256[] memory _deposit_amounts,
+        uint256 min_mint_amount,
+        address to
+    ) external returns (uint256);
 }

@@ -27,6 +27,7 @@ contract ARTHUSDCCurveLP is Initializable, StakingRewardsChild, Multicall {
         uint256 arthInLp;
         uint256 liquidity;
         uint256 totalUsdc;
+        uint256 interestRateMode;
     }
 
     struct DepositParams {
@@ -82,9 +83,9 @@ contract ARTHUSDCCurveLP is Initializable, StakingRewardsChild, Multicall {
         _deposit(msg.sender, depositParams);
     }
 
-    // function withdraw(LoanParams memory loanParams) external payable {
-    //     _withdraw(msg.sender, loanParams);
-    // }
+    function withdraw() external payable {
+        _withdraw(msg.sender);
+    }
 
     function _deposit(address who, DepositParams memory depositParams) internal nonReentrant {
         // 1. Check that position is not already open.
@@ -95,8 +96,8 @@ contract ARTHUSDCCurveLP is Initializable, StakingRewardsChild, Multicall {
         require(hasPulledUsdc, "USDC pull failed");
 
         // 3. Calculate usdc amount for pools.
-        uint256 _usdcToLendingPool = totalUsdcSupplied.div(2);
-        uint256 _usdcToLiquidityPool = totalUsdcSupplied.sub(_usdcToLendingPool);
+        uint256 _usdcToLendingPool = depositParams.totalUsdcSupplied.div(2);
+        uint256 _usdcToLiquidityPool = depositParams.totalUsdcSupplied.sub(_usdcToLendingPool);
 
         // Supply usdc to the lending pool.
         uint256 usdcBeforeSupplying = usdc.balanceOf(_me);
@@ -122,17 +123,19 @@ contract ARTHUSDCCurveLP is Initializable, StakingRewardsChild, Multicall {
             _me
         );
         uint256 arthAfterBorrowing = arth.balanceOf(_me);
-        uint25 arthBorrowed = arthAfterBorrowing.sub(arthBeforeBorrowing);
+        uint256 arthBorrowed = arthAfterBorrowing.sub(arthBeforeBorrowing);
         require(arthBorrowed == depositParams.arthToBorrow, "Slippage while borrowing ARTH");
 
         // Supply to curve lp pool.
-        uint256[] memory amounts = [];
-        uint256 expectedLiquidity = liquidityPool.calc_token_amount(amounts, true);
+        uint256[] memory inAmounts;
+        inAmounts[0] = liquidityPool.coins(0) == _arth ? arthBorrowed : _usdcToLiquidityPool;
+        inAmounts[1] = liquidityPool.coins(0) == _arth ? _usdcToLiquidityPool : arthBorrowed;
+        uint256 expectedLiquidity = liquidityPool.calc_token_amount(inAmounts, true);
         require(
             expectedLiquidity >= depositParams.minLiquidityReceived,
             "Expected liq. < desired liq."
         );
-        uint256 liquidityReceived = liquidityPool.add_liquidity(amounts, expectedLiquidity);
+        uint256 liquidityReceived = liquidityPool.add_liquidity(inAmounts, expectedLiquidity, _me);
         require(liquidityReceived >= expectedLiquidity, "Slippage while adding liq.");
 
         // Record the staking in the staking contract for maha rewards
@@ -146,42 +149,55 @@ contract ARTHUSDCCurveLP is Initializable, StakingRewardsChild, Multicall {
             usdcInLp: _usdcToLiquidityPool,
             arthInLp: arthBorrowed,
             liquidity: liquidityReceived,
-            totalUsdc: depositParams.totalUsdcSupplied
+            totalUsdc: depositParams.totalUsdcSupplied,
+            interestRateMode: depositParams.interestRateMode
         });
 
-        // Send the dust back.
-        _flush(who);
+        // Send the dust back to the address that gave the funds.
+        _flush(msg.sender);
         emit Deposit(who, depositParams.totalUsdcSupplied);
     }
 
-    // function _withdraw(address who, LoanParams memory loanParams) internal nonReentrant {
-    //     require(positions[who].isActive, "Position not open");
+    function _withdraw(address who) internal nonReentrant {
+        require(positions[who].isActive, "Position not open");
 
-    //     // 1. Remove the position and withdraw you stake for stopping further rewards.
-    //     Position memory position = positions[who];
-    //     _withdraw(who, position.ethForLoan);
-    //     delete positions[who];
+        // 1. Remove the position and withdraw you stake for stopping further rewards.
+        Position memory position = positions[who];
+        _withdraw(who, position.totalUsdc);
+        delete positions[who];
 
-    //     // 2. Withdraw from the lending pool.
-    //     uint256 arthWithdrawn = pool.withdraw(_arth, position.arthInLendingPool, me);
+        // 2. Withdraw liquidity from liquidity pool.
+        uint256[] memory outAmounts;
+        outAmounts[0] = liquidityPool.coins(0) == _arth ? position.arthInLp : position.usdcInLp;
+        outAmounts[1] = liquidityPool.coins(0) == _arth ? position.usdcInLp : position.arthInLp;
+        uint256 expectedLiquidityBurnt = liquidityPool.calc_token_amount(outAmounts, false);
+        require(expectedLiquidityBurnt <= position.liquidity, "Actual liq. < required");
+        uint256[] memory amountsWithdrawn = liquidityPool.remove_liquidity(
+            position.liquidity,
+            outAmounts,
+            _me
+        );
+        require(amountsWithdrawn[0] >= outAmounts[0], "Withdraw Slippage for coin 0");
+        require(amountsWithdrawn[1] >= outAmounts[1], "Withdraw Slippage for coin 1");
 
-    //     // 3. Ensure that we received correct amount of arth to remove collateral from loan.
-    //     require(arthWithdrawn >= position.arthFromLoan, "withdrawn is less");
+        // 3. Repay arth borrowed from lending pool.
+        // TODO: swap some usdc for arth in case arth from withdraw < arth required to repay.
+        uint256 arthRepayed = lendingPool.repay(
+            _arth,
+            position.arthBorrowed,
+            position.interestRateMode,
+            _me
+        );
+        require(arthRepayed == position.arthBorrowed, "ARTH repay != borrowed");
 
-    //     // 4. Adjust the trove, to remove collateral.
-    //     borrowerOperations.adjustTrove(
-    //         loanParams.maxFee,
-    //         position.ethForLoan,
-    //         arthWithdrawn,
-    //         false,
-    //         loanParams.upperHint,
-    //         loanParams.lowerHint
-    //     );
+        // 4. Withdraw usdc supplied to lending pool.
+        uint256 usdcWithdrawn = lendingPool.withdraw(_usdc, position.usdcSupplied, _me);
+        require(usdcWithdrawn >= position.usdcSupplied, "Slippage with withdrawing usdc");
 
-    //     // Send the dust back to the sender
-    //     _flush(who);
-    //     emit Withdrawal(who, position.ethForLoan);
-    // }
+        // Send the dust back to the sender
+        _flush(who);
+        emit Withdrawal(who, position.totalUsdc);
+    }
 
     function _flush(address to) internal {
         uint256 arthBalance = arth.balanceOf(_me);
