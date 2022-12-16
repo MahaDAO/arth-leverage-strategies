@@ -181,7 +181,28 @@ contract ARTHUSDCCurveLP is Initializable, StakingRewardsChild, Multicall {
         require(amountsWithdrawn[1] >= outAmounts[1], "Withdraw Slippage for coin 1");
 
         // 3. Repay arth borrowed from lending pool.
-        // TODO: swap some usdc for arth in case arth from withdraw < arth required to repay.
+        (uint256 arthWithdrawnFromLp, uint256 usdcWithdrawnFromLp) = liquidityPool.coins(0) == _arth
+            ? (amountsWithdrawn[0], amountsWithdrawn[1])
+            : (amountsWithdrawn[1], amountsWithdrawn[0]);
+        // Swap some usdc for arth in case arth from withdraw < arth required to repay.
+        if (arthWithdrawnFromLp < position.arthBorrowed) {
+            // If arth is coin0, then input(i) = 1(usdc).
+            uint256 i = liquidityPool.coins(0) == _arth ? 1 : 0;
+
+            // If arth is coin0, then output(j) = 0(arth).
+            uint256 j = liquidityPool.coins(0) == _arth ? 0 : 1;
+
+            // If the coin 0 is arth, then usdc is coin 1 else coin0.
+            uint256 usdcIn = liquidityPool.coins(0) == _arth
+                ? amountsWithdrawn[1]
+                : amountsWithdrawn[0];
+            uint256 expectedOut = liquidityPool.get_dy(i, j, usdcIn);
+
+            // Perform the swap.
+            uint256 out = liquidityPool.exchange(i, j, usdcIn, expectedOut, _me);
+            require(out >= expectedOut, "USDC to ARTH swap slippage");
+        }
+
         uint256 arthRepayed = lendingPool.repay(
             _arth,
             position.arthBorrowed,
