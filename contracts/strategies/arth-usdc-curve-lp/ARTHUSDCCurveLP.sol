@@ -44,6 +44,9 @@ contract ARTHUSDCCurveLP is Initializable, StakingRewardsChild, Multicall {
     address private _arth;
     address private _usdc;
 
+    uint256 private _arthLpCoinIndex;
+    uint256 private _usdcLpCoinIndex;
+
     mapping(address => Position) public positions;
 
     IERC20 public arth;
@@ -74,6 +77,9 @@ contract ARTHUSDCCurveLP is Initializable, StakingRewardsChild, Multicall {
         arth.approve(_lendingPool, type(uint256).max);
         usdc.approve(_liquidityPool, type(uint256).max);
         arth.approve(_liquidityPool, type(uint256).max);
+
+        _arthLpCoinIndex = liquidityPool.coins(0) == _arth ? 0 : 1;
+        _usdcLpCoinIndex = liquidityPool.coins(0) == _arth ? 0 : 1;
 
         _stakingRewardsChildInit(__maha, _rewardsDuration, _operator);
         _transferOwnership(_owner);
@@ -128,8 +134,8 @@ contract ARTHUSDCCurveLP is Initializable, StakingRewardsChild, Multicall {
 
         // Supply to curve lp pool.
         uint256[] memory inAmounts;
-        inAmounts[0] = liquidityPool.coins(0) == _arth ? arthBorrowed : _usdcToLiquidityPool;
-        inAmounts[1] = liquidityPool.coins(0) == _arth ? _usdcToLiquidityPool : arthBorrowed;
+        inAmounts[_arthLpCoinIndex] = arthBorrowed;
+        inAmounts[_usdcLpCoinIndex] = _usdcToLiquidityPool;
         uint256 expectedLiquidity = liquidityPool.calc_token_amount(inAmounts, true);
         require(
             expectedLiquidity >= depositParams.minLiquidityReceived,
@@ -168,8 +174,8 @@ contract ARTHUSDCCurveLP is Initializable, StakingRewardsChild, Multicall {
 
         // 2. Withdraw liquidity from liquidity pool.
         uint256[] memory outAmounts;
-        outAmounts[0] = liquidityPool.coins(0) == _arth ? position.arthInLp : position.usdcInLp;
-        outAmounts[1] = liquidityPool.coins(0) == _arth ? position.usdcInLp : position.arthInLp;
+        outAmounts[_arthLpCoinIndex] = position.arthInLp;
+        outAmounts[_usdcLpCoinIndex] = position.usdcInLp;
         uint256 expectedLiquidityBurnt = liquidityPool.calc_token_amount(outAmounts, false);
         require(expectedLiquidityBurnt <= position.liquidity, "Actual liq. < required");
         uint256[] memory amountsWithdrawn = liquidityPool.remove_liquidity(
@@ -177,32 +183,38 @@ contract ARTHUSDCCurveLP is Initializable, StakingRewardsChild, Multicall {
             outAmounts,
             _me
         );
-        require(amountsWithdrawn[0] >= outAmounts[0], "Withdraw Slippage for coin 0");
-        require(amountsWithdrawn[1] >= outAmounts[1], "Withdraw Slippage for coin 1");
+        require(
+            amountsWithdrawn[_arthLpCoinIndex] >= outAmounts[_arthLpCoinIndex],
+            "Withdraw Slippage for coin 0"
+        );
+        require(
+            amountsWithdrawn[_usdcLpCoinIndex] >= outAmounts[_usdcLpCoinIndex],
+            "Withdraw Slippage for coin 1"
+        );
 
-        // 3. Repay arth borrowed from lending pool.
-        (uint256 arthWithdrawnFromLp, uint256 usdcWithdrawnFromLp) = liquidityPool.coins(0) == _arth
-            ? (amountsWithdrawn[0], amountsWithdrawn[1])
-            : (amountsWithdrawn[1], amountsWithdrawn[0]);
+        (uint256 arthWithdrawnFromLp, uint256 usdcWithdrawnFromLp) = (
+            amountsWithdrawn[_arthLpCoinIndex],
+            amountsWithdrawn[_usdcLpCoinIndex]
+        );
+
         // Swap some usdc for arth in case arth from withdraw < arth required to repay.
         if (arthWithdrawnFromLp < position.arthBorrowed) {
-            // If arth is coin0, then input(i) = 1(usdc).
-            uint256 i = liquidityPool.coins(0) == _arth ? 1 : 0;
-
-            // If arth is coin0, then output(j) = 0(arth).
-            uint256 j = liquidityPool.coins(0) == _arth ? 0 : 1;
-
-            // If the coin 0 is arth, then usdc is coin 1 else coin0.
-            uint256 usdcIn = liquidityPool.coins(0) == _arth
-                ? amountsWithdrawn[1]
-                : amountsWithdrawn[0];
-            uint256 expectedOut = liquidityPool.get_dy(i, j, usdcIn);
-
-            // Perform the swap.
-            uint256 out = liquidityPool.exchange(i, j, usdcIn, expectedOut, _me);
+            uint256 expectedOut = liquidityPool.get_dy(
+                _usdcLpCoinIndex,
+                _arthLpCoinIndex,
+                usdcWithdrawnFromLp
+            );
+            uint256 out = liquidityPool.exchange(
+                _usdcLpCoinIndex,
+                _arthLpCoinIndex,
+                usdcWithdrawnFromLp,
+                expectedOut,
+                _me
+            );
             require(out >= expectedOut, "USDC to ARTH swap slippage");
         }
 
+        // 3. Repay arth borrowed from lending pool.
         uint256 arthRepayed = lendingPool.repay(
             _arth,
             position.arthBorrowed,
