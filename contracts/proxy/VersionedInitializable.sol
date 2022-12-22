@@ -15,14 +15,14 @@ pragma solidity ^0.8.0;
  */
 abstract contract VersionedInitializable {
     /**
-     * @dev Indicates that the contract has been initialized.
-     */
-    uint256 private lastInitializedRevision = 0;
-
-    /**
      * @dev Indicates that the contract is in the process of being initialized.
      */
     bool private initializing;
+
+    /**
+     * @dev Indicates that the contract has been initialized.
+     */
+    uint256 private lastInitializedRevision = 0;
 
     /**
      * @dev Modifier to use in the initializer function of a contract.
@@ -70,6 +70,11 @@ abstract contract VersionedInitializable {
             cs := extcodesize(address())
         }
         return cs == 0;
+    }
+
+    function canInitialize() public view returns (bool) {
+        uint256 revision = getRevision();
+        return initializing || isConstructor() || revision > lastInitializedRevision;
     }
 
     // Reserved storage space to allow for layout changes in the future.
