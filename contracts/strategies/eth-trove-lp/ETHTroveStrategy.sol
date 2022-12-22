@@ -10,15 +10,29 @@ import {StakingRewardsChild} from "./StakingRewardsChild.sol";
 import {IPriceFeed} from "../../interfaces/IPriceFeed.sol";
 import {ILendingPool} from "../../interfaces/ILendingPool.sol";
 
-// import {console} from "hardhat/console.sol";
-
-contract ARTHETHTroveLP is VersionedInitializable, StakingRewardsChild {
+/**
+ * @title ETHTroveStrategy
+ * @author MahaDAO
+ *
+ * @notice A ETH staking contract that takes in ETH and uses it to mint ARTH and provide liquidity to MahaLend.
+ * This strategy is a low risk strategy albeit some risks such as ETH price fluctuation and smart-contract bugs.
+ * Most liquidity providers who participate in this strategy will be able to withdraw the
+ * same amount of ETH that they provided.
+ **/
+contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
     using SafeMath for uint256;
 
     event Deposit(address indexed src, uint256 wad, uint256 arthWad, uint256 price);
-    event Rebalance(address indexed src, uint256 wad, uint256 arthWad, uint256 arthBurntWad);
+    event Rebalance(
+        address indexed src,
+        uint256 wad,
+        uint256 arthWad,
+        uint256 arthBurntWad,
+        uint256 price
+    );
     event Withdrawal(address indexed dst, uint256 wad, uint256 arthWad);
     event RevenueClaimed(uint256 wad);
+    event PauseToggled(bool val);
 
     struct Position {
         bool isActive;
@@ -59,6 +73,9 @@ contract ARTHETHTroveLP is VersionedInitializable, StakingRewardsChild {
     /// @dev to track how much interest this pool has earned.
     uint256 public totalmArthSupplied;
 
+    /// @dev is the contract paused?
+    bool public paused;
+
     function initialize(
         address _borrowerOperations,
         address __arth,
@@ -92,6 +109,7 @@ contract ARTHETHTroveLP is VersionedInitializable, StakingRewardsChild {
     function deposit(LoanParams memory loanParams) external payable nonReentrant {
         // Check that we are getting ETH.
         require(msg.value > 0, "no eth");
+        require(!paused, "paused");
 
         // Check that position is not already open.
         require(!positions[msg.sender].isActive, "Position already open");
@@ -143,8 +161,9 @@ contract ARTHETHTroveLP is VersionedInitializable, StakingRewardsChild {
         emit Deposit(msg.sender, msg.value, loanParams.arthAmount, price);
     }
 
-    function withdraw(LoanParams memory loanParams) external payable nonReentrant {
+    function withdraw(LoanParams memory loanParams) external nonReentrant {
         require(positions[msg.sender].isActive, "Position not open");
+        require(!paused, "paused");
 
         // 1. Remove the position and withdraw the stake for stopping further rewards.
         Position memory position = positions[msg.sender];
@@ -179,10 +198,9 @@ contract ARTHETHTroveLP is VersionedInitializable, StakingRewardsChild {
     }
 
     function increase(LoanParams memory loanParams) external payable nonReentrant {
-        require(false, "work in progress");
-
         // Check that we are getting ETH.
         require(msg.value > 0, "no eth");
+        require(!paused, "paused");
 
         // Check that position is already open.
         Position memory position = positions[msg.sender];
@@ -231,12 +249,6 @@ contract ARTHETHTroveLP is VersionedInitializable, StakingRewardsChild {
         _stake(msg.sender, msg.value);
 
         emit Deposit(msg.sender, msg.value, loanParams.arthAmount, price);
-    }
-
-    function collectRewards() public payable nonReentrant {
-        Position memory position = positions[msg.sender];
-        require(position.isActive, "Position not open");
-        _getReward();
     }
 
     /// @notice Send the revenue the strategy has generated to the treasury <3
@@ -294,7 +306,14 @@ contract ARTHETHTroveLP is VersionedInitializable, StakingRewardsChild {
         positions[who] = position;
     }
 
-    /// @dev in case operator needs to rebalance the trove
+    /// @notice Toggle pausing the contract in the event of any bugs
+    function togglePause() external onlyOwner {
+        paused = !paused;
+        emit PauseToggled(paused);
+    }
+
+    /// @notice in case operator needs to rebalance the position for a particular user
+    /// this function can be used.
     // TODO: make this publicly accessible somehow
     function rebalance(
         address who,
@@ -302,14 +321,21 @@ contract ARTHETHTroveLP is VersionedInitializable, StakingRewardsChild {
         uint256 arthToBurn
     ) external payable onlyOperator {
         require(positions[who].isActive, "Position not open");
+        Position memory position = positions[who];
+
+        // only allow a rebalance if the CR has fallen below the min CR
+        uint256 price = priceFeed.fetchPrice();
+        require(
+            price.mul(position.ethForLoan).div(position.arthFromLoan) < minCollateralRatio,
+            "CR is healthy"
+        );
 
         // 1. Reduce the stake
-        Position memory position = positions[who];
         position.arthFromLoan = position.arthFromLoan.sub(arthToBurn);
 
-        // 2. Withdraw from the lending pool.
+        // 2. Withdraw from the lending pool the amount of arth to burn.
         uint256 mArthBeforeLending = mArth.balanceOf(me);
-        pool.withdraw(_arth, arthToBurn, me);
+        require(arthToBurn == pool.withdraw(_arth, arthToBurn, me), "arthToBurn != pool withdrawn");
 
         // 3. update mARTH tracker variable
         uint256 mArthAfterLending = mArth.balanceOf(me);
@@ -327,7 +353,7 @@ contract ARTHETHTroveLP is VersionedInitializable, StakingRewardsChild {
         );
 
         // now the new user has now been rebalanced
-        emit Rebalance(who, position.ethForLoan, position.arthFromLoan, arthToBurn);
+        emit Rebalance(who, position.ethForLoan, position.arthFromLoan, arthToBurn, price);
     }
 
     // --- View functions
@@ -348,6 +374,14 @@ contract ARTHETHTroveLP is VersionedInitializable, StakingRewardsChild {
         // this will always be positive.
         revenue = mArth.balanceOf(me) - totalmArthSupplied;
     }
+
+    // TODO
+    // /// @notice Returns how much mARTH revenue we have generated so far.
+    // function arthInLending() public view returns (uint256 revenue) {
+    //     // Since mARTH.balanceOf is always an increasing number,
+    //     // this will always be positive.
+    //     revenue = mArth.balanceOf(me) - totalmArthSupplied;
+    // }
 
     // /// @notice Returns how much ARTH has been minted so far by the contract
     // function arthMinted() public view returns (uint256 revenue) {

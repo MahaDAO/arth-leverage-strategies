@@ -24,8 +24,8 @@ async function main() {
     const instance = await ethers.getContractAt("ARTHETHTroveLP", proxy.address);
 
     console.log("Deploying ARTHETHTroveLP...");
-    const factory = await ethers.getContractFactory("ARTHETHTroveLP");
-    const implementation = await deployOrLoadAndVerify("ARTHETHTroveLPImplV2", "ARTHETHTroveLP", []);
+    const factory = await ethers.getContractFactory("ETHTroveStrategy");
+    const implementation = await deployOrLoadAndVerify("ETHTroveLPImplV2", "ETHTroveStrategy", []);
 
     // deploy as proxy
     console.log("Deploying proxy...");
