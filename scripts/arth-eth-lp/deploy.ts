@@ -36,7 +36,7 @@ async function main() {
 
     const proxy = await deployOrLoadAndVerify("ARTHETHTroveLP", "TransparentUpgradeableProxy", [
         implementation.address,
-        config.gnosisSafe,
+        config.gnosisProxy,
         initDecode
     ]);
     const arthEthTroveInstance = await ethers.getContractAt("ARTHETHTroveLP", proxy.address);
@@ -48,16 +48,9 @@ async function main() {
     console.log("funding contract and opening trove");
     await arthEthTroveInstance
         .connect(deployer)
-        .openTrove(
-            e18,
-            e18.mul(251),
-            config.ZERO_ADDRESS,
-            config.ZERO_ADDRESS,
-            config.ZERO_ADDRESS,
-            {
-                value: e18.mul(1)
-            }
-        );
+        .openTrove(e18, e18.mul(251), config.ZERO_ADDRESS, config.ZERO_ADDRESS, {
+            value: e18.mul(1)
+        });
 
     // await reportBalances(hre, arthEthTroveInstance.address);
     await reportBalances(hre, deployer.address);

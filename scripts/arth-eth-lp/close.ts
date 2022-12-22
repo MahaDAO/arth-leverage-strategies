@@ -51,16 +51,9 @@ task("arth-eth:close", "Close ARTH/ETH Loan").setAction(async (pramas, hre) => {
     console.log("funding contract and opening trove");
     await arthEthTroveLp
         .connect(deployer)
-        .openTrove(
-            e18,
-            e18.mul(251),
-            config.ZERO_ADDRESS,
-            config.ZERO_ADDRESS,
-            config.ZERO_ADDRESS,
-            {
-                value: e18.mul(2)
-            }
-        );
+        .openTrove(e18, e18.mul(251), config.ZERO_ADDRESS, config.ZERO_ADDRESS, {
+            value: e18.mul(2)
+        });
 
     await reportBalances(hre, arthEthTroveLp.address, "contract");
     await reportBalances(hre, deployer.address, "deployer");
@@ -73,7 +66,6 @@ task("arth-eth:close", "Close ARTH/ETH Loan").setAction(async (pramas, hre) => {
             lowerHint: config.ZERO_ADDRESS,
             arthAmount: e18.mul(251)
         },
-        0,
         {
             value: e18.mul(2)
         }
