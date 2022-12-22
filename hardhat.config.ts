@@ -55,7 +55,7 @@ const config: HardhatUserConfig & any = {
             accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : []
         },
         polygon: {
-            gasPrice: 75000000000,
+            gasPrice: 95000000000,
             url: "https://polygon-rpc.com/",
             chainId: 137,
             accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : []
