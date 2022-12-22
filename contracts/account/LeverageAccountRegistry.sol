@@ -6,30 +6,30 @@ import {LeverageAccount, LeverageAccountFactory} from "./LeverageAccountFactory.
 
 // This Registry deploys new proxy instances through LeverageAccountFactory.build(address) and keeps a registry of owner => proxy
 contract LeverageAccountRegistry {
-  mapping(address => LeverageAccount) public accounts;
-  LeverageAccountFactory public factory;
+    mapping(address => LeverageAccount) public accounts;
+    LeverageAccountFactory public factory;
 
-  constructor(address factory_) {
-    factory = LeverageAccountFactory(factory_);
-  }
+    constructor(address factory_) {
+        factory = LeverageAccountFactory(factory_);
+    }
 
-  // deploys a new proxy instance
-  // sets owner of proxy to caller
-  function build() public returns (address payable account) {
-    account = build(msg.sender);
-  }
+    // deploys a new proxy instance
+    // sets owner of proxy to caller
+    function build() public returns (address payable account) {
+        account = build(msg.sender);
+    }
 
-  // deploys a new proxy instance
-  // sets custom owner of proxy
-  function build(address owner) public returns (address payable account) {
-    // Not allow new proxy if the user already has one and remains being the owner
-    require(
-      address(accounts[owner]) == address(LeverageAccount(address(0))) ||
-        accounts[owner].canExecute(owner),
-      "account exists"
-    );
+    // deploys a new proxy instance
+    // sets custom owner of proxy
+    function build(address owner) public returns (address payable account) {
+        // Not allow new proxy if the user already has one and remains being the owner
+        require(
+            address(accounts[owner]) == address(LeverageAccount(address(0))) ||
+                accounts[owner].canExecute(owner),
+            "account exists"
+        );
 
-    account = factory.build(owner);
-    accounts[owner] = LeverageAccount(account);
-  }
+        account = factory.build(owner);
+        accounts[owner] = LeverageAccount(account);
+    }
 }
