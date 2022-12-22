@@ -53,6 +53,8 @@ async function main() {
     console.log("revenueMArth", await instance.revenueMArth());
     console.log("canInitialize", await instance.canInitialize());
     console.log("getRevision", await instance.getRevision());
+    console.log("rewardRate", await instance.rewardRate());
+    console.log("lastUpdateTime", await instance.lastUpdateTime());
 }
 
 main().catch(error => {

@@ -6,7 +6,7 @@ import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 import {VersionedInitializable} from "../../proxy/VersionedInitializable.sol";
 import {IBorrowerOperations} from "../../interfaces/IBorrowerOperations.sol";
-import {StakingRewardsChild} from "./StakingRewardsChild.sol";
+import {StakingRewardsChild} from "../../staking/StakingRewardsChild.sol";
 import {IPriceFeed} from "../../interfaces/IPriceFeed.sol";
 import {ILendingPool} from "../../interfaces/ILendingPool.sol";
 
@@ -177,7 +177,7 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
             "arth withdrawn != loan position"
         );
 
-        // 4. Adjust the trove, remove ETH on behalf of the user and burning the
+        // 4. Adjust the trove, remove ETH on behalf of the user and burn the
         // ARTH that was minted.
         borrowerOperations.adjustTrove(
             loanParams.maxFee,
