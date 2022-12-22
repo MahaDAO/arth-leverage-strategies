@@ -45,12 +45,14 @@ async function main() {
     console.log("new implementation", implementation.address);
     console.log("init code", initDecode);
 
-    proxy.upgradeToAndCall(implementation.address, initDecode);
+    await proxy.upgradeToAndCall(implementation.address, initDecode);
 
     // todo: should report all previous values properly; especially positions
     console.log("position[deployer]", await instance.positions(deployer.address));
     console.log("totalmArthSupplied", await instance.totalmArthSupplied());
     console.log("treasury", await instance.treasury());
+    console.log("canInitialize", await instance.canInitialize());
+    console.log("getRevision", await instance.getRevision());
 }
 
 main().catch(error => {

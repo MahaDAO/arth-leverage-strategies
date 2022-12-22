@@ -344,7 +344,7 @@ contract ARTHETHTroveLP is VersionedInitializable, StakingRewardsChild {
     }
 
     /// @notice Version number for upgradability
-    function getRevision() internal pure virtual override returns (uint256) {
+    function getRevision() public pure virtual override returns (uint256) {
         return 1;
     }
 
