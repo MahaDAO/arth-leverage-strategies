@@ -66,7 +66,6 @@ contract ARTHETHTroveLP is VersionedInitializable, StakingRewardsChild {
         address _priceFeed,
         address _pool,
         uint256 _rewardsDuration,
-        address _operator,
         address _owner,
         address _treasury,
         uint256 _minCr
@@ -86,7 +85,7 @@ contract ARTHETHTroveLP is VersionedInitializable, StakingRewardsChild {
         minCollateralRatio = _minCr;
         treasury = _treasury;
 
-        _stakingRewardsChildInit(__maha, _rewardsDuration, _operator);
+        _stakingRewardsChildInit(__maha, _rewardsDuration, _owner);
         _transferOwnership(_owner);
     }
 
@@ -98,13 +97,15 @@ contract ARTHETHTroveLP is VersionedInitializable, StakingRewardsChild {
         require(!positions[msg.sender].isActive, "Position already open");
 
         // Check that min. cr for the strategy is met.
+        // Important! If this check is not there then a user can possibly
+        // manipulate the trove.
         uint256 price = priceFeed.fetchPrice();
         require(
             price.mul(msg.value).div(loanParams.arthAmount) >= minCollateralRatio,
             "min CR not met"
         );
 
-        // 2. Mint ARTH and track ARTH balance changes due to this current tx.
+        // 2. Mint ARTH
         borrowerOperations.adjustTrove{value: msg.value}(
             loanParams.maxFee,
             0, // No coll withdrawal.
@@ -151,16 +152,18 @@ contract ARTHETHTroveLP is VersionedInitializable, StakingRewardsChild {
         delete positions[msg.sender];
 
         // 2. Withdraw from the lending pool.
-        uint256 arthWithdrawn = pool.withdraw(_arth, position.arthFromLoan, me);
-
         // 3. Ensure that we received correct amount of arth
-        require(arthWithdrawn == position.arthFromLoan, "arth withdrawn != loan position");
+        require(
+            pool.withdraw(_arth, position.arthFromLoan, me) == position.arthFromLoan,
+            "arth withdrawn != loan position"
+        );
 
-        // 4. Adjust the trove, to remove the ETH on behalf of the user, burning the ARTH.
+        // 4. Adjust the trove, remove ETH on behalf of the user and burning the
+        // ARTH that was minted.
         borrowerOperations.adjustTrove(
             loanParams.maxFee,
             position.ethForLoan,
-            arthWithdrawn,
+            position.arthFromLoan,
             false,
             loanParams.upperHint,
             loanParams.lowerHint
@@ -176,6 +179,8 @@ contract ARTHETHTroveLP is VersionedInitializable, StakingRewardsChild {
     }
 
     function increase(LoanParams memory loanParams) external payable nonReentrant {
+        require(false, "work in progress");
+
         // Check that we are getting ETH.
         require(msg.value > 0, "no eth");
 
@@ -234,12 +239,11 @@ contract ARTHETHTroveLP is VersionedInitializable, StakingRewardsChild {
         _getReward();
     }
 
-    /// @dev Send the revenue the strategy has generated to the treasury <3
+    /// @notice Send the revenue the strategy has generated to the treasury <3
     function collectRevenue() public {
         uint256 revenue = revenueMArth();
         mArth.transfer(treasury, revenue);
         _flush(treasury);
-
         emit RevenueClaimed(revenue);
     }
 
@@ -279,23 +283,13 @@ contract ARTHETHTroveLP is VersionedInitializable, StakingRewardsChild {
         _flush(msg.sender);
     }
 
-    /// @dev admin-only function in case admin needs to execute some calls directly
+    /// @notice admin-only function in case admin needs to execute some calls directly
     function emergencyCall(address target, bytes memory signature) external payable onlyOwner {
         (bool success, bytes memory response) = target.call{value: msg.value}(signature);
         require(success, string(response));
     }
 
-    // function setVariables(
-    //     address _treasury,
-    //     address _mArth,
-    //     uint256 _minCr
-    // ) external onlyOwner {
-    //     treasury = _treasury;
-    //     mArth = IERC20(_mArth);
-    //     minCollateralRatio = _minCr;
-    //     totalmArthSupplied = mArth.balanceOf(me);
-    // }
-
+    /// @notice Emergency function to modify a position in case it has been corrupted.
     function modifyPosition(address who, Position memory position) external onlyOwner {
         positions[who] = position;
     }
@@ -354,6 +348,10 @@ contract ARTHETHTroveLP is VersionedInitializable, StakingRewardsChild {
         // this will always be positive.
         revenue = mArth.balanceOf(me) - totalmArthSupplied;
     }
+
+    // /// @notice Returns how much ARTH has been minted so far by the contract
+    // function arthMinted() public view returns (uint256 revenue) {
+    // }
 
     // --- Internal functions
 

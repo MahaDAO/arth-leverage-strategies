@@ -36,7 +36,6 @@ async function main() {
         config.priceFeed, // address _priceFeed,
         config.lendingPool, // address _pool,
         86400 * 30, // uint256 _rewardsDuration,
-        deployer.address, // address _operator,
         deployer.address, // address _owner,
         config.gnosisSafe, // address _treasury,
         e18.mul(250).div(100) // uint256 _minCr 250%
@@ -51,6 +50,7 @@ async function main() {
     console.log("position[deployer]", await instance.positions(deployer.address));
     console.log("totalmArthSupplied", await instance.totalmArthSupplied());
     console.log("treasury", await instance.treasury());
+    console.log("revenueMArth", await instance.revenueMArth());
     console.log("canInitialize", await instance.canInitialize());
     console.log("getRevision", await instance.getRevision());
 }
