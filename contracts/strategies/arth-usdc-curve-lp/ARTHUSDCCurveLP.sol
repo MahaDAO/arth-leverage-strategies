@@ -142,8 +142,6 @@ contract ARTHUSDCCurveLP is Initializable, StakingRewardsChild, Multicall {
             false,
             _me
         );
-        uint256 liquidityReceived = liquidityPool.add_liquidity(inAmounts, expectedLiquidity, _me);
-        require(liquidityReceived >= expectedLiquidity, "Slippage while adding liq.");
 
         // Record the staking in the staking contract for maha rewards
         _stake(who, depositParams.totalUsdcSupplied);
