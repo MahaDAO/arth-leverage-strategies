@@ -6,7 +6,7 @@ import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 import {IBorrowerOperations} from "../../interfaces/IBorrowerOperations.sol";
-import {StakingRewardsChild} from "../eth-trove-lp/StakingRewardsChild.sol";
+import {StakingRewardsChild} from "../../staking/StakingRewardsChild.sol";
 import {IPriceFeed} from "../../interfaces/IPriceFeed.sol";
 import {Multicall} from "../../utils/Multicall.sol";
 import {ILendingPool} from "../../interfaces/ILendingPool.sol";
