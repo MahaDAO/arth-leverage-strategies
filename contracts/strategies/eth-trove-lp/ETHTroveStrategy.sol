@@ -320,14 +320,14 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
         LoanParams memory loanParams,
         uint256 arthToBurn
     ) external payable onlyOperator {
-        require(positions[who].isActive, "Position not open");
+        require(positions[who].isActive, "!position");
         Position memory position = positions[who];
 
         // only allow a rebalance if the CR has fallen below the min CR
         uint256 price = priceFeed.fetchPrice();
         require(
             price.mul(position.ethForLoan).div(position.arthFromLoan) < minCollateralRatio,
-            "CR is healthy"
+            "cr healthy"
         );
 
         // 1. Reduce the stake
@@ -335,12 +335,10 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
 
         // 2. Withdraw from the lending pool the amount of arth to burn.
         uint256 mArthBeforeLending = mArth.balanceOf(me);
-        require(arthToBurn == pool.withdraw(_arth, arthToBurn, me), "arthToBurn != pool withdrawn");
+        require(arthToBurn == pool.withdraw(_arth, arthToBurn, me), "!arthToBurn");
 
         // 3. update mARTH tracker variable
-        uint256 mArthAfterLending = mArth.balanceOf(me);
-        uint256 mArthDifference = mArthBeforeLending.sub(mArthAfterLending);
-        totalmArthSupplied = totalmArthSupplied.sub(mArthDifference);
+        totalmArthSupplied = totalmArthSupplied.sub(mArthBeforeLending.sub(mArth.balanceOf(me)));
 
         // 4. Adjust the trove, to remove collateral on behalf of the user
         borrowerOperations.adjustTrove(
@@ -357,11 +355,6 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
     }
 
     // --- View functions
-
-    /// @notice UI helper to fetch the current ARTH price
-    function arthPrice() external view returns (uint256) {
-        return priceFeed.lastGoodPrice();
-    }
 
     /// @notice Version number for upgradability
     function getRevision() public pure virtual override returns (uint256) {
