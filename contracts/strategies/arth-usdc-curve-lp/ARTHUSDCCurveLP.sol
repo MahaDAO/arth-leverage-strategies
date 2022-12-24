@@ -6,7 +6,7 @@ import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 import {IBorrowerOperations} from "../../interfaces/IBorrowerOperations.sol";
-import {StakingRewardsChild} from "../artheth-trove-lp/StakingRewardsChild.sol";
+import {StakingRewardsChild} from "../eth-trove-lp/StakingRewardsChild.sol";
 import {IPriceFeed} from "../../interfaces/IPriceFeed.sol";
 import {Multicall} from "../../utils/Multicall.sol";
 import {ILendingPool} from "../../interfaces/ILendingPool.sol";
@@ -79,7 +79,7 @@ contract ARTHUSDCCurveLP is Initializable, StakingRewardsChild, Multicall {
         arth.approve(_liquidityPool, type(uint256).max);
 
         _arthLpCoinIndex = liquidityPool.coins(0) == _arth ? 0 : 1;
-        _usdcLpCoinIndex = liquidityPool.coins(0) == _arth ? 0 : 1;
+        _usdcLpCoinIndex = liquidityPool.coins(0) == _arth ? 1 : 0;
 
         _stakingRewardsChildInit(__maha, _rewardsDuration, _operator);
         _transferOwnership(_owner);
@@ -133,16 +133,15 @@ contract ARTHUSDCCurveLP is Initializable, StakingRewardsChild, Multicall {
         require(arthBorrowed == depositParams.arthToBorrow, "Slippage while borrowing ARTH");
 
         // Supply to curve lp pool.
-        uint256[] memory inAmounts;
+        uint256[] memory inAmounts = new uint256[](2);
         inAmounts[_arthLpCoinIndex] = arthBorrowed;
         inAmounts[_usdcLpCoinIndex] = _usdcToLiquidityPool;
-        uint256 expectedLiquidity = liquidityPool.calc_token_amount(inAmounts, true);
-        require(
-            expectedLiquidity >= depositParams.minLiquidityReceived,
-            "Expected liq. < desired liq."
+        uint256 liquidityReceived = liquidityPool.add_liquidity(
+            inAmounts,
+            depositParams.minLiquidityReceived,
+            false,
+            _me
         );
-        uint256 liquidityReceived = liquidityPool.add_liquidity(inAmounts, expectedLiquidity, _me);
-        require(liquidityReceived >= expectedLiquidity, "Slippage while adding liq.");
 
         // Record the staking in the staking contract for maha rewards
         _stake(who, depositParams.totalUsdcSupplied);
@@ -173,7 +172,7 @@ contract ARTHUSDCCurveLP is Initializable, StakingRewardsChild, Multicall {
         delete positions[who];
 
         // 2. Withdraw liquidity from liquidity pool.
-        uint256[] memory outAmounts;
+        uint256[] memory outAmounts = new uint256[](2);
         outAmounts[_arthLpCoinIndex] = position.arthInLp;
         outAmounts[_usdcLpCoinIndex] = position.usdcInLp;
         uint256 expectedLiquidityBurnt = liquidityPool.calc_token_amount(outAmounts, false);
@@ -181,6 +180,7 @@ contract ARTHUSDCCurveLP is Initializable, StakingRewardsChild, Multicall {
         uint256[] memory amountsWithdrawn = liquidityPool.remove_liquidity(
             position.liquidity,
             outAmounts,
+            false,
             _me
         );
         require(
@@ -200,13 +200,13 @@ contract ARTHUSDCCurveLP is Initializable, StakingRewardsChild, Multicall {
         // Swap some usdc for arth in case arth from withdraw < arth required to repay.
         if (arthWithdrawnFromLp < position.arthBorrowed) {
             uint256 expectedOut = liquidityPool.get_dy(
-                _usdcLpCoinIndex,
-                _arthLpCoinIndex,
+                int128(uint128(_usdcLpCoinIndex)),
+                int128(uint128(_arthLpCoinIndex)),
                 usdcWithdrawnFromLp
             );
             uint256 out = liquidityPool.exchange(
-                _usdcLpCoinIndex,
-                _arthLpCoinIndex,
+                int128(uint128(_usdcLpCoinIndex)),
+                int128(uint128(_arthLpCoinIndex)),
                 usdcWithdrawnFromLp,
                 expectedOut,
                 _me
@@ -237,7 +237,7 @@ contract ARTHUSDCCurveLP is Initializable, StakingRewardsChild, Multicall {
         if (arthBalance > 0) assert(arth.transfer(to, arthBalance));
 
         uint256 usdcBalance = usdc.balanceOf(_me);
-        if (usdcBalance > 0) assert(usdc.transfer(to, arthBalance));
+        if (usdcBalance > 0) assert(usdc.transfer(to, usdcBalance));
     }
 
     function flush(address to) external {

@@ -56,9 +56,23 @@ interface IStableSwap {
         address to
     ) external returns (uint256[] memory outputAmounts);
 
+    function remove_liquidity(
+        uint256 burn_amount,
+        uint256[] memory min_amounts,
+        bool useETH,
+        address to
+    ) external returns (uint256[] memory outputAmounts);
+
     function add_liquidity(
         uint256[] memory _deposit_amounts,
         uint256 min_mint_amount,
+        address to
+    ) external returns (uint256);
+
+    function add_liquidity(
+        uint256[] memory _deposit_amounts,
+        uint256 min_mint_amount,
+        bool useETH,
         address to
     ) external returns (uint256);
 }
