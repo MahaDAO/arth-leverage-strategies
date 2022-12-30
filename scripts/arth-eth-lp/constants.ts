@@ -11,5 +11,6 @@ export const priceFeed = "0xCB056C17ce063F20a8D0650F30550B20Ff1f04c1";
 export const deployer = "0x67c569F960C1Cc0B9a7979A851f5a67018c5A3b0";
 export const lendingPool = "0x76F0C94Ced5B48020bf0D7f3D0CEabC877744cB5";
 
+export const treasury = "0x9032f1bd0cc645fde1b41941990da85f265a7623";
 export const gnosisSafe = "0x6357EDbfE5aDA570005ceB8FAd3139eF5A8863CC";
 export const gnosisProxy = "0x6357EDbfE5aDA570005ceB8FAd3139eF5A8863CC";

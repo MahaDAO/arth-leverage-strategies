@@ -7,9 +7,9 @@ import "@typechain/hardhat";
 import "hardhat-gas-reporter";
 import "solidity-coverage";
 
-import "./scripts/arth-eth-lp/close";
-import "./scripts/arth-eth-lp/open";
-import "./scripts/arth-eth-lp/test";
+// import "./scripts/arth-eth-lp/close";
+// import "./scripts/arth-eth-lp/open";
+// import "./scripts/arth-eth-lp/test";
 
 dotenv.config();
 
@@ -25,9 +25,14 @@ task("accounts", "Prints the list of accounts", async (_taskArgs, hre) => {
 
 const config: HardhatUserConfig & any = {
     solidity: "0.8.4",
+    settings: {
+        optimizer: {
+            enabled: true,
+            runs: 200
+        }
+    },
     networks: {
         hardhat: {
-            chainId: 1337,
             forking: {
                 url: `https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`
             }

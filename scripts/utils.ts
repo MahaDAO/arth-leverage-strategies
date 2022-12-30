@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import hre, { ethers, network } from "hardhat";
-import { HardhatRuntimeEnvironment } from "hardhat/types";
+import { FactoryOptions, HardhatRuntimeEnvironment } from "hardhat/types";
 
 export const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -65,7 +65,12 @@ export const getOutputAddress = (key: string, _network?: string) => {
     return outputFile[key].address;
 };
 
-export const deployOrLoad = async (key: string, contractName: string, args: any[]) => {
+export const deployOrLoad = async (
+    key: string,
+    contractName: string,
+    args: any[],
+    libraries: FactoryOptions = {}
+) => {
     const addr = await getOutputAddress(key);
     if (addr) {
         console.log(`using ${key} at ${addr}`);
@@ -77,7 +82,7 @@ export const deployOrLoad = async (key: string, contractName: string, args: any[
     const gasPrice = estimateGasPrice.mul(5).div(4);
 
     console.log(`\ndeploying ${key} at ${ethers.utils.formatUnits(gasPrice, `gwei`)} gwei`);
-    const factory = await ethers.getContractFactory(contractName);
+    const factory = await ethers.getContractFactory(contractName, libraries);
     const instance = await factory.deploy(...args, { gasPrice });
     await instance.deployed();
     console.log(`${instance.address} -> tx hash: ${instance.deployTransaction.hash}`);
