@@ -13,6 +13,7 @@ library ETHTroveLogic {
     using SafeMath for uint256;
 
     event Deposit(address indexed src, uint256 wad, uint256 arthWad, uint256 price);
+    event Increase(address indexed src, uint256 wad, uint256 arthWad, uint256 price);
     event Rebalance(
         address indexed src,
         uint256 wad,
@@ -78,8 +79,8 @@ library ETHTroveLogic {
         positions[msg.sender] = ETHTroveData.Position({
             isActive: true,
             ethForLoan: msg.value,
-            arthFromLoan: loanParams.arthAmount,
-            arthInLendingPool: loanParams.arthAmount
+            arthFromLoan: loanParams.arthAmount
+            // arthInLendingPool: loanParams.arthAmount
         });
 
         emit Deposit(msg.sender, msg.value, loanParams.arthAmount, price);
@@ -90,10 +91,9 @@ library ETHTroveLogic {
         ETHTroveData.LoanParams memory loanParams,
         WithdrawParams memory params
     ) external returns (uint256) {
-        require(positions[msg.sender].isActive, "Position not open");
-
         // 1. Remove the position and withdraw the stake for stopping further rewards.
         ETHTroveData.Position memory p = positions[msg.sender];
+        require(p.isActive, "Position not open");
         delete positions[msg.sender];
 
         // 2. Withdraw from the lending pool.
@@ -118,7 +118,7 @@ library ETHTroveLogic {
         payable(msg.sender).transfer(p.ethForLoan);
 
         emit Withdrawal(msg.sender, p.ethForLoan, p.arthFromLoan);
-        return p.arthInLendingPool;
+        return p.arthFromLoan;
     }
 
     function increase(
@@ -159,11 +159,11 @@ library ETHTroveLogic {
         positions[msg.sender] = ETHTroveData.Position({
             isActive: true,
             ethForLoan: p.ethForLoan + msg.value,
-            arthFromLoan: p.arthFromLoan + loanParams.arthAmount,
-            arthInLendingPool: p.arthInLendingPool + loanParams.arthAmount
+            arthFromLoan: p.arthFromLoan + loanParams.arthAmount
+            // arthInLendingPool: p.arthInLendingPool + loanParams.arthAmount
         });
 
-        emit Deposit(msg.sender, msg.value, loanParams.arthAmount, price);
+        emit Increase(msg.sender, msg.value, loanParams.arthAmount, price);
     }
 
     /// @notice in case operator needs to rebalance the position for a particular user
@@ -208,6 +208,4 @@ library ETHTroveLogic {
         // now the new user has now been rebalanced
         emit Rebalance(who, position.ethForLoan, position.arthFromLoan, arthToBurn, price);
     }
-
-    // --- View functions
 }

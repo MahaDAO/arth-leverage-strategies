@@ -6,7 +6,7 @@ library ETHTroveData {
         bool isActive;
         uint256 ethForLoan; // ETH deposited
         uint256 arthFromLoan; // ARTH minted
-        uint256 arthInLendingPool; // mARTH contributed
+        // uint256 arthInLendingPool; // mARTH contributed
     }
 
     struct LoanParams {

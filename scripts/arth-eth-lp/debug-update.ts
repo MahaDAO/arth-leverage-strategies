@@ -86,7 +86,6 @@ async function main() {
     // todo: should report all previous values properly; especially positions
     console.log(">>> minCollateralRatio", await instance.connect(whale).minCollateralRatio());
     console.log("totalmArthSupplied", await instance.connect(whale).totalmArthSupplied());
-    console.log("getStoredVersion", await instance.connect(whale).getStoredVersion());
     console.log("treasury", await instance.connect(whale).treasury());
     console.log("canInitialize", await instance.connect(whale).canInitialize());
     console.log(
