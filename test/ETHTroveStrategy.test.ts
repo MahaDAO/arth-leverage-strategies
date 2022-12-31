@@ -84,8 +84,6 @@ describe("ETHTroveStrategy", async () => {
             await strategy.openTrove(e18, e18.mul(1000), zeroAddr, zeroAddr, { value: e18.mul(10) });
         });
 
-        // it("should record");
-
         describe("valid deposit(...) - 10 eth", async () => {
             const depositLoanParams = {
                 maxFee: e18, // maxFee: BigNumberish;
@@ -95,14 +93,22 @@ describe("ETHTroveStrategy", async () => {
             };
 
             beforeEach(async () => {
-                await strategy.connect(whale).deposit(depositLoanParams, { value: e18.mul(10) });
+                await strategy
+                    .connect(whale)
+                    .deposit(
+                        depositLoanParams.maxFee,
+                        depositLoanParams.upperHint,
+                        depositLoanParams.lowerHint,
+                        depositLoanParams.arthAmount,
+                        { value: e18.mul(10) }
+                    );
             });
 
-            it("should record position properly", async () => {
+            it.only("should record position properly", async () => {
                 const position = await strategy.positions(whale.address);
                 const positionCR = await strategy.callStatic.getPositionCR(whale.address);
                 expect(position.isActive).eq(true);
-                expect(positionCR).eq("5729384837886236308");
+                expect(positionCR).gt(e18.mul(3));
                 expect(position.arthFromLoan).eq(depositLoanParams.arthAmount);
             });
 
@@ -130,19 +136,30 @@ describe("ETHTroveStrategy", async () => {
                 const withdrawLoanParams = {
                     maxFee: e18, // maxFee: BigNumberish;
                     upperHint: zeroAddr, // upperHint: string;
-                    lowerHint: zeroAddr, // lowerHint: string;
-                    arthAmount: e18.mul(1000) // arthAmount: BigNumberish;
+                    lowerHint: zeroAddr // lowerHint: string;
                 };
 
                 it("should return 10 eth back to the user", async () => {
                     expect((await whale.getBalance()).div(e18)).eq(9989);
-                    await strategy.connect(whale).withdraw(withdrawLoanParams);
+                    await strategy
+                        .connect(whale)
+                        .withdraw(
+                            withdrawLoanParams.maxFee,
+                            withdrawLoanParams.upperHint,
+                            withdrawLoanParams.lowerHint
+                        );
                     expect((await whale.getBalance()).div(e18)).eq(9999);
                 });
 
                 it("should fail if the user has not deposited before", async () => {
                     await expect(
-                        strategy.connect(ant).withdraw(withdrawLoanParams)
+                        strategy
+                            .connect(ant)
+                            .withdraw(
+                                withdrawLoanParams.maxFee,
+                                withdrawLoanParams.upperHint,
+                                withdrawLoanParams.lowerHint
+                            )
                     ).to.be.revertedWith("Cannot withdraw 0");
                 });
 
@@ -153,7 +170,13 @@ describe("ETHTroveStrategy", async () => {
                     await time.increase(86400 * 365);
 
                     // withdraw
-                    await strategy.connect(whale).withdraw(withdrawLoanParams);
+                    await strategy
+                        .connect(whale)
+                        .withdraw(
+                            withdrawLoanParams.maxFee,
+                            withdrawLoanParams.upperHint,
+                            withdrawLoanParams.lowerHint
+                        );
 
                     // revenue should also be valid
                     expect(await strategy.revenueMArth(), "valid revenue").gt(0);
@@ -166,7 +189,13 @@ describe("ETHTroveStrategy", async () => {
                     await time.increase(86400 * 365);
 
                     // withdraw
-                    await strategy.connect(whale).withdraw(withdrawLoanParams);
+                    await strategy
+                        .connect(whale)
+                        .withdraw(
+                            withdrawLoanParams.maxFee,
+                            withdrawLoanParams.upperHint,
+                            withdrawLoanParams.lowerHint
+                        );
 
                     // close everything
                     await strategy.closeTrove(await arth.balanceOf(strategy.address));
@@ -178,12 +207,12 @@ describe("ETHTroveStrategy", async () => {
                 });
             });
 
-            describe.only("invalid withdraw(...)", async () => {
+            describe("invalid withdraw(...)", async () => {
                 // TODO
             });
         });
 
-        describe.skip("invalid deposit(...)", async () => {
+        describe("invalid deposit(...)", async () => {
             it("should not open position if no eth was given", async () => {
                 const loanParams = {
                     maxFee: e18, // maxFee: BigNumberish;
@@ -193,7 +222,15 @@ describe("ETHTroveStrategy", async () => {
                 };
 
                 await expect(
-                    strategy.connect(whale).deposit(loanParams, { value: e18.mul(0) })
+                    strategy
+                        .connect(whale)
+                        .deposit(
+                            loanParams.maxFee,
+                            loanParams.upperHint,
+                            loanParams.lowerHint,
+                            loanParams.arthAmount,
+                            { value: e18.mul(0) }
+                        )
                 ).to.be.revertedWith("no eth");
             });
 
@@ -206,7 +243,15 @@ describe("ETHTroveStrategy", async () => {
                 };
 
                 await expect(
-                    strategy.connect(whale).deposit(loanParams, { value: e18 })
+                    strategy
+                        .connect(whale)
+                        .deposit(
+                            loanParams.maxFee,
+                            loanParams.upperHint,
+                            loanParams.lowerHint,
+                            loanParams.arthAmount,
+                            { value: e18 }
+                        )
                 ).to.be.revertedWith("min CR not met");
             });
 
@@ -219,11 +264,27 @@ describe("ETHTroveStrategy", async () => {
                 };
 
                 // this should go through
-                await strategy.connect(whale).deposit(loanParams, { value: e18 });
+                await strategy
+                    .connect(whale)
+                    .deposit(
+                        loanParams.maxFee,
+                        loanParams.upperHint,
+                        loanParams.lowerHint,
+                        loanParams.arthAmount,
+                        { value: e18 }
+                    );
 
                 // this should fail
                 await expect(
-                    strategy.connect(whale).deposit(loanParams, { value: e18 })
+                    strategy
+                        .connect(whale)
+                        .deposit(
+                            loanParams.maxFee,
+                            loanParams.upperHint,
+                            loanParams.lowerHint,
+                            loanParams.arthAmount,
+                            { value: e18 }
+                        )
                 ).to.be.revertedWith("position open");
             });
         });

@@ -28,8 +28,12 @@ library ETHTroveLogic {
         IPriceFeed priceFeed;
         IBorrowerOperations borrowerOperations;
         ILendingPool pool;
+        address upperHint;
+        address lowerHint;
         address me;
         address arth;
+        uint256 arthAmount;
+        uint256 maxFee;
         uint256 minCollateralRatio;
     }
 
@@ -38,11 +42,13 @@ library ETHTroveLogic {
         ILendingPool pool;
         address me;
         address arth;
+        address upperHint;
+        address lowerHint;
+        uint256 maxFee;
     }
 
     function deposit(
         mapping(address => ETHTroveData.Position) storage positions,
-        ETHTroveData.LoanParams memory loanParams,
         DepositParams memory params
     ) external {
         // Check that position is not already open.
@@ -53,24 +59,24 @@ library ETHTroveLogic {
         // manipulate the trove.
         uint256 price = params.priceFeed.fetchPrice();
         require(
-            price.mul(msg.value).div(loanParams.arthAmount) >= params.minCollateralRatio,
+            price.mul(msg.value).div(params.arthAmount) >= params.minCollateralRatio,
             "min CR not met"
         );
 
         // 2. Mint ARTH
         params.borrowerOperations.adjustTrove{value: msg.value}(
-            loanParams.maxFee,
+            params.maxFee,
             0, // No coll withdrawal.
-            loanParams.arthAmount, // Mint ARTH.
+            params.arthAmount, // Mint ARTH.
             true, // Debt increasing.
-            loanParams.upperHint,
-            loanParams.lowerHint
+            params.upperHint,
+            params.lowerHint
         );
 
         // 3. Supply ARTH in the lending pool
         params.pool.supply(
             params.arth,
-            loanParams.arthAmount,
+            params.arthAmount,
             params.me, // On behalf of this contract
             0
         );
@@ -79,16 +85,15 @@ library ETHTroveLogic {
         positions[msg.sender] = ETHTroveData.Position({
             isActive: true,
             ethForLoan: msg.value,
-            arthFromLoan: loanParams.arthAmount,
-            arthInLendingPool: loanParams.arthAmount
+            arthFromLoan: params.arthAmount,
+            arthInLendingPool: params.arthAmount
         });
 
-        emit Deposit(msg.sender, msg.value, loanParams.arthAmount, price);
+        emit Deposit(msg.sender, msg.value, params.arthAmount, price);
     }
 
     function withdraw(
         mapping(address => ETHTroveData.Position) storage positions,
-        ETHTroveData.LoanParams memory loanParams,
         WithdrawParams memory params
     ) external {
         // 1. Remove the position and withdraw the stake for stopping further rewards.
@@ -105,12 +110,12 @@ library ETHTroveLogic {
         // 4. Adjust the trove, remove ETH on behalf of the user and burn the
         // ARTH that was minted.
         params.borrowerOperations.adjustTrove(
-            loanParams.maxFee,
+            params.maxFee,
             p.ethForLoan,
             p.arthFromLoan,
             false,
-            loanParams.upperHint, // calculated from the frontend
-            loanParams.lowerHint // calculated from the frontend
+            params.upperHint, // calculated from the frontend
+            params.lowerHint // calculated from the frontend
         );
 
         // 5. The contract now has eth inside it. Send it back to the user
@@ -122,7 +127,6 @@ library ETHTroveLogic {
 
     function increase(
         mapping(address => ETHTroveData.Position) storage positions,
-        ETHTroveData.LoanParams memory loanParams,
         DepositParams memory params
     ) external {
         // Check that position is already open.
@@ -132,24 +136,24 @@ library ETHTroveLogic {
         // Check that min. cr for the strategy is met.
         uint256 price = params.priceFeed.fetchPrice();
         require(
-            price.mul(msg.value).div(loanParams.arthAmount) >= params.minCollateralRatio,
+            price.mul(msg.value).div(params.arthAmount) >= params.minCollateralRatio,
             "min CR not met"
         );
 
         // 2. Mint ARTH and track ARTH balance changes due to this current tx.
         params.borrowerOperations.adjustTrove{value: msg.value}(
-            loanParams.maxFee,
+            params.maxFee,
             0, // No coll withdrawal.
-            loanParams.arthAmount, // Mint ARTH.
+            params.arthAmount, // Mint ARTH.
             true, // Debt increasing.
-            loanParams.upperHint,
-            loanParams.lowerHint
+            params.upperHint,
+            params.lowerHint
         );
 
         // 3. Supply ARTH in the lending pool
         params.pool.supply(
             params.arth,
-            loanParams.arthAmount,
+            params.arthAmount,
             params.me, // On behalf of this contract
             0
         );
@@ -158,11 +162,11 @@ library ETHTroveLogic {
         positions[msg.sender] = ETHTroveData.Position({
             isActive: true,
             ethForLoan: p.ethForLoan + msg.value,
-            arthFromLoan: p.arthFromLoan + loanParams.arthAmount,
-            arthInLendingPool: p.arthInLendingPool + loanParams.arthAmount
+            arthFromLoan: p.arthFromLoan + params.arthAmount,
+            arthInLendingPool: p.arthInLendingPool + params.arthAmount
         });
 
-        emit Increase(msg.sender, msg.value, loanParams.arthAmount, price);
+        emit Increase(msg.sender, msg.value, params.arthAmount, price);
     }
 
     /// @notice in case operator needs to rebalance the position for a particular user
@@ -172,7 +176,6 @@ library ETHTroveLogic {
         mapping(address => ETHTroveData.Position) storage positions,
         address who,
         uint256 arthToBurn,
-        ETHTroveData.LoanParams memory loanParams,
         DepositParams memory params
     ) external {
         ETHTroveData.Position memory position = positions[who];
@@ -196,12 +199,12 @@ library ETHTroveLogic {
 
         // 4. Adjust the trove, to remove collateral on behalf of the user
         params.borrowerOperations.adjustTrove(
-            loanParams.maxFee,
+            params.maxFee,
             0,
             arthToBurn,
             false,
-            loanParams.upperHint,
-            loanParams.lowerHint
+            params.upperHint,
+            params.lowerHint
         );
 
         // now the new user has now been rebalanced

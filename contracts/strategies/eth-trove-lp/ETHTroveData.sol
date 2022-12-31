@@ -8,11 +8,4 @@ library ETHTroveData {
         uint256 arthFromLoan; // ARTH minted
         uint256 arthInLendingPool; // mARTH contributed
     }
-
-    struct LoanParams {
-        uint256 maxFee;
-        address upperHint;
-        address lowerHint;
-        uint256 arthAmount;
-    }
 }

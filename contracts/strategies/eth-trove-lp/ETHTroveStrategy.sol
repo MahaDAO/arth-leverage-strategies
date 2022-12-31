@@ -85,29 +85,41 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
         _transferOwnership(_owner);
     }
 
-    function deposit(ETHTroveData.LoanParams memory loanParams) external payable nonReentrant {
+    function deposit(
+        uint256 maxFee,
+        address upperHint,
+        address lowerHint,
+        uint256 arthAmount
+    ) external payable nonReentrant {
         // Check that we are getting ETH.
         require(msg.value > 0, "no eth");
         require(!paused, "paused");
 
         _stake(msg.sender, msg.value);
-        totalmArthSupplied += loanParams.arthAmount;
+        totalmArthSupplied += arthAmount;
 
         ETHTroveLogic.deposit(
             positions, // mapping(address => Position) memory positions
-            loanParams, // LoanParams memory loanParams,
             ETHTroveLogic.DepositParams({
                 priceFeed: priceFeed, // IPriceFeed priceFeed,
                 minCollateralRatio: minCollateralRatio, // uint256 minCollateralRatio,
                 borrowerOperations: borrowerOperations, // IBorrowerOperations borrowerOperations,
                 me: me, // address me,
                 pool: pool, // ILendingPool pool,
-                arth: _arth // address _arth,
+                arth: _arth, // address _arth,
+                upperHint: upperHint, // address upperHint;
+                lowerHint: lowerHint, // address lowerHint;
+                arthAmount: arthAmount, // uint256 arthAmount;
+                maxFee: maxFee // uint256 maxFee;
             })
         );
     }
 
-    function withdraw(ETHTroveData.LoanParams memory loanParams) external nonReentrant {
+    function withdraw(
+        uint256 maxFee,
+        address upperHint,
+        address lowerHint
+    ) external nonReentrant {
         require(!paused, "paused");
 
         _withdraw(msg.sender, positions[msg.sender].ethForLoan);
@@ -115,17 +127,24 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
 
         ETHTroveLogic.withdraw(
             positions, // mapping(address => Position) memory positions
-            loanParams, // LoanParams memory loanParams,
             ETHTroveLogic.WithdrawParams({
                 borrowerOperations: borrowerOperations, // IBorrowerOperations borrowerOperations,
                 me: me, // address me,
                 pool: pool, // ILendingPool pool,
-                arth: _arth // address _arth,
+                arth: _arth, // address _arth,
+                upperHint: upperHint, // address upperHint;
+                lowerHint: lowerHint, // address lowerHint;
+                maxFee: maxFee // uint256 maxFee;
             })
         );
     }
 
-    function increase(ETHTroveData.LoanParams memory loanParams) external payable nonReentrant {
+    function increase(
+        uint256 maxFee,
+        address upperHint,
+        address lowerHint,
+        uint256 arthAmount
+    ) external payable nonReentrant {
         // Check that we are getting ETH.
         require(msg.value > 0, "no eth");
         require(!paused, "paused");
@@ -133,18 +152,21 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
         // track how much mARTH was minted
         // record the eth deposited in the staking contract for maha rewards
         _stake(msg.sender, msg.value);
-        totalmArthSupplied += loanParams.arthAmount;
+        totalmArthSupplied += arthAmount;
 
         ETHTroveLogic.increase(
             positions, // mapping(address => Position) memory positions
-            loanParams, // LoanParams memory loanParams,
             ETHTroveLogic.DepositParams({
                 priceFeed: priceFeed, // IPriceFeed priceFeed,
                 minCollateralRatio: minCollateralRatio, // uint256 minCollateralRatio,
                 borrowerOperations: borrowerOperations, // IBorrowerOperations borrowerOperations,
                 me: me, // address me,
                 pool: pool, // ILendingPool pool,
-                arth: _arth // address _arth,
+                arth: _arth, // address _arth,
+                upperHint: upperHint, // address upperHint;
+                lowerHint: lowerHint, // address lowerHint;
+                arthAmount: arthAmount, // uint256 arthAmount;
+                maxFee: maxFee // uint256 maxFee;
             })
         );
     }
@@ -209,11 +231,11 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
     }
 
     /// @notice admin-only function to close the trove; normally not needed if the campaign keeps on running
-    function closeTrove(uint256 arthNeeded) external payable onlyOwner {
+    function closeTrove() external payable onlyOwner {
         // Close the trove.
         borrowerOperations.closeTrove();
 
-        // Send the dust back to owner.
+        // Send the eth back to owner.
         payable(msg.sender).transfer(me.balance);
     }
 
