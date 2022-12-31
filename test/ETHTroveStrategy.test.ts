@@ -20,7 +20,7 @@ describe("ETHTroveStrategy", async () => {
     let lendingPool: ILendingPool;
     let troveManager: ITroveManager;
 
-    let arth: IERC20;
+    // let arth: IERC20;
     let mArth: IERC20;
     let maha: IERC20;
 
@@ -44,7 +44,7 @@ describe("ETHTroveStrategy", async () => {
 
         lendingPool = await ethers.getContractAt("ILendingPool", lendingPoolAddr);
         maha = await ethers.getContractAt("ERC20", mahaAddr);
-        arth = await ethers.getContractAt("ERC20", arthAddr);
+        // arth = await ethers.getContractAt("ERC20", arthAddr);
         mArth = await ethers.getContractAt("ERC20", mArthAddr);
 
         troveManager = await ethers.getContractAt("ITroveManager", troveManagerAddr);
@@ -104,7 +104,7 @@ describe("ETHTroveStrategy", async () => {
                     );
             });
 
-            it.only("should record position properly", async () => {
+            it("should record position properly", async () => {
                 const position = await strategy.positions(whale.address);
                 const positionCR = await strategy.callStatic.getPositionCR(whale.address);
                 expect(position.isActive).eq(true);
@@ -123,7 +123,6 @@ describe("ETHTroveStrategy", async () => {
 
             it("should open a trove on arth loans", async () => {
                 const trove = await troveManager.Troves(strategy.address);
-                console.log(trove);
 
                 // 10 eth initial + 10 eth from whale
                 expect(trove.coll, "has enough eth").eq(e18.mul(10 + 10));
@@ -140,7 +139,7 @@ describe("ETHTroveStrategy", async () => {
                 };
 
                 it("should return 10 eth back to the user", async () => {
-                    expect((await whale.getBalance()).div(e18)).eq(9989);
+                    const balance = await whale.getBalance();
                     await strategy
                         .connect(whale)
                         .withdraw(
@@ -148,7 +147,7 @@ describe("ETHTroveStrategy", async () => {
                             withdrawLoanParams.upperHint,
                             withdrawLoanParams.lowerHint
                         );
-                    expect((await whale.getBalance()).div(e18)).eq(9999);
+                    expect((await whale.getBalance()).div(e18)).gt(balance.mul(10).add(99).div(10));
                 });
 
                 it("should fail if the user has not deposited before", async () => {
@@ -198,7 +197,7 @@ describe("ETHTroveStrategy", async () => {
                         );
 
                     // close everything
-                    await strategy.closeTrove(await arth.balanceOf(strategy.address));
+                    await strategy.closeTrove();
 
                     // collect revenue
                     expect(await strategy.revenueMArth(), "valid revenue").gt(0);

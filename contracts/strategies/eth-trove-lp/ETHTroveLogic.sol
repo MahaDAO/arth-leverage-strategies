@@ -7,7 +7,6 @@ import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {IBorrowerOperations} from "../../interfaces/IBorrowerOperations.sol";
 import {IPriceFeed} from "../../interfaces/IPriceFeed.sol";
 import {ILendingPool} from "../../interfaces/ILendingPool.sol";
-import {ETHTroveData} from "./ETHTroveData.sol";
 
 library ETHTroveLogic {
     using SafeMath for uint256;
@@ -23,6 +22,13 @@ library ETHTroveLogic {
     );
     event Withdrawal(address indexed dst, uint256 wad, uint256 arthWad);
     event RevenueClaimed(uint256 wad);
+
+    struct Position {
+        bool isActive;
+        uint256 ethForLoan; // ETH deposited
+        uint256 arthFromLoan; // ARTH minted
+        uint256 arthInLendingPool; // mARTH contributed
+    }
 
     struct DepositParams {
         IPriceFeed priceFeed;
@@ -47,10 +53,9 @@ library ETHTroveLogic {
         uint256 maxFee;
     }
 
-    function deposit(
-        mapping(address => ETHTroveData.Position) storage positions,
-        DepositParams memory params
-    ) external {
+    function deposit(mapping(address => Position) storage positions, DepositParams memory params)
+        external
+    {
         // Check that position is not already open.
         require(!positions[msg.sender].isActive, "position open");
 
@@ -82,7 +87,7 @@ library ETHTroveLogic {
         );
 
         // 4. Record the position.
-        positions[msg.sender] = ETHTroveData.Position({
+        positions[msg.sender] = Position({
             isActive: true,
             ethForLoan: msg.value,
             arthFromLoan: params.arthAmount,
@@ -92,12 +97,11 @@ library ETHTroveLogic {
         emit Deposit(msg.sender, msg.value, params.arthAmount, price);
     }
 
-    function withdraw(
-        mapping(address => ETHTroveData.Position) storage positions,
-        WithdrawParams memory params
-    ) external {
+    function withdraw(mapping(address => Position) storage positions, WithdrawParams memory params)
+        external
+    {
         // 1. Remove the position and withdraw the stake for stopping further rewards.
-        ETHTroveData.Position memory p = positions[msg.sender];
+        Position memory p = positions[msg.sender];
         require(p.isActive, "Position not open");
 
         // 2. Withdraw from the lending pool.
@@ -125,12 +129,11 @@ library ETHTroveLogic {
         delete positions[msg.sender];
     }
 
-    function increase(
-        mapping(address => ETHTroveData.Position) storage positions,
-        DepositParams memory params
-    ) external {
+    function increase(mapping(address => Position) storage positions, DepositParams memory params)
+        external
+    {
         // Check that position is already open.
-        ETHTroveData.Position memory p = positions[msg.sender];
+        Position memory p = positions[msg.sender];
         require(p.isActive, "Position not open");
 
         // Check that min. cr for the strategy is met.
@@ -159,7 +162,7 @@ library ETHTroveLogic {
         );
 
         // 5. Update the position.
-        positions[msg.sender] = ETHTroveData.Position({
+        positions[msg.sender] = Position({
             isActive: true,
             ethForLoan: p.ethForLoan + msg.value,
             arthFromLoan: p.arthFromLoan + params.arthAmount,
@@ -173,12 +176,12 @@ library ETHTroveLogic {
     /// this function can be used.
     // TODO: make this publicly accessible somehow
     function rebalance(
-        mapping(address => ETHTroveData.Position) storage positions,
+        mapping(address => Position) storage positions,
         address who,
         uint256 arthToBurn,
         DepositParams memory params
     ) external {
-        ETHTroveData.Position memory position = positions[who];
+        Position memory position = positions[who];
         require(position.isActive, "!position");
 
         // only allow a rebalance if the CR has fallen below the min CR

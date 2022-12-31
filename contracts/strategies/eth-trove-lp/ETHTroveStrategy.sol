@@ -8,7 +8,7 @@ import {IBorrowerOperations} from "../../interfaces/IBorrowerOperations.sol";
 import {StakingRewardsChild} from "../../staking/StakingRewardsChild.sol";
 import {IPriceFeed} from "../../interfaces/IPriceFeed.sol";
 import {ILendingPool} from "../../interfaces/ILendingPool.sol";
-import {ETHTroveData, ETHTroveLogic} from "./ETHTroveLogic.sol";
+import {ETHTroveLogic} from "./ETHTroveLogic.sol";
 
 // import "hardhat/console.sol";
 
@@ -28,7 +28,7 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
     uint256 public minCollateralRatio;
     address private me;
     address private _arth;
-    mapping(address => ETHTroveData.Position) public positions;
+    mapping(address => ETHTroveLogic.Position) public positions;
 
     IERC20 public arth;
 
@@ -148,6 +148,7 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
         // Check that we are getting ETH.
         require(msg.value > 0, "no eth");
         require(!paused, "paused");
+        require(false, "disabled");
 
         // track how much mARTH was minted
         // record the eth deposited in the staking contract for maha rewards
@@ -184,7 +185,7 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
     // // TODO: make this publicly accessible somehow
     // function rebalance(
     //     address who,
-    //     ETHTroveData.LoanParams memory loanParams,
+    //     ETHTroveLogic.LoanParams memory loanParams,
     //     uint256 arthToBurn
     // ) external payable onlyOperator {
     //     ETHTroveLogic.rebalance(
@@ -246,7 +247,7 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
     }
 
     /// @notice Emergency function to modify a position in case it has been corrupted.
-    function modifyPosition(address who, ETHTroveData.Position memory position) external onlyOwner {
+    function modifyPosition(address who, ETHTroveLogic.Position memory position) external onlyOwner {
         positions[who] = position;
     }
 
