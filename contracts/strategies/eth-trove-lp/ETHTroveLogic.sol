@@ -79,8 +79,8 @@ library ETHTroveLogic {
         positions[msg.sender] = ETHTroveData.Position({
             isActive: true,
             ethForLoan: msg.value,
-            arthFromLoan: loanParams.arthAmount
-            // arthInLendingPool: loanParams.arthAmount
+            arthFromLoan: loanParams.arthAmount,
+            arthInLendingPool: loanParams.arthAmount
         });
 
         emit Deposit(msg.sender, msg.value, loanParams.arthAmount, price);
@@ -90,7 +90,7 @@ library ETHTroveLogic {
         mapping(address => ETHTroveData.Position) storage positions,
         ETHTroveData.LoanParams memory loanParams,
         WithdrawParams memory params
-    ) external returns (uint256) {
+    ) external {
         // 1. Remove the position and withdraw the stake for stopping further rewards.
         ETHTroveData.Position memory p = positions[msg.sender];
         require(p.isActive, "Position not open");
@@ -118,7 +118,6 @@ library ETHTroveLogic {
         payable(msg.sender).transfer(p.ethForLoan);
 
         emit Withdrawal(msg.sender, p.ethForLoan, p.arthFromLoan);
-        return p.arthFromLoan;
     }
 
     function increase(
@@ -159,8 +158,8 @@ library ETHTroveLogic {
         positions[msg.sender] = ETHTroveData.Position({
             isActive: true,
             ethForLoan: p.ethForLoan + msg.value,
-            arthFromLoan: p.arthFromLoan + loanParams.arthAmount
-            // arthInLendingPool: p.arthInLendingPool + loanParams.arthAmount
+            arthFromLoan: p.arthFromLoan + loanParams.arthAmount,
+            arthInLendingPool: p.arthInLendingPool + loanParams.arthAmount
         });
 
         emit Increase(msg.sender, msg.value, loanParams.arthAmount, price);

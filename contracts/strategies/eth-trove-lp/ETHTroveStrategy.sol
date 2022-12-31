@@ -89,7 +89,9 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
         // Check that we are getting ETH.
         require(msg.value > 0, "no eth");
         require(!paused, "paused");
+
         _stake(msg.sender, msg.value);
+        totalmArthSupplied += loanParams.arthAmount;
 
         ETHTroveLogic.deposit(
             positions, // mapping(address => Position) memory positions
@@ -103,15 +105,15 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
                 arth: _arth // address _arth,
             })
         );
-
-        totalmArthSupplied = totalmArthSupplied + loanParams.arthAmount;
     }
 
     function withdraw(ETHTroveData.LoanParams memory loanParams) external nonReentrant {
         require(!paused, "paused");
-        _withdraw(msg.sender, positions[msg.sender].ethForLoan);
 
-        uint256 arthInLendingPool = ETHTroveLogic.withdraw(
+        _withdraw(msg.sender, positions[msg.sender].ethForLoan);
+        totalmArthSupplied -= positions[msg.sender].arthFromLoan;
+
+        ETHTroveLogic.withdraw(
             positions, // mapping(address => Position) memory positions
             loanParams, // LoanParams memory loanParams,
             ETHTroveLogic.WithdrawParams({
@@ -121,14 +123,17 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
                 arth: _arth // address _arth,
             })
         );
-
-        totalmArthSupplied = totalmArthSupplied - arthInLendingPool;
     }
 
     function increase(ETHTroveData.LoanParams memory loanParams) external payable nonReentrant {
         // Check that we are getting ETH.
         require(msg.value > 0, "no eth");
         require(!paused, "paused");
+
+        // track how much mARTH was minted
+        // record the eth deposited in the staking contract for maha rewards
+        _stake(msg.sender, msg.value);
+        totalmArthSupplied += loanParams.arthAmount;
 
         ETHTroveLogic.increase(
             positions, // mapping(address => Position) memory positions
@@ -142,12 +147,6 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
                 arth: _arth // address _arth,
             })
         );
-
-        // 4. and track how much mARTH was minted
-        totalmArthSupplied = totalmArthSupplied + loanParams.arthAmount;
-
-        // 6. Record the eth deposited in the staking contract for maha rewards
-        _stake(msg.sender, msg.value);
     }
 
     /// @notice Send the revenue the strategy has generated to the treasury <3
