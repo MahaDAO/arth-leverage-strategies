@@ -11,6 +11,8 @@ import {IPriceFeed} from "../../interfaces/IPriceFeed.sol";
 import {ILendingPool} from "../../interfaces/ILendingPool.sol";
 import {ETHTroveData, ETHTroveLogic} from "./ETHTroveLogic.sol";
 
+import "hardhat/console.sol";
+
 /**
  * @title ETHTroveStrategy
  * @author MahaDAO
@@ -87,6 +89,8 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
         minCollateralRatio = _minCr;
         treasury = _treasury;
 
+        totalmArthSupplied = mArth.balanceOf(me);
+
         _stakingRewardsChildInit(__maha, _rewardsDuration, _owner);
         _transferOwnership(_owner);
     }
@@ -95,6 +99,7 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
         // Check that we are getting ETH.
         require(msg.value > 0, "no eth");
         require(!paused, "paused");
+        _stake(msg.sender, msg.value);
 
         uint256 mArthMinted = ETHTroveLogic.deposit(
             positions, // mapping(address => Position) memory positions
@@ -111,9 +116,6 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
         );
 
         totalmArthSupplied = totalmArthSupplied.add(mArthMinted);
-
-        // Record the eth deposited in the staking contract for maha rewards
-        _stake(msg.sender, msg.value);
     }
 
     function withdraw(ETHTroveData.LoanParams memory loanParams) external nonReentrant {
@@ -163,8 +165,8 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
     /// @notice Send the revenue the strategy has generated to the treasury <3
     function collectRevenue() public {
         uint256 revenue = revenueMArth();
-        mArth.transfer(treasury, revenue);
-        _flush(treasury);
+        pool.withdraw(_arth, revenue, me);
+        arth.transfer(treasury, revenue);
         emit RevenueClaimed(revenue);
     }
 
@@ -221,47 +223,47 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
         emit PauseToggled(paused);
     }
 
-    /// @notice in case operator needs to rebalance the position for a particular user
-    /// this function can be used.
-    // TODO: make this publicly accessible somehow
-    function rebalance(
-        address who,
-        ETHTroveData.LoanParams memory loanParams,
-        uint256 arthToBurn
-    ) external payable onlyOperator {
-        require(positions[who].isActive, "!position");
-        ETHTroveData.Position memory position = positions[who];
+    // /// @notice in case operator needs to rebalance the position for a particular user
+    // /// this function can be used.
+    // // TODO: make this publicly accessible somehow
+    // function rebalance(
+    //     address who,
+    //     ETHTroveData.LoanParams memory loanParams,
+    //     uint256 arthToBurn
+    // ) external payable onlyOperator {
+    //     require(positions[who].isActive, "!position");
+    //     ETHTroveData.Position memory position = positions[who];
 
-        // only allow a rebalance if the CR has fallen below the min CR
-        uint256 price = priceFeed.fetchPrice();
-        require(
-            price.mul(position.ethForLoan).div(position.arthFromLoan) < minCollateralRatio,
-            "cr healthy"
-        );
+    //     // only allow a rebalance if the CR has fallen below the min CR
+    //     uint256 price = priceFeed.fetchPrice();
+    //     require(
+    //         price.mul(position.ethForLoan).div(position.arthFromLoan) < minCollateralRatio,
+    //         "cr healthy"
+    //     );
 
-        // 1. Reduce the stake
-        position.arthFromLoan = position.arthFromLoan.sub(arthToBurn);
+    //     // 1. Reduce the stake
+    //     position.arthFromLoan = position.arthFromLoan.sub(arthToBurn);
 
-        // 2. Withdraw from the lending pool the amount of arth to burn.
-        uint256 mArthBeforeLending = mArth.balanceOf(me);
-        require(arthToBurn == pool.withdraw(_arth, arthToBurn, me), "!arthToBurn");
+    //     // 2. Withdraw from the lending pool the amount of arth to burn.
+    //     uint256 mArthBeforeLending = mArth.balanceOf(me);
+    //     require(arthToBurn == pool.withdraw(_arth, arthToBurn, me), "!arthToBurn");
 
-        // 3. update mARTH tracker variable
-        totalmArthSupplied = totalmArthSupplied.sub(mArthBeforeLending.sub(mArth.balanceOf(me)));
+    //     // 3. update mARTH tracker variable
+    //     totalmArthSupplied = totalmArthSupplied.sub(mArthBeforeLending.sub(mArth.balanceOf(me)));
 
-        // 4. Adjust the trove, to remove collateral on behalf of the user
-        borrowerOperations.adjustTrove(
-            loanParams.maxFee,
-            0,
-            arthToBurn,
-            false,
-            loanParams.upperHint,
-            loanParams.lowerHint
-        );
+    //     // 4. Adjust the trove, to remove collateral on behalf of the user
+    //     borrowerOperations.adjustTrove(
+    //         loanParams.maxFee,
+    //         0,
+    //         arthToBurn,
+    //         false,
+    //         loanParams.upperHint,
+    //         loanParams.lowerHint
+    //     );
 
-        // now the new user has now been rebalanced
-        emit Rebalance(who, position.ethForLoan, position.arthFromLoan, arthToBurn, price);
-    }
+    //     // now the new user has now been rebalanced
+    //     emit Rebalance(who, position.ethForLoan, position.arthFromLoan, arthToBurn, price);
+    // }
 
     // --- View functions
 
@@ -276,18 +278,6 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
         // this will always be positive.
         revenue = mArth.balanceOf(me) - totalmArthSupplied;
     }
-
-    // TODO
-    // /// @notice Returns how much mARTH revenue we have generated so far.
-    // function arthInLending() public view returns (uint256 revenue) {
-    //     // Since mARTH.balanceOf is always an increasing number,
-    //     // this will always be positive.
-    //     revenue = mArth.balanceOf(me) - totalmArthSupplied;
-    // }
-
-    // /// @notice Returns how much ARTH has been minted so far by the contract
-    // function arthMinted() public view returns (uint256 revenue) {
-    // }
 
     // --- Internal functions
 

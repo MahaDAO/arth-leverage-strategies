@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.0;
 
+import {StorageSlot} from "@openzeppelin/contracts/utils/StorageSlot.sol";
+
 /**
  * @title VersionedInitializable
  * @author Aave, inspired by the OpenZeppelin Initializable contract
@@ -15,35 +17,38 @@ pragma solidity ^0.8.0;
  */
 abstract contract VersionedInitializable {
     /**
-     * @dev Indicates that the contract is in the process of being initialized.
-     */
-    bool private initializing;
-
-    /**
      * @dev Indicates that the contract has been initialized.
      */
-    uint256 private lastInitializedRevision = 0;
+    bool private _initialized;
+
+    /**
+     * @dev Indicates that the contract is in the process of being initialized.
+     */
+    bool private _initializing;
 
     /**
      * @dev Modifier to use in the initializer function of a contract.
      */
     modifier initializer() {
         uint256 revision = getRevision();
-        require(
-            initializing || isConstructor() || revision > lastInitializedRevision,
-            "Contract instance has already been initialized"
-        );
 
-        bool isTopLevelCall = !initializing;
+        // If the contract is initializing we ignore whether _initialized is set in order to support multiple
+        // inheritance patterns, but we only do this in the context of a constructor, because in other contexts the
+        // contract may have been reentered.
+        require(canInitialize(), "Initializable: contract is already initialized");
+        _setStoredVersion(revision);
+
+        bool isTopLevelCall = !_initializing;
+
         if (isTopLevelCall) {
-            initializing = true;
-            lastInitializedRevision = revision;
+            _initializing = true;
+            _initialized = true;
         }
 
         _;
 
         if (isTopLevelCall) {
-            initializing = false;
+            _initializing = false;
         }
     }
 
@@ -74,9 +79,24 @@ abstract contract VersionedInitializable {
 
     function canInitialize() public view returns (bool) {
         uint256 revision = getRevision();
-        return initializing || isConstructor() || revision > lastInitializedRevision;
+        return !_initialized || isConstructor() || revision > getStoredVersion();
     }
 
-    // Reserved storage space to allow for layout changes in the future.
-    uint256[49] private ______gap;
+    function getStoredVersion() public view returns (uint256) {
+        // keccak-256(eip1967.proxy.version)
+        // = 0x460994c355dbc8229336897ed9def5884fb6b26b0a995b156780d056c758577e
+        // bytes32 _slot = 0x460994c355dbc8229336897ed9def5884fb6b26b0a995b156780d056c758577d;
+        return
+            StorageSlot
+                .getUint256Slot(0x460994c355dbc8229336897ed9def5884fb6b26b0a995b156780d056c758577d)
+                .value;
+    }
+
+    function _setStoredVersion(uint256 val) internal {
+        // keccak-256(eip1967.proxy.version) - 1
+        // bytes32 _slot = 0x460994c355dbc8229336897ed9def5884fb6b26b0a995b156780d056c758577d;
+        StorageSlot
+            .getUint256Slot(0x460994c355dbc8229336897ed9def5884fb6b26b0a995b156780d056c758577d)
+            .value = val;
+    }
 }

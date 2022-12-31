@@ -80,13 +80,14 @@ async function main() {
     await proxy.upgradeToAndCall(newImpl.address, initDecode);
 
     console.log("upgraded!");
+
     console.log("impl address", await proxy.callStatic.implementation());
 
     // todo: should report all previous values properly; especially positions
     console.log(">>> minCollateralRatio", await instance.connect(whale).minCollateralRatio());
     console.log("totalmArthSupplied", await instance.connect(whale).totalmArthSupplied());
+    console.log("getStoredVersion", await instance.connect(whale).getStoredVersion());
     console.log("treasury", await instance.connect(whale).treasury());
-    console.log("revenueMArth", await instance.connect(whale).revenueMArth());
     console.log("canInitialize", await instance.connect(whale).canInitialize());
     console.log(
         "position(e.eth)",
@@ -96,6 +97,14 @@ async function main() {
     console.log("rewardRate", await instance.connect(whale).rewardRate());
     console.log("rewardsDuration", await instance.connect(whale).rewardsDuration());
     console.log("lastUpdateTime", await instance.connect(whale).lastUpdateTime());
+
+    console.log("revenueMArth", await instance.connect(whale).revenueMArth());
+    await hre.network.provider.send("hardhat_mine", ["0x3472E"]); // 30 days - 214830 blocks
+    console.log("revenueMArth", await instance.connect(whale).revenueMArth());
+
+    // claim revenue!
+
+    await instance.connect(whale).collectRevenue();
 }
 
 main().catch(error => {

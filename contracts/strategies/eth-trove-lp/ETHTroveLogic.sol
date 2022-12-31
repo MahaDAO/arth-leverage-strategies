@@ -22,7 +22,6 @@ library ETHTroveLogic {
     );
     event Withdrawal(address indexed dst, uint256 wad, uint256 arthWad);
     event RevenueClaimed(uint256 wad);
-    event PauseToggled(bool val);
 
     struct DepositParams {
         IPriceFeed priceFeed;
@@ -34,11 +33,18 @@ library ETHTroveLogic {
         address arth;
     }
 
+    struct WithdrawParams {
+        IBorrowerOperations borrowerOperations;
+        address me;
+        ILendingPool pool;
+        address arth;
+    }
+
     function deposit(
         mapping(address => ETHTroveData.Position) storage positions,
         ETHTroveData.LoanParams memory loanParams,
         DepositParams memory params
-    ) public returns (uint256 _mArthMinted) {
+    ) external returns (uint256 _mArthMinted) {
         // Check that position is not already open.
         require(!positions[msg.sender].isActive, "Position already open");
 
@@ -83,13 +89,6 @@ library ETHTroveLogic {
         });
 
         emit Deposit(msg.sender, msg.value, loanParams.arthAmount, price);
-    }
-
-    struct WithdrawParams {
-        IBorrowerOperations borrowerOperations;
-        address me;
-        ILendingPool pool;
-        address arth;
     }
 
     function withdraw(
