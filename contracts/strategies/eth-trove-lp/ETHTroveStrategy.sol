@@ -170,6 +170,34 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
         emit RevenueClaimed(revenue);
     }
 
+    // /// @notice in case operator needs to rebalance the position for a particular user
+    // /// this function can be used.
+    // // TODO: make this publicly accessible somehow
+    // function rebalance(
+    //     address who,
+    //     ETHTroveData.LoanParams memory loanParams,
+    //     uint256 arthToBurn
+    // ) external payable onlyOperator {
+    //     ETHTroveLogic.rebalance(
+    //         positions, // mapping(address => Position) memory positions
+    //         who,
+    //         arthToBurn,
+    //         loanParams, // LoanParams memory loanParams,
+    //         ETHTroveLogic.DepositParams({
+    //             priceFeed: priceFeed, // IPriceFeed priceFeed,
+    //             minCollateralRatio: minCollateralRatio, // uint256 minCollateralRatio,
+    //             borrowerOperations: borrowerOperations, // IBorrowerOperations borrowerOperations,
+    //             mArth: mArth, // IERC20 mArth,
+    //             me: me, // address me,
+    //             pool: pool, // ILendingPool pool,
+    //             arth: _arth // address _arth,
+    //         })
+    //     );
+
+    //     // update mARTH tracker variable
+    //     totalmArthSupplied = totalmArthSupplied.sub(arthToBurn);
+    // }
+
     /// --- Admin only functions
 
     /// @notice admin-only function to open a trove; needed to initialize the contract
@@ -222,48 +250,6 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
         paused = !paused;
         emit PauseToggled(paused);
     }
-
-    // /// @notice in case operator needs to rebalance the position for a particular user
-    // /// this function can be used.
-    // // TODO: make this publicly accessible somehow
-    // function rebalance(
-    //     address who,
-    //     ETHTroveData.LoanParams memory loanParams,
-    //     uint256 arthToBurn
-    // ) external payable onlyOperator {
-    //     require(positions[who].isActive, "!position");
-    //     ETHTroveData.Position memory position = positions[who];
-
-    //     // only allow a rebalance if the CR has fallen below the min CR
-    //     uint256 price = priceFeed.fetchPrice();
-    //     require(
-    //         price.mul(position.ethForLoan).div(position.arthFromLoan) < minCollateralRatio,
-    //         "cr healthy"
-    //     );
-
-    //     // 1. Reduce the stake
-    //     position.arthFromLoan = position.arthFromLoan.sub(arthToBurn);
-
-    //     // 2. Withdraw from the lending pool the amount of arth to burn.
-    //     uint256 mArthBeforeLending = mArth.balanceOf(me);
-    //     require(arthToBurn == pool.withdraw(_arth, arthToBurn, me), "!arthToBurn");
-
-    //     // 3. update mARTH tracker variable
-    //     totalmArthSupplied = totalmArthSupplied.sub(mArthBeforeLending.sub(mArth.balanceOf(me)));
-
-    //     // 4. Adjust the trove, to remove collateral on behalf of the user
-    //     borrowerOperations.adjustTrove(
-    //         loanParams.maxFee,
-    //         0,
-    //         arthToBurn,
-    //         false,
-    //         loanParams.upperHint,
-    //         loanParams.lowerHint
-    //     );
-
-    //     // now the new user has now been rebalanced
-    //     emit Rebalance(who, position.ethForLoan, position.arthFromLoan, arthToBurn, price);
-    // }
 
     // --- View functions
 

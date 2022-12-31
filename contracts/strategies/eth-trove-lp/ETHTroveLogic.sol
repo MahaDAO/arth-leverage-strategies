@@ -25,18 +25,18 @@ library ETHTroveLogic {
 
     struct DepositParams {
         IPriceFeed priceFeed;
-        uint256 minCollateralRatio;
         IBorrowerOperations borrowerOperations;
         IERC20 mArth;
-        address me;
         ILendingPool pool;
+        address me;
         address arth;
+        uint256 minCollateralRatio;
     }
 
     struct WithdrawParams {
         IBorrowerOperations borrowerOperations;
-        address me;
         ILendingPool pool;
+        address me;
         address arth;
     }
 
@@ -178,47 +178,48 @@ library ETHTroveLogic {
         emit Deposit(msg.sender, msg.value, loanParams.arthAmount, price);
     }
 
-    // /// @notice in case operator needs to rebalance the position for a particular user
-    // /// this function can be used.
-    // // TODO: make this publicly accessible somehow
-    // function rebalance(
-    //     address who,
-    //     LoanParams memory loanParams,
-    //     uint256 arthToBurn
-    // ) external payable {
-    //     require(positions[who].isActive, "!position");
-    //     Position memory position = positions[who];
+    /// @notice in case operator needs to rebalance the position for a particular user
+    /// this function can be used.
+    // TODO: make this publicly accessible somehow
+    function rebalance(
+        mapping(address => ETHTroveData.Position) storage positions,
+        address who,
+        uint256 arthToBurn,
+        ETHTroveData.LoanParams memory loanParams,
+        DepositParams memory params
+    ) external {
+        ETHTroveData.Position memory position = positions[who];
+        require(position.isActive, "!position");
 
-    //     // only allow a rebalance if the CR has fallen below the min CR
-    //     uint256 price = priceFeed.fetchPrice();
-    //     require(
-    //         price.mul(position.ethForLoan).div(position.arthFromLoan) < minCollateralRatio,
-    //         "cr healthy"
-    //     );
+        // only allow a rebalance if the CR has fallen below the min CR
+        uint256 price = params.priceFeed.fetchPrice();
+        require(
+            price.mul(position.ethForLoan).div(position.arthFromLoan) < params.minCollateralRatio,
+            "cr healthy"
+        );
 
-    //     // 1. Reduce the stake
-    //     position.arthFromLoan = position.arthFromLoan.sub(arthToBurn);
+        // 1. Reduce the stake
+        position.arthFromLoan = position.arthFromLoan.sub(arthToBurn);
 
-    //     // 2. Withdraw from the lending pool the amount of arth to burn.
-    //     uint256 mArthBeforeLending = mArth.balanceOf(me);
-    //     require(arthToBurn == pool.withdraw(_arth, arthToBurn, me), "!arthToBurn");
+        // 2. Withdraw from the lending pool the amount of arth to burn.
+        require(
+            arthToBurn == params.pool.withdraw(params.arth, arthToBurn, params.me),
+            "!arthToBurn"
+        );
 
-    //     // 3. update mARTH tracker variable
-    //     totalmArthSupplied = totalmArthSupplied.sub(mArthBeforeLending.sub(mArth.balanceOf(me)));
+        // 4. Adjust the trove, to remove collateral on behalf of the user
+        params.borrowerOperations.adjustTrove(
+            loanParams.maxFee,
+            0,
+            arthToBurn,
+            false,
+            loanParams.upperHint,
+            loanParams.lowerHint
+        );
 
-    //     // 4. Adjust the trove, to remove collateral on behalf of the user
-    //     borrowerOperations.adjustTrove(
-    //         loanParams.maxFee,
-    //         0,
-    //         arthToBurn,
-    //         false,
-    //         loanParams.upperHint,
-    //         loanParams.lowerHint
-    //     );
-
-    //     // now the new user has now been rebalanced
-    //     emit Rebalance(who, position.ethForLoan, position.arthFromLoan, arthToBurn, price);
-    // }
+        // now the new user has now been rebalanced
+        emit Rebalance(who, position.ethForLoan, position.arthFromLoan, arthToBurn, price);
+    }
 
     // --- View functions
 }
