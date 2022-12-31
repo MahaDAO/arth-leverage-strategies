@@ -26,7 +26,6 @@ library ETHTroveLogic {
     struct DepositParams {
         IPriceFeed priceFeed;
         IBorrowerOperations borrowerOperations;
-        IERC20 mArth;
         ILendingPool pool;
         address me;
         address arth;
@@ -44,7 +43,7 @@ library ETHTroveLogic {
         mapping(address => ETHTroveData.Position) storage positions,
         ETHTroveData.LoanParams memory loanParams,
         DepositParams memory params
-    ) external returns (uint256 _mArthMinted) {
+    ) external {
         // Check that position is not already open.
         require(!positions[msg.sender].isActive, "Position already open");
 
@@ -68,7 +67,6 @@ library ETHTroveLogic {
         );
 
         // 3. Supply ARTH in the lending pool
-        uint256 mArthBeforeLending = params.mArth.balanceOf(params.me);
         params.pool.supply(
             params.arth,
             loanParams.arthAmount,
@@ -76,16 +74,12 @@ library ETHTroveLogic {
             0
         );
 
-        // 4. and track how much mARTH was minted
-        uint256 mArthAfterLending = params.mArth.balanceOf(params.me);
-        _mArthMinted = mArthAfterLending.sub(mArthBeforeLending);
-
-        // 5. Record the position.
+        // 4. Record the position.
         positions[msg.sender] = ETHTroveData.Position({
             isActive: true,
             ethForLoan: msg.value,
             arthFromLoan: loanParams.arthAmount,
-            arthInLendingPool: _mArthMinted
+            arthInLendingPool: loanParams.arthAmount
         });
 
         emit Deposit(msg.sender, msg.value, loanParams.arthAmount, price);
@@ -99,14 +93,13 @@ library ETHTroveLogic {
         require(positions[msg.sender].isActive, "Position not open");
 
         // 1. Remove the position and withdraw the stake for stopping further rewards.
-        ETHTroveData.Position memory position = positions[msg.sender];
+        ETHTroveData.Position memory p = positions[msg.sender];
         delete positions[msg.sender];
 
         // 2. Withdraw from the lending pool.
         // 3. Ensure that we received correct amount of arth
         require(
-            params.pool.withdraw(params.arth, position.arthFromLoan, params.me) ==
-                position.arthFromLoan,
+            params.pool.withdraw(params.arth, p.arthFromLoan, params.me) == p.arthFromLoan,
             "arth withdrawn != loan position"
         );
 
@@ -114,28 +107,28 @@ library ETHTroveLogic {
         // ARTH that was minted.
         params.borrowerOperations.adjustTrove(
             loanParams.maxFee,
-            position.ethForLoan,
-            position.arthFromLoan,
+            p.ethForLoan,
+            p.arthFromLoan,
             false,
-            loanParams.upperHint,
-            loanParams.lowerHint
+            loanParams.upperHint, // calculated from the frontend
+            loanParams.lowerHint // calculated from the frontend
         );
 
         // 5. The contract now has eth inside it. Send it back to the user
-        payable(msg.sender).transfer(position.ethForLoan);
+        payable(msg.sender).transfer(p.ethForLoan);
 
-        emit Withdrawal(msg.sender, position.ethForLoan, position.arthFromLoan);
-        return position.arthInLendingPool;
+        emit Withdrawal(msg.sender, p.ethForLoan, p.arthFromLoan);
+        return p.arthInLendingPool;
     }
 
     function increase(
         mapping(address => ETHTroveData.Position) storage positions,
         ETHTroveData.LoanParams memory loanParams,
         DepositParams memory params
-    ) external returns (uint256 mArthMinted) {
+    ) external {
         // Check that position is already open.
-        ETHTroveData.Position memory position = positions[msg.sender];
-        require(position.isActive, "Position not open");
+        ETHTroveData.Position memory p = positions[msg.sender];
+        require(p.isActive, "Position not open");
 
         // Check that min. cr for the strategy is met.
         uint256 price = params.priceFeed.fetchPrice();
@@ -155,7 +148,6 @@ library ETHTroveLogic {
         );
 
         // 3. Supply ARTH in the lending pool
-        uint256 mArthBeforeLending = params.mArth.balanceOf(params.me);
         params.pool.supply(
             params.arth,
             loanParams.arthAmount,
@@ -163,16 +155,12 @@ library ETHTroveLogic {
             0
         );
 
-        // 4. and track how much mARTH was minted
-        uint256 mArthAfterLending = params.mArth.balanceOf(params.me);
-        mArthMinted = mArthAfterLending.sub(mArthBeforeLending);
-
         // 5. Update the position.
         positions[msg.sender] = ETHTroveData.Position({
             isActive: true,
-            ethForLoan: position.ethForLoan.add(msg.value),
-            arthFromLoan: position.arthFromLoan.add(loanParams.arthAmount),
-            arthInLendingPool: position.arthInLendingPool.add(mArthMinted)
+            ethForLoan: p.ethForLoan + msg.value,
+            arthFromLoan: p.arthFromLoan + loanParams.arthAmount,
+            arthInLendingPool: p.arthInLendingPool + loanParams.arthAmount
         });
 
         emit Deposit(msg.sender, msg.value, loanParams.arthAmount, price);

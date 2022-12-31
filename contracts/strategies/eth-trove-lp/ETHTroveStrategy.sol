@@ -24,14 +24,6 @@ import "hardhat/console.sol";
  **/
 contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
     using SafeMath for uint256;
-
-    event Rebalance(
-        address indexed src,
-        uint256 wad,
-        uint256 arthWad,
-        uint256 arthBurntWad,
-        uint256 price
-    );
     event RevenueClaimed(uint256 wad);
     event PauseToggled(bool val);
 
@@ -101,21 +93,20 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
         require(!paused, "paused");
         _stake(msg.sender, msg.value);
 
-        uint256 mArthMinted = ETHTroveLogic.deposit(
+        ETHTroveLogic.deposit(
             positions, // mapping(address => Position) memory positions
             loanParams, // LoanParams memory loanParams,
             ETHTroveLogic.DepositParams({
                 priceFeed: priceFeed, // IPriceFeed priceFeed,
                 minCollateralRatio: minCollateralRatio, // uint256 minCollateralRatio,
                 borrowerOperations: borrowerOperations, // IBorrowerOperations borrowerOperations,
-                mArth: mArth, // IERC20 mArth,
                 me: me, // address me,
                 pool: pool, // ILendingPool pool,
                 arth: _arth // address _arth,
             })
         );
 
-        totalmArthSupplied = totalmArthSupplied.add(mArthMinted);
+        totalmArthSupplied = totalmArthSupplied + loanParams.arthAmount;
     }
 
     function withdraw(ETHTroveData.LoanParams memory loanParams) external nonReentrant {
@@ -141,14 +132,13 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
         require(msg.value > 0, "no eth");
         require(!paused, "paused");
 
-        uint256 mArthMinted = ETHTroveLogic.increase(
+        ETHTroveLogic.increase(
             positions, // mapping(address => Position) memory positions
             loanParams, // LoanParams memory loanParams,
             ETHTroveLogic.DepositParams({
                 priceFeed: priceFeed, // IPriceFeed priceFeed,
                 minCollateralRatio: minCollateralRatio, // uint256 minCollateralRatio,
                 borrowerOperations: borrowerOperations, // IBorrowerOperations borrowerOperations,
-                mArth: mArth, // IERC20 mArth,
                 me: me, // address me,
                 pool: pool, // ILendingPool pool,
                 arth: _arth // address _arth,
@@ -156,7 +146,7 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
         );
 
         // 4. and track how much mARTH was minted
-        totalmArthSupplied = totalmArthSupplied.add(mArthMinted);
+        totalmArthSupplied = totalmArthSupplied.add(loanParams.arthAmount);
 
         // 6. Record the eth deposited in the staking contract for maha rewards
         _stake(msg.sender, msg.value);
@@ -193,7 +183,6 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
     //             arth: _arth // address _arth,
     //         })
     //     );
-
     //     // update mARTH tracker variable
     //     totalmArthSupplied = totalmArthSupplied.sub(arthToBurn);
     // }
