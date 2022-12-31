@@ -38,7 +38,7 @@ async function main() {
         86400 * 30, // uint256 _rewardsDuration,
         deployer.address, // address _owner,
         config.gnosisSafe, // address _treasury,
-        e18.mul(250).div(100) // uint256 _minCr 250%
+        e18.mul(25).div(10) // uint256 _minCr 250%
     ]);
 
     console.log("new implementation", implementation.address);

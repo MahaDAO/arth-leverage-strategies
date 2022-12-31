@@ -46,7 +46,7 @@ library ETHTroveLogic {
         DepositParams memory params
     ) external {
         // Check that position is not already open.
-        require(!positions[msg.sender].isActive, "Position already open");
+        require(!positions[msg.sender].isActive, "position open");
 
         // Check that min. cr for the strategy is met.
         // Important! If this check is not there then a user can possibly
@@ -94,7 +94,6 @@ library ETHTroveLogic {
         // 1. Remove the position and withdraw the stake for stopping further rewards.
         ETHTroveData.Position memory p = positions[msg.sender];
         require(p.isActive, "Position not open");
-        delete positions[msg.sender];
 
         // 2. Withdraw from the lending pool.
         // 3. Ensure that we received correct amount of arth
@@ -116,8 +115,9 @@ library ETHTroveLogic {
 
         // 5. The contract now has eth inside it. Send it back to the user
         payable(msg.sender).transfer(p.ethForLoan);
-
         emit Withdrawal(msg.sender, p.ethForLoan, p.arthFromLoan);
+
+        delete positions[msg.sender];
     }
 
     function increase(

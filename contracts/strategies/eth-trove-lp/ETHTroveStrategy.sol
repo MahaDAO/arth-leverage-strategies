@@ -150,7 +150,7 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
     }
 
     /// @notice Send the revenue the strategy has generated to the treasury <3
-    function collectRevenue() public {
+    function collectRevenue() public nonReentrant {
         uint256 revenue = revenueMArth();
         pool.withdraw(_arth, revenue, me);
         arth.transfer(treasury, revenue);
@@ -205,19 +205,16 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
         );
 
         // Send the dust back to owner.
-        _flush(msg.sender);
+        payable(msg.sender).transfer(me.balance);
     }
 
     /// @notice admin-only function to close the trove; normally not needed if the campaign keeps on running
     function closeTrove(uint256 arthNeeded) external payable onlyOwner {
-        // Get the ARTH needed to close the loan.
-        arth.transferFrom(msg.sender, me, arthNeeded);
-
         // Close the trove.
         borrowerOperations.closeTrove();
 
         // Send the dust back to owner.
-        _flush(msg.sender);
+        payable(msg.sender).transfer(me.balance);
     }
 
     /// @notice admin-only function in case admin needs to execute some calls directly
@@ -251,13 +248,11 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
         revenue = mArth.balanceOf(me) - totalmArthSupplied;
     }
 
-    // --- Internal functions
-
-    function _flush(address to) internal {
-        uint256 arthBalance = arth.balanceOf(me);
-        if (arthBalance > 0) arth.transfer(to, arthBalance);
-
-        uint256 ethBalance = me.balance;
-        if (ethBalance > 0) payable(to).transfer(ethBalance);
+    /// @notice Returns the CR of the given user
+    function getPositionCR(address who) public returns (uint256 cr) {
+        uint256 price = priceFeed.fetchPrice();
+        return (price * positions[who].ethForLoan) / (positions[who].arthFromLoan);
     }
+
+    receive() external payable {}
 }

@@ -121,6 +121,18 @@ interface ITroveManager is ILiquityBase {
 
     function getTCR(uint256 _price) external view returns (uint256);
 
+    function Troves(address _who)
+        external
+        view
+        returns (
+            uint256 debt,
+            uint256 coll,
+            uint256 stake,
+            uint8 status,
+            uint256 arrayIndex,
+            address frontEndTag
+        );
+
     function checkRecoveryMode(uint256 _price) external view returns (bool);
 
     function getTroveFrontEnd(address _borrower) external view returns (address);
