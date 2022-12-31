@@ -2,7 +2,6 @@
 pragma solidity ^0.8.0;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 import {VersionedInitializable} from "../../proxy/VersionedInitializable.sol";
 import {IBorrowerOperations} from "../../interfaces/IBorrowerOperations.sol";
@@ -11,7 +10,7 @@ import {IPriceFeed} from "../../interfaces/IPriceFeed.sol";
 import {ILendingPool} from "../../interfaces/ILendingPool.sol";
 import {ETHTroveData, ETHTroveLogic} from "./ETHTroveLogic.sol";
 
-import "hardhat/console.sol";
+// import "hardhat/console.sol";
 
 /**
  * @title ETHTroveStrategy
@@ -23,7 +22,6 @@ import "hardhat/console.sol";
  * same amount of ETH that they provided.
  **/
 contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
-    using SafeMath for uint256;
     event RevenueClaimed(uint256 wad);
     event PauseToggled(bool val);
 
@@ -124,7 +122,7 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
             })
         );
 
-        totalmArthSupplied = totalmArthSupplied.sub(arthInLendingPool);
+        totalmArthSupplied = totalmArthSupplied - arthInLendingPool;
     }
 
     function increase(ETHTroveData.LoanParams memory loanParams) external payable nonReentrant {
@@ -146,7 +144,7 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
         );
 
         // 4. and track how much mARTH was minted
-        totalmArthSupplied = totalmArthSupplied.add(loanParams.arthAmount);
+        totalmArthSupplied = totalmArthSupplied + loanParams.arthAmount;
 
         // 6. Record the eth deposited in the staking contract for maha rewards
         _stake(msg.sender, msg.value);

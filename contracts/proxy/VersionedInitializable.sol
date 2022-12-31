@@ -79,10 +79,10 @@ abstract contract VersionedInitializable {
 
     function canInitialize() public view returns (bool) {
         uint256 revision = getRevision();
-        return !_initialized || isConstructor() || revision > getStoredVersion();
+        return !_initialized || isConstructor() || revision > _getStoredVersion();
     }
 
-    function getStoredVersion() public view returns (uint256) {
+    function _getStoredVersion() internal view returns (uint256) {
         // keccak-256(eip1967.proxy.version)
         // = 0x460994c355dbc8229336897ed9def5884fb6b26b0a995b156780d056c758577e
         // bytes32 _slot = 0x460994c355dbc8229336897ed9def5884fb6b26b0a995b156780d056c758577d;
