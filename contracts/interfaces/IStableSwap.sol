@@ -34,10 +34,7 @@ interface IStableSwap {
 
     function get_virtual_price() external view returns (uint256);
 
-    function calc_token_amount(uint256[] memory amounts, bool _is_deposit)
-        external
-        view
-        returns (uint256);
+    function calc_token_amount(uint256[2] memory amounts) external view returns (uint256);
 
     function calc_withdraw_one_coin(uint256 _burn_amount, int128 i) external view returns (uint256);
 
@@ -50,29 +47,11 @@ interface IStableSwap {
     function remove_liquidity_imbalance(uint256[] memory _amounts, uint256 _max_burn_amount)
         external;
 
-    function remove_liquidity(
-        uint256 burn_amount,
-        uint256[] memory min_amounts,
-        address to
-    ) external returns (uint256[] memory outputAmounts);
-
-    function remove_liquidity(
-        uint256 burn_amount,
-        uint256[] memory min_amounts,
-        bool useETH,
-        address to
-    ) external returns (uint256[] memory outputAmounts);
+    function remove_liquidity(uint256 burn_amount, uint256[2] memory min_amounts) external;
 
     function add_liquidity(
-        uint256[] memory _deposit_amounts,
+        uint256[2] memory amounts,
         uint256 min_mint_amount,
-        address to
-    ) external returns (uint256);
-
-    function add_liquidity(
-        uint256[] memory _deposit_amounts,
-        uint256 min_mint_amount,
-        bool useETH,
-        address to
+        bool use_eth
     ) external returns (uint256);
 }

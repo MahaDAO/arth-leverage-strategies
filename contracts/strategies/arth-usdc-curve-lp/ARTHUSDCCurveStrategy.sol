@@ -8,6 +8,7 @@ import {VersionedInitializable} from "../../proxy/VersionedInitializable.sol";
 import {StakingRewardsChild} from "../../staking/StakingRewardsChild.sol";
 import {ILendingPool} from "../../interfaces/ILendingPool.sol";
 import {IStableSwap} from "../../interfaces/IStableSwap.sol";
+import {IPriceFeed} from "../../interfaces/IPriceFeed.sol";
 
 import {ARTHUSDCCurveLogic} from "./ARTHUSDCCurveLogic.sol";
 
@@ -16,8 +17,6 @@ contract ARTHUSDCCurveLP is VersionedInitializable, StakingRewardsChild {
     event Withdrawal(address indexed dst, uint256 wad);
 
     address private _me;
-    uint8 private _arthLpCoinIndex;
-    uint8 private _usdcLpCoinIndex;
 
     mapping(address => ARTHUSDCCurveLogic.Position) public positions;
 
@@ -25,6 +24,7 @@ contract ARTHUSDCCurveLP is VersionedInitializable, StakingRewardsChild {
     IERC20 public usdc;
     ILendingPool public lendingPool;
     IStableSwap public liquidityPool;
+    IPriceFeed priceFeed;
 
     /// @notice all revenue gets sent over here.
     address public treasury;
@@ -36,7 +36,7 @@ contract ARTHUSDCCurveLP is VersionedInitializable, StakingRewardsChild {
         address _lendingPool,
         address _liquidityPool,
         uint256 _rewardsDuration,
-        address _operator,
+        address _priceFeed,
         address _treasury,
         address _owner
     ) external initializer {
@@ -44,6 +44,7 @@ contract ARTHUSDCCurveLP is VersionedInitializable, StakingRewardsChild {
         usdc = IERC20(_usdc);
         lendingPool = ILendingPool(_lendingPool);
         liquidityPool = IStableSwap(_liquidityPool);
+        priceFeed = IPriceFeed(_priceFeed);
 
         treasury = _treasury;
         _me = address(this);
@@ -53,15 +54,20 @@ contract ARTHUSDCCurveLP is VersionedInitializable, StakingRewardsChild {
         usdc.approve(_liquidityPool, type(uint256).max);
         arth.approve(_liquidityPool, type(uint256).max);
 
-        _arthLpCoinIndex = liquidityPool.coins(0) == _arth ? 0 : 1;
-        _usdcLpCoinIndex = liquidityPool.coins(0) == _arth ? 1 : 0;
-
-        _stakingRewardsChildInit(_maha, _rewardsDuration, _operator);
+        _stakingRewardsChildInit(_maha, _rewardsDuration, _owner);
         _transferOwnership(_owner);
+
+        // allow the strategy to borrow upto 97% LTV
+        lendingPool.setUserEMode(1);
     }
 
-    function deposit(ARTHUSDCCurveLogic.DepositInputParams memory p) external {
-        _deposit(msg.sender, p);
+    function deposit(uint256 usdcSupplied, uint256 minLiquidityReceived) external {
+        _deposit(
+            msg.sender,
+            usdcSupplied,
+            minLiquidityReceived,
+            86400 * 30 // 30 day lock
+        );
     }
 
     function depositWithPermit(
@@ -71,111 +77,75 @@ contract ARTHUSDCCurveLP is VersionedInitializable, StakingRewardsChild {
         uint8 v,
         bytes32 r,
         bytes32 s,
-        ARTHUSDCCurveLogic.DepositInputParams memory p
+        uint256 usdcSupplied,
+        uint256 minLiquidityReceived
     ) external {
         IERC20Permit(address(usdc)).permit(who, _me, value, deadline, v, r, s);
-        _deposit(who, p);
+        _deposit(
+            who,
+            usdcSupplied,
+            minLiquidityReceived,
+            86400 * 30 // 30 day lock
+        );
     }
 
-    function _deposit(address who, ARTHUSDCCurveLogic.DepositInputParams memory p)
-        internal
-        nonReentrant
-    {
-        usdc.transferFrom(who, _me, p.totalUsdcSupplied);
+    function _deposit(
+        address who,
+        uint256 usdcSupplied,
+        uint256 minLiquidityReceived,
+        uint64 lockDuration
+    ) internal nonReentrant {
+        usdc.transferFrom(who, _me, usdcSupplied);
 
         ARTHUSDCCurveLogic.deposit(
             positions,
             who,
-            p,
+            usdcSupplied,
+            minLiquidityReceived,
+            lockDuration,
             ARTHUSDCCurveLogic.DepositParams({
                 me: _me, // address me;
                 treasury: treasury, // address treasury;
-                arthLpCoinIndex: _arthLpCoinIndex, // uint256 arthLpCoinIndex;
-                usdcLpCoinIndex: _usdcLpCoinIndex, // uint256 usdcLpCoinIndex;
                 usdc: usdc, // IERC20 usdc;
                 arth: arth, // IERC20 arth;
                 lendingPool: lendingPool, // ILendingPool lendingPool;
-                stableswap: liquidityPool // IStableSwap stableswap;
+                stableswap: liquidityPool, // IStableSwap stableswap;
+                priceFeed: priceFeed
             })
         );
 
         // Record the staking in the staking contract for maha rewards
-        _stake(who, p.totalUsdcSupplied);
+        _stake(who, usdcSupplied);
 
         // // Send the dust back to the address that gave the funds.
         // _flush(who);
     }
 
-    // function withdraw() external payable {
-    //     _withdraw(msg.sender);
-    // }
+    function withdraw() external payable {
+        _withdraw(msg.sender);
+    }
 
-    // function _withdraw(address who) internal nonReentrant {
-    //     require(positions[who].isActive, "Position not open");
+    function _withdraw(address who) internal nonReentrant {
+        // Record the staking in the staking contract for maha rewards
+        _withdraw(who, positions[who].usdcSupplied);
 
-    //     // 1. Remove the position and withdraw you stake for stopping further rewards.
-    //     Position memory position = positions[who];
-    //     _withdraw(who, position.totalUsdc);
-    //     delete positions[who];
+        ARTHUSDCCurveLogic.withdraw(
+            positions,
+            who,
+            ARTHUSDCCurveLogic.DepositParams({
+                me: _me, // address me;
+                treasury: treasury, // address treasury;
+                usdc: usdc, // IERC20 usdc;
+                arth: arth, // IERC20 arth;
+                lendingPool: lendingPool, // ILendingPool lendingPool;
+                stableswap: liquidityPool, // IStableSwap stableswap;
+                priceFeed: priceFeed
+            })
+        );
 
-    //     // 2. Withdraw liquidity from liquidity pool.
-    //     uint256[] memory outAmounts = new uint256[](2);
-    //     outAmounts[_arthLpCoinIndex] = position.arthInLp;
-    //     outAmounts[_usdcLpCoinIndex] = position.usdcInLp;
-    //     uint256 expectedLiquidityBurnt = liquidityPool.calc_token_amount(outAmounts, false);
-    //     require(expectedLiquidityBurnt <= position.liquidity, "Actual liq. < required");
-    //     uint256[] memory amountsWithdrawn = liquidityPool.remove_liquidity(
-    //         position.liquidity,
-    //         outAmounts,
-    //         false,
-    //         _me
-    //     );
-    //     require(
-    //         amountsWithdrawn[_arthLpCoinIndex] >= outAmounts[_arthLpCoinIndex],
-    //         "Withdraw Slippage for coin 0"
-    //     );
-    //     require(
-    //         amountsWithdrawn[_usdcLpCoinIndex] >= outAmounts[_usdcLpCoinIndex],
-    //         "Withdraw Slippage for coin 1"
-    //     );
-
-    //     (uint256 arthWithdrawnFromLp, uint256 usdcWithdrawnFromLp) = (
-    //         amountsWithdrawn[_arthLpCoinIndex],
-    //         amountsWithdrawn[_usdcLpCoinIndex]
-    //     );
-
-    //     // Swap some usdc for arth in case arth from withdraw < arth required to repay.
-    //     if (arthWithdrawnFromLp < position.arthBorrowed) {
-    //         uint256 expectedOut = liquidityPool.get_dy(
-    //             int128(uint128(_usdcLpCoinIndex)),
-    //             int128(uint128(_arthLpCoinIndex)),
-    //             usdcWithdrawnFromLp
-    //         );
-    //         uint256 out = liquidityPool.exchange(
-    //             int128(uint128(_usdcLpCoinIndex)),
-    //             int128(uint128(_arthLpCoinIndex)),
-    //             usdcWithdrawnFromLp,
-    //             expectedOut,
-    //             _me
-    //         );
-    //         require(out >= expectedOut, "USDC to ARTH swap slippage");
-    //     }
-
-    //     // 3. Repay arth borrowed from lending pool.
-    //     require(
-    //         lendingPool.repay(_arth, position.arthBorrowed, position.interestRateMode, _me) ==
-    //             position.arthBorrowed,
-    //         "ARTH repay != borrowed"
-    //     );
-
-    //     // 4. Withdraw usdc supplied to lending pool.
-    //     uint256 usdcWithdrawn = lendingPool.withdraw(_usdc, position.usdcSupplied, _me);
-    //     require(usdcWithdrawn >= position.usdcSupplied, "Slippage with withdrawing usdc");
-
-    //     // Send the dust back to the sender
-    //     _flush(who);
-    //     emit Withdrawal(who, position.totalUsdc);
-    // }
+        // Send the dust back to the treasury (revenue)
+        _flush(treasury);
+    }
 
     function _flush(address to) internal {
         uint256 arthBalance = arth.balanceOf(_me);
@@ -183,10 +153,6 @@ contract ARTHUSDCCurveLP is VersionedInitializable, StakingRewardsChild {
 
         uint256 usdcBalance = usdc.balanceOf(_me);
         if (usdcBalance > 0) assert(usdc.transfer(to, usdcBalance));
-    }
-
-    function flush(address to) external {
-        _flush(to);
     }
 
     /// @dev in case admin needs to execute some calls directly

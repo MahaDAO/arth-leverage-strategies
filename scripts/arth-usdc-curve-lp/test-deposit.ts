@@ -1,6 +1,6 @@
+/* eslint-disable node/no-missing-import */
 import hre, { ethers } from "hardhat";
 import { BigNumber } from "ethers";
-// eslint-disable-next-line node/no-missing-import
 import * as config from "./constants";
 import { deployOrLoadAndVerify } from "../utils";
 
@@ -43,35 +43,23 @@ async function main() {
             config.lendingPoolAddr, // address _lendingPool,
             config.stableSwapAddr, // address _liquidityPool,
             86400 * 30, // uint256 _rewardsDuration,
-            deployer.address, // address _operator,
+            config.priceFeedAddr, // address _priceFeed,
             deployer.address, // address _treasury,
             deployer.address // address _owner
         )
     ).wait();
 
-    console.log("Opening position", whale.address);
-
+    console.log("ppening position", whale.address);
     const usdc = await ethers.getContractAt("IERC20", config.usdcAddr);
+    await usdc.connect(whale).approve(instance.address, e18);
+    await instance.connect(whale).deposit(e6.mul(100), 0);
 
-    await (await usdc.connect(whale).approve(instance.address, BigNumber.from(10).pow(30))).wait();
+    console.log("position", await instance.positions(whale.address));
 
-    console.log(
-        "USDC balance",
-        (await usdc.balanceOf(whale.address)).toString(),
-        BigNumber.from(10).pow(18).mul(75).div(100).toString()
-    );
+    console.log("closing position", whale.address);
+    await instance.connect(whale).withdraw();
 
-    const params = {
-        arthToBorrow: e18.mul(100),
-        totalUsdcSupplied: e6.mul(500),
-        minUsdcInLp: 0,
-        minArthInLp: 0,
-        minLiquidityReceived: 0,
-        // lendingReferralCode: 0,
-        interestRateMode: 1
-    };
-
-    await instance.connect(whale).deposit(params);
+    console.log("position", await instance.positions(whale.address));
 }
 
 // We recommend this pattern to be able to use async/await everywhere
