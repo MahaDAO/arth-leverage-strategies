@@ -2,14 +2,8 @@
 pragma solidity ^0.8.0;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
-
-import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import {IBorrowerOperations} from "../../interfaces/IBorrowerOperations.sol";
-import {StakingRewardsChild} from "../../staking/StakingRewardsChild.sol";
-import {IPriceFeed} from "../../interfaces/IPriceFeed.sol";
-import {Multicall} from "../../utils/Multicall.sol";
 import {ILendingPool} from "../../interfaces/ILendingPool.sol";
+import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {console} from "hardhat/console.sol";
 import {IStableSwap} from "../../interfaces/IStableSwap.sol";
 
@@ -37,7 +31,6 @@ library ARTHUSDCCurveLogic {
         uint256 minArthInLp;
         uint256 minLiquidityReceived;
         uint256 interestRateMode;
-        uint16 lendingReferralCode;
     }
 
     struct DepositParams {
@@ -54,80 +47,48 @@ library ARTHUSDCCurveLogic {
     function deposit(
         mapping(address => Position) storage positions,
         address who,
-        DepositInputParams memory input,
-        DepositParams memory pramas
+        DepositInputParams memory i,
+        DepositParams memory p
     ) external {
+        console.log("in deposit");
         // 1. Check that position is not already open.
         require(!positions[who].isActive, "Position already open");
 
-        // 2. Pull usdc for lending pool and lp form the msg.sender.
-        bool hasPulledUsdc = pramas.usdc.transferFrom(
-            msg.sender,
-            pramas.me,
-            input.totalUsdcSupplied
-        );
-        require(hasPulledUsdc, "USDC pull failed");
-
         // 3. Calculate usdc amount for pools.
-        uint256 _usdcToLendingPool = input.totalUsdcSupplied.div(2);
-        uint256 _usdcToLiquidityPool = input.totalUsdcSupplied.sub(_usdcToLendingPool);
+        uint256 _usdcToLendingPool = i.totalUsdcSupplied.div(2);
+        uint256 _usdcToLiquidityPool = i.totalUsdcSupplied.sub(_usdcToLendingPool);
 
         // Supply usdc to the lending pool.
-        uint256 usdcBeforeSupplying = pramas.usdc.balanceOf(pramas.me);
-        pramas.lendingPool.supply(
-            address(pramas.usdc),
-            _usdcToLendingPool,
-            pramas.me, // On behalf of this contract.
-            input.lendingReferralCode
-        );
-        uint256 usdcAfterSupplying = pramas.usdc.balanceOf(pramas.me);
-        require(
-            usdcBeforeSupplying.sub(usdcAfterSupplying) == _usdcToLendingPool,
-            "Slippage while supplying USDC"
-        );
+        p.lendingPool.supply(address(p.usdc), _usdcToLendingPool, p.me, 0);
+        console.log("usdc deposited in mahalend", _usdcToLendingPool);
 
         // Borrow ARTH.
-        uint256 arthBeforeBorrowing = pramas.arth.balanceOf(pramas.me);
-        pramas.lendingPool.borrow(
-            address(pramas.arth),
-            input.arthToBorrow,
-            input.interestRateMode,
-            input.lendingReferralCode,
-            pramas.me
-        );
-        uint256 arthAfterBorrowing = pramas.arth.balanceOf(pramas.me);
-        uint256 arthBorrowed = arthAfterBorrowing.sub(arthBeforeBorrowing);
-        require(arthBorrowed == input.arthToBorrow, "Slippage while borrowing ARTH");
+        p.lendingPool.borrow(address(p.arth), i.arthToBorrow, i.interestRateMode, 0, p.me);
 
         // Supply to curve lp pool.
         uint256[] memory inAmounts = new uint256[](2);
-        inAmounts[pramas.arthLpCoinIndex] = arthBorrowed;
-        inAmounts[pramas.usdcLpCoinIndex] = _usdcToLiquidityPool;
-        uint256 liquidityReceived = pramas.stableswap.add_liquidity(
+        inAmounts[p.arthLpCoinIndex] = i.arthToBorrow;
+        inAmounts[p.usdcLpCoinIndex] = _usdcToLiquidityPool;
+        uint256 liquidityReceived = p.stableswap.add_liquidity(
             inAmounts,
-            input.minLiquidityReceived,
+            i.minLiquidityReceived,
             false,
-            pramas.me
+            p.me
         );
-
-        // Record the staking in the staking contract for maha rewards
-        // _stake(who, pramas.totalUsdcSupplied);
 
         // Record the position.
         positions[who] = Position({
             isActive: true,
-            arthBorrowed: arthBorrowed,
+            arthBorrowed: i.arthToBorrow,
             usdcSupplied: _usdcToLendingPool,
             usdcInLp: _usdcToLiquidityPool,
-            arthInLp: arthBorrowed,
+            arthInLp: i.arthToBorrow,
             liquidity: liquidityReceived,
-            totalUsdc: input.totalUsdcSupplied,
-            interestRateMode: input.interestRateMode
+            totalUsdc: i.totalUsdcSupplied,
+            interestRateMode: i.interestRateMode
         });
 
-        // Send the dust back to the address that gave the funds.
-        // _flush(msg.sender);
-        emit Deposit(who, input.totalUsdcSupplied);
+        emit Deposit(who, i.totalUsdcSupplied);
     }
 
     // function withdraw(address who) external {

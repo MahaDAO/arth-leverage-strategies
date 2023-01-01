@@ -3,21 +3,15 @@ pragma solidity ^0.8.0;
 
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {VersionedInitializable} from "../../proxy/VersionedInitializable.sol";
 
-import {IBorrowerOperations} from "../../interfaces/IBorrowerOperations.sol";
 import {StakingRewardsChild} from "../../staking/StakingRewardsChild.sol";
-import {IPriceFeed} from "../../interfaces/IPriceFeed.sol";
-import {Multicall} from "../../utils/Multicall.sol";
 import {ILendingPool} from "../../interfaces/ILendingPool.sol";
 import {IStableSwap} from "../../interfaces/IStableSwap.sol";
 
 import {ARTHUSDCCurveLogic} from "./ARTHUSDCCurveLogic.sol";
 
 contract ARTHUSDCCurveLP is VersionedInitializable, StakingRewardsChild {
-    using SafeMath for uint256;
-
     event Deposit(address indexed src, uint256 wad);
     event Withdrawal(address indexed dst, uint256 wad);
 
