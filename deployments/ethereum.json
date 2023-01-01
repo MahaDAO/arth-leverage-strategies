@@ -8,5 +8,15 @@
     "abi": "TransparentUpgradeableProxy",
     "verified": true,
     "address": "0xA9735E594624339f8fbc8a99c57C13C7B4E8BCaC"
+  },
+  "ETHTroveLogic": {
+    "abi": "ETHTroveLogic",
+    "verified": true,
+    "address": "0xC27Ec472F97B5F97fe013e02c909E1551eE65361"
+  },
+  "ETHTroveLPImplV2": {
+    "abi": "ETHTroveStrategy",
+    "verified": true,
+    "address": "0x205dbeB79CaD491Ff5B5Aa9E8BA926CE4681189E"
   }
 }

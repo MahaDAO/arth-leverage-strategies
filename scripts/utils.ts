@@ -7,7 +7,8 @@ export const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, m
 export default async function verifyContract(
     hre: HardhatRuntimeEnvironment,
     address: string,
-    constructorArguments: any[]
+    constructorArguments: any[],
+    libraries: { [key: string]: string } = {}
 ) {
     try {
         // await wait(20 * 1000); // wait for 20s
@@ -15,7 +16,8 @@ export default async function verifyContract(
 
         await hre.run("verify:verify", {
             address,
-            constructorArguments
+            constructorArguments,
+            libraries
         });
     } catch (error: any) {
         if (error.name !== "NomicLabsHardhatPluginError") {
@@ -95,14 +97,15 @@ export const deployOrLoadAndVerify = async (
     key: string,
     contractName: string,
     args: any[],
-    delay: number = 5000
+    delay: number = 5000,
+    libraries: { [key: string]: string } = {}
 ) => {
-    const instance = await deployOrLoad(key, contractName, args);
+    const instance = await deployOrLoad(key, contractName, args, libraries);
 
     const outputFile = getOutput();
     if (outputFile[key] && !outputFile[key].verified) {
         await wait(delay);
-        await verifyContract(hre, instance.address, args);
+        await verifyContract(hre, instance.address, args, libraries);
         await saveABI(key, contractName, instance.address, true);
     }
 
