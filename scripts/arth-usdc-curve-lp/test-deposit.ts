@@ -40,6 +40,8 @@ async function main() {
             config.usdcAddr, // address _usdc,
             config.arthAddr, // address _arth,
             config.mahaAddr, // address _maha,
+            config.curveLp,
+            config.varDebtArth,
             config.lendingPoolAddr, // address _lendingPool,
             config.stableSwapAddr, // address _liquidityPool,
             86400 * 30, // uint256 _rewardsDuration,
@@ -49,9 +51,13 @@ async function main() {
         )
     ).wait();
 
-    console.log("ppening position", whale.address);
     const usdc = await ethers.getContractAt("IERC20", config.usdcAddr);
     await usdc.connect(whale).approve(instance.address, e18);
+
+    console.log("seeding LP", whale.address);
+    await instance.connect(whale).seedLP(e6.mul(100));
+
+    console.log("opening position", whale.address);
     await instance.connect(whale).deposit(e6.mul(100), 0);
 
     console.log("position", await instance.positions(whale.address));
@@ -60,6 +66,8 @@ async function main() {
     await instance.connect(whale).withdraw();
 
     console.log("position", await instance.positions(whale.address));
+    console.log("usdc bal treasury", await usdc.balanceOf(config.treasury));
+    console.log("usdc bal whale", await usdc.balanceOf(whale.address));
 }
 
 // We recommend this pattern to be able to use async/await everywhere

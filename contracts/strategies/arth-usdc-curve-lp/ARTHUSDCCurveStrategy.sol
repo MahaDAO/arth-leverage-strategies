@@ -21,6 +21,8 @@ contract ARTHUSDCCurveLP is VersionedInitializable, StakingRewardsChild {
     mapping(address => ARTHUSDCCurveLogic.Position) public positions;
 
     IERC20 public arth;
+    IERC20 public lp;
+    IERC20 public varDebtArth;
     IERC20 public usdc;
     ILendingPool public lendingPool;
     IStableSwap public liquidityPool;
@@ -29,10 +31,15 @@ contract ARTHUSDCCurveLP is VersionedInitializable, StakingRewardsChild {
     /// @notice all revenue gets sent over here.
     address public treasury;
 
+    uint256 totalUsdcSupplied;
+    uint256 totalArthBorrowed;
+
     function initialize(
         address _usdc,
         address _arth,
         address _maha,
+        address _lp,
+        address _varDebtArth,
         address _lendingPool,
         address _liquidityPool,
         uint256 _rewardsDuration,
@@ -42,6 +49,8 @@ contract ARTHUSDCCurveLP is VersionedInitializable, StakingRewardsChild {
     ) external initializer {
         arth = IERC20(_arth);
         usdc = IERC20(_usdc);
+        lp = IERC20(_lp);
+        varDebtArth = IERC20(_varDebtArth);
         lendingPool = ILendingPool(_lendingPool);
         liquidityPool = IStableSwap(_liquidityPool);
         priceFeed = IPriceFeed(_priceFeed);
@@ -59,6 +68,12 @@ contract ARTHUSDCCurveLP is VersionedInitializable, StakingRewardsChild {
 
         // allow the strategy to borrow upto 97% LTV
         lendingPool.setUserEMode(1);
+    }
+
+    function seedLP(uint256 usdcToLiquidityPool) external {
+        usdc.transferFrom(msg.sender, _me, usdcToLiquidityPool);
+        uint256[2] memory inAmounts = [0, usdcToLiquidityPool];
+        liquidityPool.add_liquidity(inAmounts, 0);
     }
 
     function deposit(uint256 usdcSupplied, uint256 minLiquidityReceived) external {
@@ -97,7 +112,7 @@ contract ARTHUSDCCurveLP is VersionedInitializable, StakingRewardsChild {
     ) internal nonReentrant {
         usdc.transferFrom(who, _me, usdcSupplied);
 
-        ARTHUSDCCurveLogic.deposit(
+        uint256 _totalArthBorrowed = ARTHUSDCCurveLogic.deposit(
             positions,
             who,
             usdcSupplied,
@@ -105,7 +120,6 @@ contract ARTHUSDCCurveLP is VersionedInitializable, StakingRewardsChild {
             lockDuration,
             ARTHUSDCCurveLogic.DepositParams({
                 me: _me, // address me;
-                treasury: treasury, // address treasury;
                 usdc: usdc, // IERC20 usdc;
                 arth: arth, // IERC20 arth;
                 lendingPool: lendingPool, // ILendingPool lendingPool;
@@ -113,6 +127,9 @@ contract ARTHUSDCCurveLP is VersionedInitializable, StakingRewardsChild {
                 priceFeed: priceFeed
             })
         );
+
+        totalArthBorrowed += _totalArthBorrowed;
+        totalUsdcSupplied += usdcSupplied;
 
         // Record the staking in the staking contract for maha rewards
         _stake(who, usdcSupplied);
@@ -129,22 +146,28 @@ contract ARTHUSDCCurveLP is VersionedInitializable, StakingRewardsChild {
         // Record the staking in the staking contract for maha rewards
         _withdraw(who, positions[who].usdcSupplied);
 
+        uint256 _usdcSupplied = positions[who].totalUsdc;
+        uint256 _totalArthBorrowed = positions[who].arthBorrowed;
+
         ARTHUSDCCurveLogic.withdraw(
             positions,
             who,
-            ARTHUSDCCurveLogic.DepositParams({
+            ARTHUSDCCurveLogic.WithdrawParams({
                 me: _me, // address me;
                 treasury: treasury, // address treasury;
                 usdc: usdc, // IERC20 usdc;
                 arth: arth, // IERC20 arth;
+                lp: lp,
+                totalArthBorrowed: totalArthBorrowed,
+                totalUsdcSupplied: totalUsdcSupplied,
+                varDebtArth: varDebtArth,
                 lendingPool: lendingPool, // ILendingPool lendingPool;
-                stableswap: liquidityPool, // IStableSwap stableswap;
-                priceFeed: priceFeed
+                stableswap: liquidityPool // IStableSwap stableswap;
             })
         );
 
-        // Send the dust back to the treasury (revenue)
-        _flush(treasury);
+        totalArthBorrowed -= _totalArthBorrowed;
+        totalUsdcSupplied -= _usdcSupplied;
     }
 
     function _flush(address to) internal {

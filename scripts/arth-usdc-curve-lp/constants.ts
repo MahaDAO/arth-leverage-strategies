@@ -16,3 +16,6 @@ export const stableSwapAddr = "0xB4018CB02E264C3FCfe0f21A1F5cfbCAAba9F61F";
 export const treasury = "0x9032F1Bd0cc645Fde1b41941990dA85f265A7623";
 export const gnosisSafe = "0x6357EDbfE5aDA570005ceB8FAd3139eF5A8863CC";
 export const gnosisProxy = "0x6357EDbfE5aDA570005ceB8FAd3139eF5A8863CC";
+
+export const varDebtArth = "0x93c457512aAe663F36e555d2ad62E1dEe9d91836";
+export const curveLp = "0xdf34bad1D3B16c8F28c9Cf95f15001949243A038";
