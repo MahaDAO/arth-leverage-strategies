@@ -71,7 +71,7 @@ export const deployOrLoad = async (
     key: string,
     contractName: string,
     args: any[],
-    libraries: FactoryOptions = {}
+    options: FactoryOptions = {}
 ) => {
     const addr = await getOutputAddress(key);
     if (addr) {
@@ -84,7 +84,7 @@ export const deployOrLoad = async (
     const gasPrice = estimateGasPrice.mul(5).div(4);
 
     console.log(`\ndeploying ${key} at ${ethers.utils.formatUnits(gasPrice, `gwei`)} gwei`);
-    const factory = await ethers.getContractFactory(contractName, libraries);
+    const factory = await ethers.getContractFactory(contractName, options);
     const instance = await factory.deploy(...args, { gasPrice });
     await instance.deployed();
     console.log(`${instance.address} -> tx hash: ${instance.deployTransaction.hash}`);
@@ -100,7 +100,7 @@ export const deployOrLoadAndVerify = async (
     delay: number = 5000,
     libraries: { [key: string]: string } = {}
 ) => {
-    const instance = await deployOrLoad(key, contractName, args, libraries);
+    const instance = await deployOrLoad(key, contractName, args, { libraries });
 
     const outputFile = getOutput();
     if (outputFile[key] && !outputFile[key].verified) {

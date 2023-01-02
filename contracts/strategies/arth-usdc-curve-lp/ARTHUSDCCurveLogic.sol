@@ -4,9 +4,10 @@ pragma solidity ^0.8.0;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ILendingPool} from "../../interfaces/ILendingPool.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import {console} from "hardhat/console.sol";
 import {IStableSwap} from "../../interfaces/IStableSwap.sol";
 import {IPriceFeed} from "../../interfaces/IPriceFeed.sol";
+
+// import {console} from "hardhat/console.sol";
 
 library ARTHUSDCCurveLogic {
     using SafeMath for uint256;
@@ -54,7 +55,6 @@ library ARTHUSDCCurveLogic {
         uint64 lockDuration,
         DepositParams memory p
     ) external returns (uint256 arthBorrowed) {
-        console.log("in deposit");
         // 1. Check that position is not already open.
         require(positions[who].depositedAt == 0, "position open");
 
@@ -62,25 +62,25 @@ library ARTHUSDCCurveLogic {
         // LTV = 95% -> 51.282051% into lending
         uint256 usdcToLendingPool = totalUsdc.mul(51282051).div(100000000); // 51% into lending
         uint256 usdcToLiquidityPool = totalUsdc.sub(usdcToLendingPool);
-        console.log("usdcToLendingPool", usdcToLendingPool);
-        console.log("usdcToLiquidityPool", usdcToLiquidityPool);
+        // console.log("usdcToLendingPool", usdcToLendingPool);
+        // console.log("usdcToLiquidityPool", usdcToLiquidityPool);
 
         // 3. Supply usdc to the lending pool.
         p.lendingPool.supply(address(p.usdc), usdcToLendingPool, p.me, 0);
-        console.log("usdc deposited in mahalend", usdcToLendingPool);
+        // console.log("usdc deposited in mahalend", usdcToLendingPool);
 
         // 4. Borrow ARTH at a 95% LTV
         arthBorrowed = usdcToLendingPool.mul(95e30).div(p.priceFeed.fetchPrice()).div(100);
-        console.log("borrowing arth", arthBorrowed);
+        // console.log("borrowing arth", arthBorrowed);
         p.lendingPool.borrow(address(p.arth), arthBorrowed, 2, 0, p.me);
-        console.log("borrowed arth");
+        // console.log("borrowed arth");
 
         // 5. Supply to curve lp pool.
-        console.log("supplying to curve");
-        console.log("usdc", usdcToLiquidityPool);
+        // console.log("supplying to curve");
+        // console.log("usdc", usdcToLiquidityPool);
         uint256[2] memory inAmounts = [arthBorrowed, usdcToLiquidityPool];
         uint256 lpTokensMinted = p.stableswap.add_liquidity(inAmounts, minLiquidityReceived);
-        console.log("supplied to curve");
+        // console.log("supplied to curve");
 
         // 6. Record the position.
         positions[who] = Position({

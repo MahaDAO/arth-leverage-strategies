@@ -12,7 +12,7 @@ import {IPriceFeed} from "../../interfaces/IPriceFeed.sol";
 
 import {ARTHUSDCCurveLogic} from "./ARTHUSDCCurveLogic.sol";
 
-contract ARTHUSDCCurveLP is VersionedInitializable, StakingRewardsChild {
+contract ARTHUSDCCurveStrategy is VersionedInitializable, StakingRewardsChild {
     event Deposit(address indexed src, uint256 wad);
     event Withdrawal(address indexed dst, uint256 wad);
 
@@ -31,8 +31,12 @@ contract ARTHUSDCCurveLP is VersionedInitializable, StakingRewardsChild {
     /// @notice all revenue gets sent over here.
     address public treasury;
 
-    uint256 totalUsdcSupplied;
-    uint256 totalArthBorrowed;
+    uint64 public minLockDuration;
+    uint64 public minLockDurationForPermit;
+
+    uint256 public minDepositForPermit;
+    uint256 public totalUsdcSupplied;
+    uint256 public totalArthBorrowed;
 
     function initialize(
         address _usdc,
@@ -66,6 +70,9 @@ contract ARTHUSDCCurveLP is VersionedInitializable, StakingRewardsChild {
         _stakingRewardsChildInit(_maha, _rewardsDuration, _owner);
         _transferOwnership(_owner);
 
+        minLockDuration = 86400 * 5; // 5 day lock
+        minLockDurationForPermit = 86400 * 30; // 30 day lock
+
         // allow the strategy to borrow upto 97% LTV
         lendingPool.setUserEMode(1);
     }
@@ -77,12 +84,7 @@ contract ARTHUSDCCurveLP is VersionedInitializable, StakingRewardsChild {
     }
 
     function deposit(uint256 usdcSupplied, uint256 minLiquidityReceived) external {
-        _deposit(
-            msg.sender,
-            usdcSupplied,
-            minLiquidityReceived,
-            86400 * 30 // 30 day lock
-        );
+        _deposit(msg.sender, usdcSupplied, minLiquidityReceived, minLockDuration);
     }
 
     function depositWithPermit(
@@ -95,13 +97,9 @@ contract ARTHUSDCCurveLP is VersionedInitializable, StakingRewardsChild {
         uint256 usdcSupplied,
         uint256 minLiquidityReceived
     ) external {
+        require(value >= minDepositForPermit, "!minDepositForPermit");
         IERC20Permit(address(usdc)).permit(who, _me, value, deadline, v, r, s);
-        _deposit(
-            who,
-            usdcSupplied,
-            minLiquidityReceived,
-            86400 * 30 // 30 day lock
-        );
+        _deposit(who, usdcSupplied, minLiquidityReceived, minLockDurationForPermit);
     }
 
     function _deposit(
@@ -133,9 +131,6 @@ contract ARTHUSDCCurveLP is VersionedInitializable, StakingRewardsChild {
 
         // Record the staking in the staking contract for maha rewards
         _stake(who, usdcSupplied);
-
-        // // Send the dust back to the address that gave the funds.
-        // _flush(who);
     }
 
     function withdraw() external payable {

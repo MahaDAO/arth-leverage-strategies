@@ -1,4 +1,3 @@
-export const fee = "10000";
 export const mahaAddr = "0xb4d930279552397bba2ee473229f89ec245bc365";
 export const arthAddr = "0x8CC0F052fff7eaD7f2EdCCcaC895502E884a8a71";
 export const usdcAddr = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
