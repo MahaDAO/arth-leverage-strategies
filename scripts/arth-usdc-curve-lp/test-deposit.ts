@@ -46,7 +46,7 @@ async function main() {
             config.stableSwapAddr, // address _liquidityPool,
             86400 * 30, // uint256 _rewardsDuration,
             config.priceFeedAddr, // address _priceFeed,
-            deployer.address, // address _treasury,
+            config.treasury, // address _treasury,
             deployer.address // address _owner
         )
     ).wait();

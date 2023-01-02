@@ -13,11 +13,7 @@ import {IPriceFeed} from "../../interfaces/IPriceFeed.sol";
 import {ARTHUSDCCurveLogic} from "./ARTHUSDCCurveLogic.sol";
 
 contract ARTHUSDCCurveStrategy is VersionedInitializable, StakingRewardsChild {
-    event Deposit(address indexed src, uint256 wad);
-    event Withdrawal(address indexed dst, uint256 wad);
-
     address private _me;
-
     mapping(address => ARTHUSDCCurveLogic.Position) public positions;
 
     IERC20 public arth;
@@ -34,6 +30,7 @@ contract ARTHUSDCCurveStrategy is VersionedInitializable, StakingRewardsChild {
     uint64 public minLockDuration;
     uint64 public minLockDurationForPermit;
 
+    uint256 public withdrawalPenalty;
     uint256 public minDepositForPermit;
     uint256 public totalUsdcSupplied;
     uint256 public totalArthBorrowed;
@@ -70,8 +67,9 @@ contract ARTHUSDCCurveStrategy is VersionedInitializable, StakingRewardsChild {
         _stakingRewardsChildInit(_maha, _rewardsDuration, _owner);
         _transferOwnership(_owner);
 
-        minLockDuration = 86400 * 5; // 5 day lock
-        minLockDurationForPermit = 86400 * 30; // 30 day lock
+        minDepositForPermit = 1000 * 1e6; // min 1000$ for gasless tx's
+        minLockDuration = 86400 * 5; // 5 day lock for normal deposits
+        minLockDurationForPermit = 86400 * 30; // 30 day lock for gasless deposits
 
         // allow the strategy to borrow upto 97% LTV
         lendingPool.setUserEMode(1);
@@ -165,12 +163,16 @@ contract ARTHUSDCCurveStrategy is VersionedInitializable, StakingRewardsChild {
         totalUsdcSupplied -= _usdcSupplied;
     }
 
-    function _flush(address to) internal {
-        uint256 arthBalance = arth.balanceOf(_me);
-        if (arthBalance > 0) assert(arth.transfer(to, arthBalance));
-
-        uint256 usdcBalance = usdc.balanceOf(_me);
-        if (usdcBalance > 0) assert(usdc.transfer(to, usdcBalance));
+    function setStrategyParams(
+        uint256 _withdrawalPenalty,
+        uint256 _minDepositForPermit,
+        uint256 _totalUsdcSupplied,
+        uint256 _totalArthBorrowed
+    ) external onlyOwner {
+        withdrawalPenalty = _withdrawalPenalty;
+        minDepositForPermit = _minDepositForPermit;
+        totalUsdcSupplied = _totalUsdcSupplied;
+        totalArthBorrowed = _totalArthBorrowed;
     }
 
     /// @dev in case admin needs to execute some calls directly
