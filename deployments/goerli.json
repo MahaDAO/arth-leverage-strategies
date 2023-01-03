@@ -1,0 +1,17 @@
+{
+  "MAHA": {
+    "abi": "MockERC20Permit",
+    "verified": true,
+    "address": "0x5b46703bdf45000Df3bE0E4728EbcAd528015770"
+  },
+  "USDC": {
+    "abi": "MockERC20Permit",
+    "verified": true,
+    "address": "0x835a468B921C0568E3017bA75D61968C823E7F58"
+  },
+  "ARTHUSDCCurveStrategyTestnet": {
+    "abi": "ARTHUSDCCurveStrategyTestnet",
+    "verified": true,
+    "address": "0xf790e96301bB8E5E141F16Ae4dDBe244074bFFDC"
+  }
+}

@@ -137,7 +137,7 @@ contract ARTHUSDCCurveStrategy is VersionedInitializable, StakingRewardsChild {
 
     function _withdraw(address who) internal nonReentrant {
         // Record the staking in the staking contract for maha rewards
-        _withdraw(who, positions[who].usdcSupplied);
+        _withdraw(who, positions[who].totalUsdc);
 
         uint256 _usdcSupplied = positions[who].totalUsdc;
         uint256 _totalArthBorrowed = positions[who].arthBorrowed;
