@@ -9,7 +9,7 @@ async function main() {
     const usdc = await deployOrLoadAndVerify("USDC", "MockERC20Permit", ["USDC", "USDC", 6]);
     const maha = await deployOrLoadAndVerify("MAHA", "MockERC20Permit", ["MAHA", "MAHA", 18]);
 
-    await deployOrLoadAndVerify("ARTHUSDCCurveStrategyTestnet", "ARTHUSDCCurveStrategyTestnet", [
+    await deployOrLoadAndVerify("USDCCurveStrategyTestnet", "USDCCurveStrategyTestnet", [
         usdc.address, // address _usdc,
         maha.address, // address _maha,
         86400 * 30, // uint256 _rewardsDuration,

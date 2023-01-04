@@ -7,24 +7,20 @@ async function main() {
     const deployer = (await ethers.getSigners())[0];
 
     console.log("Deploying ETHTroveLogic...");
-    const ARTHUSDCCurveLogic = await deployOrLoadAndVerify(
-        "ARTHUSDCCurveLogic",
-        "ARTHUSDCCurveLogic",
-        []
-    );
+    const USDCCurveLogic = await deployOrLoadAndVerify("USDCCurveLogic", "USDCCurveLogic", []);
 
-    const libraries = { ARTHUSDCCurveLogic: ARTHUSDCCurveLogic.address };
+    const libraries = { USDCCurveLogic: USDCCurveLogic.address };
 
     const implementation = await deployOrLoadAndVerify(
-        "ARTHUSDCCurveStrategyInstance",
-        "ARTHUSDCCurveStrategy",
+        "USDCCurveStrategyInstance",
+        "USDCCurveStrategy",
         [],
         4000,
         libraries
     );
 
-    const ARTHUSDCCurveLP = await ethers.getContractFactory("ARTHUSDCCurveStrategy", { libraries });
-    const initDecode = ARTHUSDCCurveLP.interface.encodeFunctionData("initialize", [
+    const USDCCurveLP = await ethers.getContractFactory("USDCCurveStrategy", { libraries });
+    const initDecode = USDCCurveLP.interface.encodeFunctionData("initialize", [
         config.usdcAddr, // address _usdc,
         config.arthAddr, // address _arth,
         config.mahaAddr, // address _maha,
@@ -38,13 +34,13 @@ async function main() {
         deployer.address // address _owner
     ]);
 
-    const proxy = await deployOrLoadAndVerify(
-        "ARTHUSDCCurveStrategy",
-        "TransparentUpgradeableProxy",
-        [implementation.address, config.gnosisProxy, initDecode]
-    );
+    const proxy = await deployOrLoadAndVerify("USDCCurveStrategy", "TransparentUpgradeableProxy", [
+        implementation.address,
+        config.gnosisProxy,
+        initDecode
+    ]);
 
-    console.log("ARTHUSDCCurveStrategy deployed at", proxy.address);
+    console.log("USDCCurveStrategy deployed at", proxy.address);
 }
 
 // We recommend this pattern to be able to use async/await everywhere

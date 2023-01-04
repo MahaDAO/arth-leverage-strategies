@@ -7,7 +7,7 @@ import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {VersionedInitializable} from "../../proxy/VersionedInitializable.sol";
 import {StakingRewardsChild} from "../../staking/StakingRewardsChild.sol";
 
-contract ARTHUSDCCurveStrategyTestnet is VersionedInitializable, StakingRewardsChild {
+contract USDCCurveStrategyTestnet is VersionedInitializable, StakingRewardsChild {
     using SafeMath for uint256;
 
     struct Position {

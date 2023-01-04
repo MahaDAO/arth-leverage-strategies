@@ -10,11 +10,11 @@ import {ILendingPool} from "../../interfaces/ILendingPool.sol";
 import {IStableSwap} from "../../interfaces/IStableSwap.sol";
 import {IPriceFeed} from "../../interfaces/IPriceFeed.sol";
 
-import {ARTHUSDCCurveLogic} from "./ARTHUSDCCurveLogic.sol";
+import {USDCCurveLogic} from "./USDCCurveLogic.sol";
 
-contract ARTHUSDCCurveStrategy is VersionedInitializable, StakingRewardsChild {
+contract USDCCurveStrategy is VersionedInitializable, StakingRewardsChild {
     address private _me;
-    mapping(address => ARTHUSDCCurveLogic.Position) public positions;
+    mapping(address => USDCCurveLogic.Position) public positions;
 
     IERC20 public arth;
     IERC20 public lp;
@@ -108,13 +108,13 @@ contract ARTHUSDCCurveStrategy is VersionedInitializable, StakingRewardsChild {
     ) internal nonReentrant {
         usdc.transferFrom(who, _me, usdcSupplied);
 
-        uint256 _totalArthBorrowed = ARTHUSDCCurveLogic.deposit(
+        uint256 _totalArthBorrowed = USDCCurveLogic.deposit(
             positions,
             who,
             usdcSupplied,
             minLiquidityReceived,
             lockDuration,
-            ARTHUSDCCurveLogic.DepositParams({
+            USDCCurveLogic.DepositParams({
                 me: _me, // address me;
                 usdc: usdc, // IERC20 usdc;
                 arth: arth, // IERC20 arth;
@@ -142,10 +142,10 @@ contract ARTHUSDCCurveStrategy is VersionedInitializable, StakingRewardsChild {
         uint256 _usdcSupplied = positions[who].totalUsdc;
         uint256 _totalArthBorrowed = positions[who].arthBorrowed;
 
-        ARTHUSDCCurveLogic.withdraw(
+        USDCCurveLogic.withdraw(
             positions,
             who,
-            ARTHUSDCCurveLogic.WithdrawParams({
+            USDCCurveLogic.WithdrawParams({
                 me: _me, // address me;
                 treasury: treasury, // address treasury;
                 usdc: usdc, // IERC20 usdc;

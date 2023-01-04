@@ -7,7 +7,7 @@ import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {IStableSwap} from "../../interfaces/IStableSwap.sol";
 import {IPriceFeed} from "../../interfaces/IPriceFeed.sol";
 
-library ARTHUSDCCurveLogic {
+library USDCCurveLogic {
     using SafeMath for uint256;
 
     event Deposit(address indexed src, uint256 wad);

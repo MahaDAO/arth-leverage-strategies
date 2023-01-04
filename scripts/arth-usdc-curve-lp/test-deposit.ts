@@ -18,21 +18,17 @@ async function main() {
     const whale = await ethers.getSigner("0xf977814e90da44bfa03b6295a0616a897441acec");
 
     console.log("Deploying ETHTroveLogic...");
-    const ARTHUSDCCurveLogic = await deployOrLoadAndVerify(
-        "ARTHUSDCCurveLogic",
-        "ARTHUSDCCurveLogic",
-        []
-    );
+    const USDCCurveLogic = await deployOrLoadAndVerify("USDCCurveLogic", "USDCCurveLogic", []);
 
-    const ARTHUSDCCurveLP = await ethers.getContractFactory("ARTHUSDCCurveLP", {
-        libraries: { ARTHUSDCCurveLogic: ARTHUSDCCurveLogic.address }
+    const USDCCurveLP = await ethers.getContractFactory("USDCCurveLP", {
+        libraries: { USDCCurveLogic: USDCCurveLogic.address }
     });
 
     console.log("Deploying contract");
-    const instance = await ARTHUSDCCurveLP.deploy();
+    const instance = await USDCCurveLP.deploy();
     console.log("Tx submitted");
     await instance.deployed();
-    console.log("ARTHUSDCCurveLP deployed to:", instance.address);
+    console.log("USDCCurveLP deployed to:", instance.address);
 
     console.log("Initializing...");
     (
