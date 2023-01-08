@@ -21,7 +21,7 @@ contract USDCCurveStrategy is VersionedInitializable, StakingRewardsChild {
     IERC20 public varDebtArth;
     IERC20 public usdc;
     ILendingPool public lendingPool;
-    IStableSwap public liquidityPool;
+    IStableSwap public stableswap;
     IPriceFeed priceFeed;
 
     /// @notice all revenue gets sent over here.
@@ -42,7 +42,7 @@ contract USDCCurveStrategy is VersionedInitializable, StakingRewardsChild {
         address _lp,
         address _varDebtArth,
         address _lendingPool,
-        address _liquidityPool,
+        address _stableswap,
         uint256 _rewardsDuration,
         address _priceFeed,
         address _treasury,
@@ -53,7 +53,7 @@ contract USDCCurveStrategy is VersionedInitializable, StakingRewardsChild {
         lp = IERC20(_lp);
         varDebtArth = IERC20(_varDebtArth);
         lendingPool = ILendingPool(_lendingPool);
-        liquidityPool = IStableSwap(_liquidityPool);
+        stableswap = IStableSwap(_stableswap);
         priceFeed = IPriceFeed(_priceFeed);
 
         treasury = _treasury;
@@ -61,8 +61,8 @@ contract USDCCurveStrategy is VersionedInitializable, StakingRewardsChild {
 
         usdc.approve(_lendingPool, type(uint256).max);
         arth.approve(_lendingPool, type(uint256).max);
-        usdc.approve(_liquidityPool, type(uint256).max);
-        arth.approve(_liquidityPool, type(uint256).max);
+        usdc.approve(_stableswap, type(uint256).max);
+        arth.approve(_stableswap, type(uint256).max);
 
         _stakingRewardsChildInit(_maha, _rewardsDuration, _owner);
         _transferOwnership(_owner);
@@ -75,10 +75,10 @@ contract USDCCurveStrategy is VersionedInitializable, StakingRewardsChild {
         lendingPool.setUserEMode(1);
     }
 
-    function seedLP(uint256 usdcToLiquidityPool) external {
-        usdc.transferFrom(msg.sender, _me, usdcToLiquidityPool);
-        uint256[2] memory inAmounts = [0, usdcToLiquidityPool];
-        liquidityPool.add_liquidity(inAmounts, 0);
+    function seedLP(uint256 usdcAmt) external {
+        usdc.transferFrom(msg.sender, _me, usdcAmt);
+        uint256[2] memory inAmounts = [0, usdcAmt];
+        stableswap.add_liquidity(inAmounts, 0);
     }
 
     function deposit(uint256 usdcSupplied, uint256 minLiquidityReceived) external {
@@ -119,7 +119,7 @@ contract USDCCurveStrategy is VersionedInitializable, StakingRewardsChild {
                 usdc: usdc, // IERC20 usdc;
                 arth: arth, // IERC20 arth;
                 lendingPool: lendingPool, // ILendingPool lendingPool;
-                stableswap: liquidityPool, // IStableSwap stableswap;
+                stableswap: stableswap, // IStableSwap stableswap;
                 priceFeed: priceFeed
             })
         );
@@ -155,7 +155,7 @@ contract USDCCurveStrategy is VersionedInitializable, StakingRewardsChild {
                 totalUsdcSupplied: totalUsdcSupplied,
                 varDebtArth: varDebtArth,
                 lendingPool: lendingPool, // ILendingPool lendingPool;
-                stableswap: liquidityPool // IStableSwap stableswap;
+                stableswap: stableswap // IStableSwap stableswap;
             })
         );
 
@@ -183,5 +183,14 @@ contract USDCCurveStrategy is VersionedInitializable, StakingRewardsChild {
 
     function getRevision() public pure virtual override returns (uint256) {
         return 0;
+    }
+
+    function minLiquidityReceived(uint256 usdcSupplied, uint256 arthPrice)
+        public
+        view
+        virtual
+        returns (uint256)
+    {
+        return USDCCurveLogic.minLiquidityReceived(usdcSupplied, arthPrice, stableswap);
     }
 }

@@ -1,5 +1,5 @@
 export const fee = "10000";
-export const mahaAddr = "0xb4d930279552397bba2ee473229f89ec245bc365";
+export const mahaAddr = "0x745407c86df8db893011912d3ab28e68b62e49b0";
 export const arthAddr = "0x8CC0F052fff7eaD7f2EdCCcaC895502E884a8a71";
 export const wethAddr = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";

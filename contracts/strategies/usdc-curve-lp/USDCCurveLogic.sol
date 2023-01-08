@@ -132,4 +132,18 @@ library USDCCurveLogic {
         emit Withdrawal(who, pos.totalUsdc);
         delete positions[who];
     }
+
+    function minLiquidityReceived(
+        uint256 totalUsdc,
+        uint256 price,
+        IStableSwap stableswap
+    ) public view returns (uint256) {
+        uint256 usdcToLendingPool = totalUsdc.mul(51282051).div(100000000); // 51% into lending
+        uint256 usdcToLiquidityPool = totalUsdc.sub(usdcToLendingPool);
+
+        uint256 arthBorrowed = usdcToLendingPool.mul(95e30).div(price).div(100);
+
+        uint256[2] memory outAmounts = [arthBorrowed, usdcToLiquidityPool];
+        return stableswap.calc_token_amount(outAmounts);
+    }
 }

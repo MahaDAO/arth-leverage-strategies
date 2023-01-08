@@ -17,18 +17,17 @@ async function main() {
 
     const whale = await ethers.getSigner("0xf977814e90da44bfa03b6295a0616a897441acec");
 
-    console.log("Deploying ETHTroveLogic...");
+    console.log("Deploying USDCCurveLogic...");
     const USDCCurveLogic = await deployOrLoadAndVerify("USDCCurveLogic", "USDCCurveLogic", []);
-
-    const USDCCurveLP = await ethers.getContractFactory("USDCCurveLP", {
+    const USDCCurveStrategy = await ethers.getContractFactory("USDCCurveStrategy", {
         libraries: { USDCCurveLogic: USDCCurveLogic.address }
     });
 
     console.log("Deploying contract");
-    const instance = await USDCCurveLP.deploy();
+    const instance = await USDCCurveStrategy.deploy();
     console.log("Tx submitted");
     await instance.deployed();
-    console.log("USDCCurveLP deployed to:", instance.address);
+    console.log("USDCCurveStrategy deployed to:", instance.address);
 
     console.log("Initializing...");
     (
@@ -48,20 +47,34 @@ async function main() {
     ).wait();
 
     const usdc = await ethers.getContractAt("IERC20", config.usdcAddr);
+    const arth = await ethers.getContractAt("IERC20", config.arthAddr);
+    const lp = await ethers.getContractAt("IERC20", config.curveLp);
+
     await usdc.connect(whale).approve(instance.address, e18);
+    console.log("usdc bal whale", await usdc.balanceOf(whale.address));
 
     console.log("seeding LP", whale.address);
     await instance.connect(whale).seedLP(e6.mul(100));
+    console.log("LP bal contract", await lp.balanceOf(instance.address));
 
     console.log("opening position", whale.address);
     await instance.connect(whale).deposit(e6.mul(100), 0);
 
+    console.log(
+        "minLiquidityReceived",
+        await instance.minLiquidityReceived(e6.mul(100), e18.mul(208).div(100))
+    );
     console.log("position", await instance.positions(whale.address));
+    console.log("usdc bal whale", await usdc.balanceOf(whale.address));
+    console.log("LP bal contract", await lp.balanceOf(instance.address));
 
     console.log("closing position", whale.address);
     await instance.connect(whale).withdraw();
 
     console.log("position", await instance.positions(whale.address));
+    console.log("LP bal contract", await lp.balanceOf(instance.address));
+    console.log("arth bal contract", await arth.balanceOf(instance.address));
+    console.log("usdc bal contract", await usdc.balanceOf(instance.address));
     console.log("usdc bal treasury", await usdc.balanceOf(config.treasury));
     console.log("usdc bal whale", await usdc.balanceOf(whale.address));
 }

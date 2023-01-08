@@ -33,5 +33,10 @@
     "abi": "TransparentUpgradeableProxy",
     "verified": true,
     "address": "0x5480E8BEeDb3eBA5747a4A3aEF0850a3759df9B4"
+  },
+  "ETHTroveLPImplV3": {
+    "abi": "ETHTroveStrategyW",
+    "verified": true,
+    "address": "0x66b18f8d058276a03fBfe955A9586DCa8FB5CA59"
   }
 }

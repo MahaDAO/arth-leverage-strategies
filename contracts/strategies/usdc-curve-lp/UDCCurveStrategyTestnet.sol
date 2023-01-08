@@ -11,13 +11,13 @@ contract USDCCurveStrategyTestnet is VersionedInitializable, StakingRewardsChild
     using SafeMath for uint256;
 
     struct Position {
+        uint256 arthBorrowed;
+        uint256 lpTokensMinted;
+        uint256 totalUsdc;
+        uint256 usdcInLp;
+        uint256 usdcSupplied;
         uint64 depositedAt;
         uint64 lockDuration;
-        uint256 totalUsdc;
-        uint256 usdcSupplied;
-        uint256 arthBorrowed;
-        uint256 usdcInLp;
-        uint256 lpTokensMinted;
     }
 
     address private _me;
