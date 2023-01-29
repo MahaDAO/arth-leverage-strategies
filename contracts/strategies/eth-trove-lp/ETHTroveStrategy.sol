@@ -83,6 +83,7 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
 
         _stakingRewardsChildInit(__maha, _rewardsDuration, _owner);
         _transferOwnership(_owner);
+        _transferOperator(_owner);
     }
 
     function deposit(
@@ -212,14 +213,15 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
     /// @notice admin-only function to open a trove; needed to initialize the contract
     function openTrove(
         uint256 _maxFee,
+        uint256 _value,
         uint256 _arthAmount,
         address _upperHint,
         address _lowerHint
-    ) external payable onlyOwner {
-        require(msg.value > 0, "no eth");
+    ) external onlyOwner {
+        require(_value > 0, "no eth");
 
         // Open the trove.
-        borrowerOperations.openTrove{value: msg.value}(
+        borrowerOperations.openTrove{value: _value}(
             _maxFee,
             _arthAmount,
             _upperHint,
@@ -261,7 +263,7 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
 
     /// @notice Version number for upgradability
     function getRevision() public pure virtual override returns (uint256) {
-        return 1;
+        return 5;
     }
 
     /// @notice Returns how much mARTH revenue we have generated so far.

@@ -18,26 +18,19 @@ async function main() {
     console.log(`Whale address is ${whale.address}.`);
     // await reportBalances(hre, deployer.address);
 
-    // const proxy = await ethers.getContractAt(
-    //     "TransparentUpgradeableProxy",
-    //     "0xA9735E594624339f8fbc8a99c57C13C7B4E8BCaC"
-    // );
-    // const proxy = await deployOrLoadAndVerify(
-    //     "TransparentUpgradeableProxy2",
-    //     "TransparentUpgradeableProxy",
-    //     []
-    // );
+    const proxy = await ethers.getContractAt(
+        "TransparentUpgradeableProxy",
+        "0xA9735E594624339f8fbc8a99c57C13C7B4E8BCaC"
+    );
 
-    // // DEBUG! manually override the proxy admin
-    // console.log("manually override the proxy admin");
-    // const abi = ethers.utils.defaultAbiCoder;
-    // const params = abi.encode(["address"], [deployer.address]);
-    // await ethers.provider.send("hardhat_setStorageAt", [
-    //     proxy.address,
-    //     "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103",
-    //     params
-    // ]);
-    // console.log("proxy admin", await proxy.callStatic.proxyAdmin());
+    console.log("manually override the proxy admin");
+    const abi = ethers.utils.defaultAbiCoder;
+    const params = abi.encode(["address"], [deployer.address]);
+    await ethers.provider.send("hardhat_setStorageAt", [
+        proxy.address,
+        "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103",
+        params
+    ]);
 
     console.log("Deploying ETHTroveLogic...");
     const ETHTroveLogic = await deployOrLoadAndVerify("ETHTroveLogic", "ETHTroveLogic", []);
@@ -49,7 +42,7 @@ async function main() {
         }
     });
 
-    const newImpl = await deployOrLoad("ETHTroveLPImplV2", "ETHTroveStrategy", [], {
+    const newImpl = await deployOrLoad("ETHTroveLPImplV5", "ETHTroveStrategy", [], {
         libraries: {
             ETHTroveLogic: ETHTroveLogic.address
         }
@@ -72,19 +65,18 @@ async function main() {
     console.log("new implementation", newImpl.address);
     console.log("init code", initDecode);
 
-    const proxy = await deployOrLoadAndVerify("ARTHETHTroveLP", "TransparentUpgradeableProxy", [
-        newImpl.address,
-        config.gnosisProxy,
-        initDecode
-    ]);
-
-    const instance = await ethers.getContractAt("ETHTroveStrategy", proxy.address);
+    await proxy.upgradeToAndCall(newImpl.address, initDecode);
 
     console.log("upgraded!");
     console.log("impl address", await proxy.callStatic.implementation());
 
+    const instance = await ethers.getContractAt("ETHTroveStrategy", proxy.address);
+
     // todo: should report all previous values properly; especially positions
-    console.log("position[deployer]", await instance.connect(whale).positions(deployer.address));
+    console.log(
+        "position[deployer]",
+        await instance.connect(whale).positions("0x0040daac32d83c78546ae36da42a496b28ab09e1")
+    );
     console.log("totalmArthSupplied", await instance.connect(whale).totalmArthSupplied());
     console.log("treasury", await instance.connect(whale).treasury());
     console.log("revenueMArth", await instance.connect(whale).revenueMArth());

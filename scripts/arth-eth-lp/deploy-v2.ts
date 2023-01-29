@@ -1,7 +1,12 @@
+/* eslint-disable */
+
 import { BigNumber } from "ethers";
-import { ethers, network } from "hardhat";
-import { deployOrLoadAndVerify } from "../utils";
+import hre, { ethers, network } from "hardhat";
+import { deployOrLoad, deployOrLoadAndVerify, getOutputAddress } from "../utils";
+// eslint-disable-next-line node/no-missing-import
 import * as config from "./constants";
+// eslint-disable-next-line node/no-missing-import
+import { reportBalances } from "./utils";
 
 async function main() {
     console.log(`Deploying to ${network.name}...`);
@@ -10,6 +15,13 @@ async function main() {
 
     const [deployer] = await ethers.getSigners();
     console.log(`Deployer address is ${deployer.address}.`);
+
+    const proxy = await ethers.getContractAt(
+        "TransparentUpgradeableProxy",
+        "0xA9735E594624339f8fbc8a99c57C13C7B4E8BCaC"
+    );
+
+    console.log("proxy admin", await proxy.callStatic.proxyAdmin());
 
     console.log("Deploying ETHTroveLogic...");
     const ETHTroveLogic = await deployOrLoadAndVerify("ETHTroveLogic", "ETHTroveLogic", []);
@@ -21,7 +33,7 @@ async function main() {
         }
     });
 
-    const newImpl = await deployOrLoadAndVerify("ETHTroveLPImplV2", "ETHTroveStrategy", [], 5000, {
+    const newImpl = await deployOrLoadAndVerify("ETHTroveLPImplV5", "ETHTroveStrategy", [], 0, {
         ETHTroveLogic: ETHTroveLogic.address
     });
 
@@ -41,6 +53,7 @@ async function main() {
 
     console.log("new implementation", newImpl.address);
     console.log("init code", initDecode);
+    // await proxy.upgradeToAndCall(newImpl.address, initDecode);
 }
 
 main().catch(error => {
