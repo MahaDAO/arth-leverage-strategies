@@ -7,7 +7,7 @@ export const uniswapV3PoolAddr = "0xE7cDba5e9b0D5E044AaB795cd3D659aAc8dB869B";
 export const borrowerOperationsAddr = "0x4c50063f8238dea92c738f23221733a9a6c6888b";
 export const uniswapV3SwapRouterAddr = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
 export const uniswapNFTPositionMangerAddr = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88";
-export const priceFeed = "0x066A917fA2e1739ccfc306dc73ff78EECa8B6F29";
+export const priceFeed = "0xc31aDC9ae073a1F6A9Ce5C41B32c18790ea667fe";
 export const deployer = "0x67c569F960C1Cc0B9a7979A851f5a67018c5A3b0";
 export const lendingPool = "0x76F0C94Ced5B48020bf0D7f3D0CEabC877744cB5";
 

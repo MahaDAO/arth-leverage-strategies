@@ -53,7 +53,6 @@ async function main() {
 
     console.log("new implementation", newImpl.address);
     console.log("init code", initDecode);
-    // await proxy.upgradeToAndCall(newImpl.address, initDecode);
 }
 
 main().catch(error => {

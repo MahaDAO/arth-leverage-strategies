@@ -38,5 +38,10 @@
     "abi": "ETHTroveStrategyW",
     "verified": true,
     "address": "0x66b18f8d058276a03fBfe955A9586DCa8FB5CA59"
+  },
+  "ETHTroveLPImplV5": {
+    "abi": "ETHTroveStrategy",
+    "verified": true,
+    "address": "0xF3F261F54d8397806132598dC2B6B5C00D6EB3eA"
   }
 }
