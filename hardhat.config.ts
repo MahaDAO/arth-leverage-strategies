@@ -32,10 +32,14 @@ const config: HardhatUserConfig & any = {
             runs: 200
         }
     },
+    mocha: {
+        timeout: 100000000
+    },
     networks: {
         hardhat: {
             forking: {
-                url: `https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`
+                url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`
+                // url: `https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`
             }
         },
         dev: {
