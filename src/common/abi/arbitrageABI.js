@@ -8,7 +8,7 @@ exports.arbitrageContractABI = [
             },
             {
                 "internalType": "address",
-                "name": "_arth",
+                "name": "_lusd",
                 "type": "address"
             },
             {
@@ -32,7 +32,7 @@ exports.arbitrageContractABI = [
             {
                 "indexed": false,
                 "internalType": "uint256",
-                "name": "_ARTHAmount",
+                "name": "_LUSDAmount",
                 "type": "uint256"
             }
         ],
@@ -45,10 +45,10 @@ exports.arbitrageContractABI = [
     },
     {
         "inputs": [],
-        "name": "ARTH",
+        "name": "LUSD",
         "outputs": [
             {
-                "internalType": "contract IARTHToken",
+                "internalType": "contract ILUSDToken",
                 "name": "",
                 "type": "address"
             }
@@ -94,7 +94,7 @@ exports.arbitrageContractABI = [
                 "type": "uint256"
             }
         ],
-        "name": "ethToArthAndBackArbitrage",
+        "name": "ethToLusdAndBackArbitrage",
         "outputs": [],
         "stateMutability": "payable",
         "type": "function"

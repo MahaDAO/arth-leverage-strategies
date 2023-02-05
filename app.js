@@ -38,12 +38,12 @@ app.get('/subscribe', async (req, res) => {
 			}
 		})
 		.on('connected', function (subscriptionId) {
-			console.log(subscriptionId);
+			console.log("subscriptionId: ",subscriptionId);
 			res.send(
 				'Subscribed to ethereum events. Will continously monitor for arbitrage opportunities!'
 			);
 		})
-		.on('error', console.error);
+		.on('error', (error)=>(console.error("error-------------------",error)));
 });
 
 app.get('/unsubscribe', async (req, res) => {
@@ -62,17 +62,13 @@ app.get('/unsubscribe', async (req, res) => {
 const performArbitrage = async () => {
 	if (!store.get(ONGOING_STATUS)) {
 		store.set(ONGOING_STATUS, true);
-
-		status = await arbitrageStatus(jsonRpcProvider, webSocketWeb3, wallet);
+		status = await arbitrageStatus(jsonRpcProvider, wallet);
 		if (status['status'] == 1) {
 			await executeArbitrage(
 				status['amountIn'],
-				status['populatedRedemption'],
-				status['profit'],
-				webSocketWeb3
+				wallet
 			);
 		}
-
 		store.set(ONGOING_STATUS, false);
 	}
 };
