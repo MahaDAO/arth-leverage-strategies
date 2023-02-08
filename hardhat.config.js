@@ -1,30 +1,29 @@
-import * as dotenv from "dotenv";
+require('dotenv').config()
 
-import { HardhatUserConfig, task } from "hardhat/config";
-import "@nomiclabs/hardhat-etherscan";
-import "@nomiclabs/hardhat-waffle";
-import "@typechain/hardhat";
-import "hardhat-gas-reporter";
-import "solidity-coverage";
-import "hardhat-abi-exporter";
+// const { HardhatUserConfig, task } = require("hardhat/config");
+require("@nomiclabs/hardhat-etherscan");
+require("@nomiclabs/hardhat-waffle");
+require("@typechain/hardhat");
+require("hardhat-gas-reporter");
+require("solidity-coverage");
+require("hardhat-abi-exporter");
 
 // import "./scripts/arth-eth-lp/close";
 // import "./scripts/arth-eth-lp/open";
 // import "./scripts/arth-eth-lp/test";
 
-dotenv.config();
 
-// This is a sample Hardhat task. To learn how to create your own go to
-// https://hardhat.org/guides/create-task.html
-task("accounts", "Prints the list of accounts", async (_taskArgs, hre) => {
-    const accounts = await hre.ethers.getSigners();
-    for (const account of accounts) console.log(account.address);
-});
+// // This is a sample Hardhat task. To learn how to create your own go to
+// // https://hardhat.org/guides/create-task.html
+// task("accounts", "Prints the list of accounts", async (_taskArgs, hre) => {
+//     const accounts = await hre.ethers.getSigners();
+//     for (const account of accounts) console.log(account.address);
+// });
 
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
 
-const config: HardhatUserConfig & any = {
+module.exports = {
     solidity: "0.8.4",
     settings: {
         optimizer: {
@@ -40,6 +39,9 @@ const config: HardhatUserConfig & any = {
             forking: {
                 url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`
                 // url: `https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`
+            },
+            accounts: {
+                count: 10,
             }
         },
         dev: {
@@ -96,5 +98,3 @@ const config: HardhatUserConfig & any = {
         pretty: true
     }
 };
-
-export default config;

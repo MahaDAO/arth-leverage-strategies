@@ -12,7 +12,8 @@ const {
     SwapRouter,
     Trade,
   } = require('@uniswap/v3-sdk')
-  const { ethers } = require('ethers')
+  // const { ethers } = require('ethers')
+  const { ethers } = require('hardhat')
   const JSBI = require('jsbi')
   
   const { CurrentConfig } = require('../common/config')
@@ -20,12 +21,23 @@ const {
   const {
     QUOTER_CONTRACT_ADDRESS,
     SWAP_ROUTER_ADDRESS,
-    MAX_FEE_PER_GAS, MAX_PRIORITY_FEE_PER_GAS
+    MAX_FEE_PER_GAS, MAX_PRIORITY_FEE_PER_GAS,
+    ADDRESSES
   } = require('../common/constants')
   const { getPoolInfo } = require('./pool')
   const {
     sendTransaction,
   } = require('./providers')
+
+  const UniswapRouterABI = require('../common/abi/UniswapV3Router_ABI.json')
+  const WETH_ABI = require('../common/abi/WETH_ABI.json')
+
+  function countDecimals(x) {
+    if (Math.floor(x) === x) {
+      return 0
+    }
+    return x.toString().split('.')[1].length || 0
+  }
   
   function fromReadableAmount(amount, decimals) {
     const extraDigits = Math.pow(10, countDecimals(amount))
@@ -41,43 +53,65 @@ const {
   
   // Trading Functions
   
-  exports.createTrade = async () => {
-    const poolInfo = await getPoolInfo()
+  exports.createTrade = async (wallet, amount) => {
+    const WETH_Contract = await ethers.getContractAt(WETH_ABI, ADDRESSES['MAINNET']['WETH'], wallet)
+    await WETH_Contract.deposit({value: amount.toString()});
+
+    await WETH_Contract.approve(SWAP_ROUTER_ADDRESS, amount.toString())
+
+    const routerContract = await ethers.getContractAt(UniswapRouterABI, SWAP_ROUTER_ADDRESS, wallet);
+    console.log("----------------trading block.timestamp-------------", (Math.floor(new Date().getTime() / 1000) + 1000).toString())
+    await routerContract.exactInputSingle([
+      ADDRESSES['MAINNET']['WETH'],
+      ADDRESSES['MAINNET']['ARTH'],
+      "3000",
+      wallet.address,
+      (Math.floor(new Date().getTime() / 1000) + 1000).toString(),
+      amount.toString(),
+      "0",
+      "0"
+    ])
+
+    const arthContract = await ethers.getContractAt(ERC20_ABI, ADDRESSES['MAINNET']['ARTH'], wallet)
+    console.log('------------- balalnce of arth -----------------', await arthContract.balanceOf(wallet.address))
+    // const poolInfo = await getPoolInfo()
   
-    const pool = new Pool(
-      CurrentConfig.tokens.in,
-      CurrentConfig.tokens.out,
-      CurrentConfig.tokens.poolFee,
-      poolInfo.sqrtPriceX96.toString(),
-      poolInfo.liquidity.toString(),
-      poolInfo.tick
-    )
+    // const pool = new Pool(
+    //   CurrentConfig.tokens.in,
+    //   CurrentConfig.tokens.out,
+    //   CurrentConfig.tokens.poolFee,
+    //   poolInfo.sqrtPriceX96.toString(),
+    //   poolInfo.liquidity.toString(),
+    //   poolInfo.tick
+    // )
   
-    const swapRoute = new Route(
-      [pool],
-      Ether.onChain(SupportedChainId.MAINNET),
-      CurrentConfig.tokens.out
-    )
+    // const swapRoute = new Route(
+    //   [pool],
+    //   Ether.onChain(SupportedChainId.MAINNET),
+    //   CurrentConfig.tokens.out
+    // )
+    // console.log("------------------createTrade------------------ 1")
+    // const amountOut = await getOutputQuote(swapRoute, wallet)
+
+    // console.log('------------------getAmountOut-----------------', amountOut.toString())
+
+    // const uncheckedTrade = Trade.createUncheckedTrade({
+    //   route: swapRoute,
+    //   inputAmount: CurrencyAmount.fromRawAmount(
+    //     CurrentConfig.tokens.in,
+    //     fromReadableAmount(
+    //       CurrentConfig.tokens.amountIn,
+    //       CurrentConfig.tokens.in.decimals
+    //     ).toString()
+    //   ),
+    //   outputAmount: CurrencyAmount.fromRawAmount(
+    //     CurrentConfig.tokens.out,
+    //     JSBI.BigInt(amountOut)
+    //   ),
+    //   tradeType: TradeType.EXACT_INPUT,
+    // })
   
-    const amountOut = await getOutputQuote(swapRoute)
-  
-    const uncheckedTrade = Trade.createUncheckedTrade({
-      route: swapRoute,
-      inputAmount: CurrencyAmount.fromRawAmount(
-        CurrentConfig.tokens.in,
-        fromReadableAmount(
-          CurrentConfig.tokens.amountIn,
-          CurrentConfig.tokens.in.decimals
-        ).toString()
-      ),
-      outputAmount: CurrencyAmount.fromRawAmount(
-        CurrentConfig.tokens.out,
-        JSBI.BigInt(amountOut)
-      ),
-      tradeType: TradeType.EXACT_INPUT,
-    })
-  
-    return uncheckedTrade
+    // return uncheckedTrade
   }
   
   exports.executeTrade = async(
@@ -129,7 +163,7 @@ const {
     if (!provider) {
       throw new Error('Provider required to get pool state')
     }
-  
+    console.log('--------------------------------- getOutputQuote------------------------')
     const { calldata } = await SwapQuoter.quoteCallParameters(
       route,
       CurrencyAmount.fromRawAmount(
@@ -144,6 +178,7 @@ const {
         useQuoterV2: true,
       }
     )
+    console.log('--------------------------------- getOutputQuote  2------------------------', calldata)
   
     const quoteCallReturnData = await provider.call({
       to: QUOTER_CONTRACT_ADDRESS,
@@ -165,23 +200,19 @@ const {
     }
   
     try {
-      const tokenContract = new ethers.Contract(
-        token.address,
+      const tokenContract = await ethers.getContractAt(
         ERC20_ABI,
-        provider
+        token.address,
       )
-
+      console.log("------approve amount----------", (await tokenContract.allowance(wallet.address, SWAP_ROUTER_ADDRESS)).toString())
       if((await tokenContract.allowance(wallet.address, SWAP_ROUTER_ADDRESS)).gt(amount)) return 'Sent';
 
-      const transaction = await tokenContract.populateTransaction.approve(
+      await tokenContract.connect(wallet).approve(
         SWAP_ROUTER_ADDRESS,
         "99999999999999999999999999999999999"
       )
   
-      return sendTransaction({
-        ...transaction,
-        from: wallet.address,
-      })
+      return "Sent"
     } catch (e) {
       console.error(e)
       return "Failed"

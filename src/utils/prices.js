@@ -5,7 +5,8 @@ const { Token, SupportedChainId } = require('@uniswap/sdk-core')
 const { Pool } = require('@uniswap/v3-sdk/')
 const IUniswapV3PoolABI = require('@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json')
 const abiDecoder = require('abi-decoder');
-const { ethers } = require('ethers')
+// const { ethers } = require('ethers')
+const { ethers } = require('hardhat')
 const ERC20ABI = require("../common/abi/ERC20.json")
 const { createTrade, executeTrade } = require("./trading")
 const PriceFeedABI = require('../common/abi/PriceFeed.json')
@@ -27,13 +28,10 @@ const poolAddress = "0xe7cdba5e9b0d5e044aab795cd3d659aac8db869b";
 
 
 const arbitrageStatus = async (provider, wallet) => {
-	console.log("123", await wallet.address)
-	console.log("----------------------------2----------------------", ARTH.chainId, ARTH.decimals, WETH.address)
-	const poolContract = new ethers.Contract(poolAddress, IUniswapV3PoolABI.abi, provider);
+	const poolContract = await ethers.getContractAt(IUniswapV3PoolABI.abi, poolAddress, wallet);
 	
 	// const arth = await EthersARTH.connect(wallet);
 	// const pair = await Fetcher.fetchPairData(ARTH, WETH[ARTH.chainId], provider).catch(e=>{console.log("----------------",e)})
-	console.log("----------------------------3----------------------", poolContract.address, await poolContract.token1())
 
 	const { 
 		// trade, 
@@ -63,7 +61,7 @@ const arbitrageStatus = async (provider, wallet) => {
 		console.log('UNISWAP Price:%s', uniswapPrice.toString());
 		console.log('Chainlink Price %s', chainLinkPrice.toString());
 		console.log('Redemption fee: %s', redemptionFee.toString());
-		console.log('Eth used: %s', ethers.utils.FormatTypes(ethForSwap.toString(), 'ether'));
+		console.log('Eth used: %s', ethers.utils.formatUnits(ethForSwap.toString(), 'ether'));
 
 		console.log('After Arbitrage(without fees): %d', priceRatio * ethUsed);
 		console.log('After arbitrage: %d eth', ethAfterArbitrage);
@@ -131,7 +129,7 @@ const getFeasibleTrade = async (arth, pair, wallet) => {
 };
 
 const fetchPrices = async (wallet, pair) => {
-	const priceFeed = new ethers.Contract(ADDRESSES[NETWORK]['CHAINLINK'], CHAINLINK_ABI, wallet);
+	const priceFeed = await ethers.getContractAt(CHAINLINK_ABI, ADDRESSES[NETWORK]['CHAINLINK']);
 
 	const roundData = await priceFeed.latestRoundData();
 
@@ -151,14 +149,14 @@ const fetchPrices = async (wallet, pair) => {
       state.tick
     );
     const price1 = POOL.token0Price;
-	const WETH_priceFeed = new ethers.Contract(ADDRESSES[NETWORK]['CHAINLINK_WETH'], CHAINLINK_ABI, wallet);
+	const WETH_priceFeed = await ethers.getContractAt(CHAINLINK_ABI, ADDRESSES[NETWORK]['CHAINLINK_WETH']);
 
 	const data = await WETH_priceFeed.latestRoundData();
 
 	const ethPrice = data['answer'];
 	const p = parseFloat(price1.toFixed(8)) * parseInt(ethPrice.toString()) / 100000000;
 
-	const troveManager = new ethers.Contract(ADDRESSES[NETWORK]['TroveManager'], TroveManagerABI, wallet);
+	const troveManager = await ethers.getContractAt(TroveManagerABI, ADDRESSES[NETWORK]['TroveManager']);
 	const redemptionFeeInWei = await troveManager.getRedemptionRate();
 	return {
 		uniswapPrice: p,
@@ -196,53 +194,53 @@ async function getPoolImmutables(poolContract) {
   }
 
 const executeArbitrage = async (amountIn, wallet) => {
-
+	console.log("=====================execute Arbitrage======================", (await wallet.provider.getBalance(wallet.address)))
 	try{
-		const trade = await createTrade();
-		if( (await executeTrade(trade, wallet, amountIn)) === 'Sent') {
-			// redeem ARTH using TroveManager
-			const troveManager = new ethers.Contract(ADDRESSES[NETWORK]['TroveManager'], TroveManagerABI, wallet);
-			const priceFeed = new ethers.Contract(ADDRESSES[NETWORK]['PRICEFEED'], PriceFeedABI, wallet);
-			const hintHelpers = new ethers.Contract(ADDRESSES[NETWORK]['HINTHELPERS'], HintHelpersABI, wallet);
-			const sortedTroves = new ethers.Contract(ADDRESSES[NETWORK]['SortedTroves'], SortedTrovesABI, wallet);
-			const price = await priceFeed.getPrice();
+		await createTrade(wallet, amountIn);
+		// if( (await executeTrade(trade, wallet, amountIn)) === 'Sent') {
+		// 	// redeem ARTH using TroveManager
+		// 	const troveManager = await ethers.getContractAt(TroveManagerABI, ADDRESSES[NETWORK]['TroveManager']);
+		// 	const priceFeed = await ethers.getContractAt(PriceFeedABI, ADDRESSES[NETWORK]['PRICEFEED']);
+		// 	const hintHelpers = await ethers.getContractAt(HintHelpersABI, ADDRESSES[NETWORK]['HINTHELPERS']);
+		// 	const sortedTroves = await ethers.getContractAt(SortedTrovesABI, ADDRESSES[NETWORK]['SortedTroves']);
+		// 	const price = await priceFeed.getPrice();
 
-			// Find hints for redeeming 20 ARTH
-			const { partialRedemptionHintNICR } = await hintHelpers.getRedemptionHints(
-				amountIn,
-				price,
-				0
-			);
+		// 	// Find hints for redeeming 20 ARTH
+		// 	const { partialRedemptionHintNICR } = await hintHelpers.getRedemptionHints(
+		// 		amountIn,
+		// 		price,
+		// 		0
+		// 	);
 
-			// We don't need to use getApproxHint for this test, since it's not the subject of this
-			// test case, and the list is very small, so the correct position is quickly found
-			const {
-			0: upperPartialRedemptionHint,
-			1: lowerPartialRedemptionHint
-			} = await sortedTroves.findInsertPosition(partialRedemptionHintNICR, dennis, dennis);
+		// 	// We don't need to use getApproxHint for this test, since it's not the subject of this
+		// 	// test case, and the list is very small, so the correct position is quickly found
+		// 	const {
+		// 	0: upperPartialRedemptionHint,
+		// 	1: lowerPartialRedemptionHint
+		// 	} = await sortedTroves.findInsertPosition(partialRedemptionHintNICR, dennis, dennis);
 
-			// skip bootstrapping phase
-			await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
+		// 	// skip bootstrapping phase
+		// 	await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
 
-			// Dennis redeems 20 ARTH
-			// Don't pay for gas, as it makes it easier to calculate the received Ether
-			const redemptionTx = await troveManager.redeemCollateral(
-				amountIn,
-				"0x" + "0".repeat(40), // invalid first hint
-				upperPartialRedemptionHint,
-				lowerPartialRedemptionHint,
-				partialRedemptionHintNICR,
-				0,
-				"1000000000000000000",
-				{
-					from: wallet.address,
-					gasPrice: 10000000
-				}
-			);
-		} else {
-			console.log("Fail in trading Uniswap V3")
-			return;
-		}
+		// 	// Dennis redeems 20 ARTH
+		// 	// Don't pay for gas, as it makes it easier to calculate the received Ether
+		// 	const redemptionTx = await troveManager.connect(wallet).redeemCollateral(
+		// 		amountIn,
+		// 		"0x" + "0".repeat(40), // invalid first hint
+		// 		upperPartialRedemptionHint,
+		// 		lowerPartialRedemptionHint,
+		// 		partialRedemptionHintNICR,
+		// 		0,
+		// 		"1000000000000000000",
+		// 		{
+		// 			from: wallet.address,
+		// 			gasPrice: 10000000
+		// 		}
+		// 	);
+		// } else {
+		// 	console.log("Fail in trading Uniswap V3")
+		// 	return;
+		// }
 	} catch(e) {
 		console.log("Error in trading Uniswap V3:", e)
 		return;
