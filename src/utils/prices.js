@@ -4,7 +4,7 @@ const { CHAINLINK_ABI } = require('../common/abi/chainlinkABI.js');
 const { Token, SupportedChainId } = require('@uniswap/sdk-core')
 const { Pool } = require('@uniswap/v3-sdk/')
 const IUniswapV3PoolABI = require('@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json')
-const abiDecoder = require('abi-decoder');
+// const abiDecoder = require('abi-decoder');
 // const { ethers } = require('ethers')
 const { ethers } = require('hardhat')
 const ERC20ABI = require("../common/abi/ERC20.json")
@@ -12,6 +12,7 @@ const { createTrade, executeTrade } = require("./trading")
 const PriceFeedABI = require('../common/abi/PriceFeed.json')
 const HintHelpersABI = require('../common/abi/HintHelpers.json')
 const SortedTrovesABI = require("../common/abi/SortedTroves.json")
+const BorrowerABI = require("../common/abi/BorrowerOperationABI.json")
 
 const ETH_NETWORK = SupportedChainId.MAINNET;
 const NETWORK = 'MAINNET';
@@ -22,7 +23,7 @@ const POINT_TWO_ETH = ethers.BigNumber.from('200000000000000000');
 const PART_OF_ARTH_POOL_TO_USE = ethers.BigNumber.from(8); // 8th of the liquidity reserve will be used (12.5%)
 const UNISWAP_ARTH_PROVIDER_FEE = 0.003;
 
-abiDecoder.addABI(TroveManagerABI);
+// abiDecoder.addABI(TroveManagerABI);
 
 const poolAddress = "0xe7cdba5e9b0d5e044aab795cd3d659aac8db869b";
 
@@ -55,7 +56,6 @@ const arbitrageStatus = async (provider, wallet) => {
 	ethUsed * priceRatio * (1 - redemptionFee) * (1 - UNISWAP_ARTH_PROVIDER_FEE);
 	const profit = ethAfterArbitrage - ethUsed;
 	
-	console.log("----5----", priceRatio, ethUsed, profit)
 	// if (profit > 0) {
 	if(ethUsed > 0 && priceRatio < 0.985)  {  // run first strategy
 		console.log('UNISWAP Price:%s', uniswapPrice.toString());
@@ -88,7 +88,6 @@ const getFeasibleTrade = async (arth, pair, wallet) => {
 	// 	PART_OF_ARTH_POOL_TO_USE
 	// );
 	const ERC20Contract = new ethers.Contract(WETH.address, ERC20ABI, wallet);
-	console.log("-----456------------", (await ERC20Contract.balanceOf(pair.address)).toString())
 	const ethUniswapReserve = (await ERC20Contract.balanceOf(pair.address)).div(
 		PART_OF_ARTH_POOL_TO_USE
 	);
@@ -193,54 +192,211 @@ async function getPoolImmutables(poolContract) {
     return PoolState;
   }
 
+  async function getNetBorrowingAmount(contracts, debtWithFee) {
+    const borrowingRate = await contracts.troveManager.getBorrowingRateWithDecay();
+    return ethers.BigNumber.from(debtWithFee)
+      .mul("1000000000000000000")
+      .div(ethers.BigNumber.from("1000000000000000000").add(borrowingRate));
+  }
+
+  function dec(val, scale) {
+    let zerosCount;
+
+    if (scale == "ether") {
+      zerosCount = 18;
+    } else if (scale == "finney") zerosCount = 15;
+    else {
+      zerosCount = scale;
+    }
+
+    const strVal = val.toString();
+    const strZeros = "0".repeat(zerosCount);
+
+    return strVal.concat(strZeros);
+  }
+
+  async function getOpenTroveTotalDebt(contracts, arthAmount) {
+    const fee = await contracts.troveManager.getBorrowingFee(arthAmount);
+    const compositeDebt = await contracts.borrowerOperations.getCompositeDebt(arthAmount);
+	console.log("***************************** compositeDebt*************", compositeDebt.toString())
+    return compositeDebt.add(fee);
+  }
+
+  async function openTrove(
+    contracts,
+	price,
+    { maxFeePercentage, extraARTHAmount, upperHint, lowerHint, ICR, extraParams }
+  ) {
+    if (!maxFeePercentage) maxFeePercentage = "1000000000000000000";
+    if (!extraARTHAmount) extraARTHAmount = ethers.BigNumber.from(0);
+    else if (typeof extraARTHAmount == "string") extraARTHAmount = ethers.BigNumber.from(extraARTHAmount);
+    if (!upperHint) upperHint = "0x" + "0".repeat(40);
+    if (!lowerHint) lowerHint = "0x" + "0".repeat(40);
+
+    const MIN_DEBT = (
+      await getNetBorrowingAmount(contracts, await contracts.borrowerOperations.MIN_NET_DEBT())
+    )
+	console.log('MinDebt===========', MIN_DEBT.toString())
+    const arthAmount = MIN_DEBT.add(extraARTHAmount);
+    if (!ICR && !extraParams.value) ICR = ethers.BigNumber.from(dec(15, 17));
+    // 150%
+    else if (typeof ICR == "string") ICR = ethers.BigNumber.from(ICR);
+	console.log("***********arthAmount**********", arthAmount.toString())
+    const totalDebt = await getOpenTroveTotalDebt(contracts, arthAmount);
+    if (ICR) {
+      extraParams.value = ICR.mul(totalDebt).div(price);
+    }
+	console.log(' eth value in openTrove-----------', extraParams.value.toString())
+	console.log('--------------- totalDebt-----------', totalDebt.toString())
+    const tx = await (contracts.borrowerOperations).openTrove(
+      maxFeePercentage,
+      arthAmount,
+      upperHint,
+      lowerHint,
+      "0x" + "0".repeat(40),
+      extraParams
+    );
+
+    return {
+      arthAmount,
+      totalDebt,
+      ICR,
+      collateral: extraParams.value,
+      tx
+    };
+  }
+
 const executeArbitrage = async (amountIn, wallet) => {
-	console.log("=====================execute Arbitrage======================", (await wallet.provider.getBalance(wallet.address)))
 	try{
-		await createTrade(wallet, amountIn);
-		// if( (await executeTrade(trade, wallet, amountIn)) === 'Sent') {
-		// 	// redeem ARTH using TroveManager
-		// 	const troveManager = await ethers.getContractAt(TroveManagerABI, ADDRESSES[NETWORK]['TroveManager']);
-		// 	const priceFeed = await ethers.getContractAt(PriceFeedABI, ADDRESSES[NETWORK]['PRICEFEED']);
-		// 	const hintHelpers = await ethers.getContractAt(HintHelpersABI, ADDRESSES[NETWORK]['HINTHELPERS']);
-		// 	const sortedTroves = await ethers.getContractAt(SortedTrovesABI, ADDRESSES[NETWORK]['SortedTroves']);
-		// 	const price = await priceFeed.getPrice();
+		const tradingResult = await createTrade(wallet, amountIn);
+		if( tradingResult.isZero() === false ) {
+			console.log("------Redemption starting....-------", tradingResult.toString())
+			// redeem ARTH using TroveManager
+			const troveManager = await ethers.getContractAt(TroveManagerABI, ADDRESSES[NETWORK]['TroveManager'], wallet);
+			const priceFeed = await ethers.getContractAt(PriceFeedABI, ADDRESSES[NETWORK]['PRICEFEED'], wallet);
+			const hintHelpers = await ethers.getContractAt(HintHelpersABI, ADDRESSES[NETWORK]['HINTHELPERS'], wallet);
+			const sortedTroves = await ethers.getContractAt(SortedTrovesABI, ADDRESSES[NETWORK]['SortedTroves'], wallet);
+			const borrowerOperation = await ethers.getContractAt(BorrowerABI, ADDRESSES[NETWORK]['BorrowerOperation'], wallet);
 
-		// 	// Find hints for redeeming 20 ARTH
-		// 	const { partialRedemptionHintNICR } = await hintHelpers.getRedemptionHints(
-		// 		amountIn,
-		// 		price,
-		// 		0
-		// 	);
+			const contracts = {
+				troveManager: troveManager,
+				priceFeed: priceFeed,
+				borrowerOperations: borrowerOperation
+			}
 
-		// 	// We don't need to use getApproxHint for this test, since it's not the subject of this
-		// 	// test case, and the list is very small, so the correct position is quickly found
-		// 	const {
-		// 	0: upperPartialRedemptionHint,
-		// 	1: lowerPartialRedemptionHint
-		// 	} = await sortedTroves.findInsertPosition(partialRedemptionHintNICR, dennis, dennis);
 
-		// 	// skip bootstrapping phase
-		// 	await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
 
-		// 	// Dennis redeems 20 ARTH
-		// 	// Don't pay for gas, as it makes it easier to calculate the received Ether
-		// 	const redemptionTx = await troveManager.connect(wallet).redeemCollateral(
-		// 		amountIn,
-		// 		"0x" + "0".repeat(40), // invalid first hint
-		// 		upperPartialRedemptionHint,
-		// 		lowerPartialRedemptionHint,
-		// 		partialRedemptionHintNICR,
-		// 		0,
-		// 		"1000000000000000000",
-		// 		{
-		// 			from: wallet.address,
-		// 			gasPrice: 10000000
-		// 		}
-		// 	);
-		// } else {
-		// 	console.log("Fail in trading Uniswap V3")
-		// 	return;
-		// }
+			let price = await priceFeed.fetchPrice();
+			let tx = await price.wait()
+
+			console.log("------price-----", tx.events[tx.events.length-1].args._lastGoodPrice.toString())
+			// Find hints for redeeming 20 ARTH
+			price = tx.events[tx.events.length-1].args._lastGoodPrice.toString();
+
+			await openTrove(contracts, price, {
+				extraARTHAmount: tradingResult.toString(),
+				extraParams: {  },
+			  });
+			  console.log("============================6===============")
+			
+			// // skip bootstrapping phase
+			// await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
+
+			// Don't pay for gas, as it makes it easier to calculate the received Ether
+
+			const { partialRedemptionHintNICR } = await hintHelpers.getRedemptionHints(
+				tradingResult,
+				price,
+				0
+			);
+			console.log("------------------2 partialRedemptionHintNICR------------------", partialRedemptionHintNICR.toString())
+			// We don't need to use getApproxHint for this test, since it's not the subject of this
+			// test case, and the list is very small, so the correct position is quickly found
+			const {
+			0: upperPartialRedemptionHint,
+			1: lowerPartialRedemptionHint
+			} = await sortedTroves.findInsertPosition(partialRedemptionHintNICR, wallet.address, wallet.address);
+			
+			
+			
+			
+			// console.log("------------------3------------------")
+			// console.log("------------------4------------------", (await sortedTroves.getLast()))
+			// console.log("------------------5------------------", upperPartialRedemptionHint, lowerPartialRedemptionHint)
+
+			// let currentBorrower = await sortedTroves.getLast()
+			// while (currentBorrower !== "0x" + "0".repeat(40) && (await troveManager.getCurrentICR(currentBorrower, price)).lt(await troveManager.MCR())) {
+			// 	currentBorrower = await sortedTroves.getPrev(currentBorrower)
+			// }
+
+			// console.log("last currentBorrower -------------------", currentBorrower, wallet.address)
+			// let totals = {};
+			// totals.remainingARTH = tradingResult
+			// totals.price = price
+			// totals.totalARTHToRedeem = ethers.BigNumber.from(0)
+			// totals.totalETHDrawn = ethers.BigNumber.from(0)
+			// let _maxIterations = 99
+
+			// while (currentBorrower !== "0x" + "0".repeat(40) && totals.remainingARTH.gt(0) && _maxIterations > 0) {
+			// 	_maxIterations--;
+			// 	const nextUserToCheck = await sortedTroves.getPrev(currentBorrower)
+			// 	const ARTHLotTemp = (await troveManager.Troves(currentBorrower)).debt.sub("50000000000000000000")
+			// 	console.log('---------------ARTHLotTemp--------------', ARTHLotTemp.toString())
+			// 	const ARTHLot = ARTHLotTemp.lt(totals.remainingARTH) ? ARTHLotTemp : totals.remainingARTH
+			// 	console.log('---------------ARTHLot--------------', ARTHLot.toString())
+			// 	const ETHLot = ARTHLot.mul("1000000000000000000").div(price)
+			// 	console.log('---------------ETHLot--------------', ETHLot.toString())
+			// 	console.log("------debt--------------", (await troveManager.Troves(currentBorrower)).debt.toString())
+			// 	console.log("------coll--------------", (await troveManager.Troves(currentBorrower)).coll.toString())
+			// 	const newDebt = (await troveManager.Troves(currentBorrower)).debt.sub(ARTHLot)
+			// 	const newColl = (await troveManager.Troves(currentBorrower)).coll.sub(ETHLot)
+			// 	console.log("------newDebt--------------", newDebt.toString())
+			// 	console.log("------newColl--------------", newColl.toString())
+			// 	if(newDebt.toString() === "50000000000000000000") {
+			// 		console.log("------   _removeStake    ----------")
+			// 		console.log("------   _closeTrove    ----------")
+			// 		console.log("------   _redeemCloseTrove    ----------")
+			// 	} else {
+			// 		let newNICR 
+			// 		if( newDebt.gt(0) ) {
+			// 			newNICR = newColl.mul("100000000000000000000").div(newDebt)
+			// 		} else {
+			// 			newNICR = ethers.BigNumber.from(2).pow(256).sub(1)
+			// 		}
+
+			// 		if(newNICR.toString() !== partialRedemptionHintNICR.toString() || newDebt.sub("50000000000000000000").lt(ethers.BigNumber.from("250000000000000000000"))) {
+			// 			console.log("cancelled partical --------------- break", newNICR.toString(), partialRedemptionHintNICR.toString())
+			// 			console.log("cancelled partical --------------- 2", newDebt.sub("50000000000000000000").toString(), partialRedemptionHintNICR.toString())
+			// 			break;
+			// 		}
+			// 		console.log("-------------ARTHLot------------",ARTHLot.toString())
+			// 		console.log("-------------ETHLot------------",ETHLot.toString())
+			// 		totals.totalARTHToRedeem = totals.totalARTHToRedeem.add(ARTHLot)
+			// 		totals.totalETHDrawn = totals.totalETHDrawn.add(ETHLot)
+			// 		totals.remainingARTH = totals.remainingARTH.sub(ARTHLot)
+
+			// 		console.log("totals.totalARTHToRedeem", totals.totalARTHToRedeem.toString())
+			// 		console.log("totals.totalETHDrawn", totals.totalETHDrawn.toString())
+			// 		console.log("totals.remainingARTH", totals.remainingARTH.toString())
+			// 		currentBorrower = nextUserToCheck
+					
+			// 	}
+			// }
+			console.log("==============before ETH=========", (await wallet.provider.getBalance(wallet.address)).toString())
+			const redemptionTx = await troveManager.redeemCollateral(
+				tradingResult,
+				"0x" + "0".repeat(40), // invalid first hint
+				upperPartialRedemptionHint,
+				lowerPartialRedemptionHint,
+				partialRedemptionHintNICR,
+				0,
+				"1000000000000000000"
+			);
+			console.log("==============after ETH=========", (await wallet.provider.getBalance(wallet.address)).toString())
+		} else {
+			console.log("Fail in trading Uniswap V3")
+			return;
+		}
 	} catch(e) {
 		console.log("Error in trading Uniswap V3:", e)
 		return;
