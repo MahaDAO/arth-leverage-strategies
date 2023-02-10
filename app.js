@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const Web3 = require('web3');
 const store = require('data-store')({ path: process.cwd() + '/localstore.json' });
-const { arbitrageStatus, executeArbitrage } = require('./src/utils/prices');
+const { arbitrageStatus, executeArbitrage, executeArbitrageAbovePeg } = require('./src/utils/prices');
 const { Wallet } = require('ethers');
 const { ethers } = require('hardhat')
 
@@ -15,7 +15,6 @@ const webSocketProvider = new Web3.providers.WebsocketProvider(WSS_PROVIDER_URL)
 const webSocketWeb3 = new Web3(webSocketProvider);
 // const webSocketWeb3 = new ethers.providers.WebSocketProvider(WSS_PROVIDER_URL)
 
-let jsonRpcProvider;
 // let jsonRpcProvider = new providers.JsonRpcProvider(HTTPS_PROVIDER_URL);
 let wallet;
 // let wallet = new Wallet(PRIVATE_KEY).connect(jsonRpcProvider);
@@ -68,9 +67,14 @@ const performArbitrage = async () => {
 	if (!store.get(ONGOING_STATUS)) {
 		store.set(ONGOING_STATUS, true);
 		console.log("------------start------------")
-		status = await arbitrageStatus(jsonRpcProvider, wallet);
+		status = await arbitrageStatus(wallet);
 		if (status['status'] == 1) {
 			await executeArbitrage(
+				status['amountIn'],
+				wallet
+			);
+		} else if(status['status'] == 2) {
+			await executeArbitrageAbovePeg(
 				status['amountIn'],
 				wallet
 			);
