@@ -3,7 +3,7 @@ const { Token, SupportedChainId } = require('@uniswap/sdk-core')
 const { Pool } = require('@uniswap/v3-sdk/')
 // const { ethers } = require('ethers')
 const { ethers } = require('hardhat')
-const { createTrade } = require("./trading")
+const { createTrade, sellETHForUSDC, sellARTH, depositAndBorrow } = require("./trading")
 
 const IUniswapV3PoolABI = require('@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json')
 const ERC20ABI = require("../common/abi/ERC20.json")
@@ -321,67 +321,10 @@ const executeArbitrage = async (amountIn, wallet) => {
 
 const executeArbitrageAbovePeg = async (amountIn, wallet) => {
 	try{
-		const tradingResult = await createTrade(wallet, amountIn);
-		if( tradingResult.isZero() === false ) {
-			// redeem ARTH using TroveManager
-			const troveManager = await ethers.getContractAt(TroveManagerABI, ADDRESSES[NETWORK]['TroveManager'], wallet);
-			const priceFeed = await ethers.getContractAt(PriceFeedABI, ADDRESSES[NETWORK]['PRICEFEED'], wallet);
-			const hintHelpers = await ethers.getContractAt(HintHelpersABI, ADDRESSES[NETWORK]['HINTHELPERS'], wallet);
-			const sortedTroves = await ethers.getContractAt(SortedTrovesABI, ADDRESSES[NETWORK]['SortedTroves'], wallet);
-			const borrowerOperation = await ethers.getContractAt(BorrowerABI, ADDRESSES[NETWORK]['BorrowerOperation'], wallet);
-
-			const contracts = {
-				troveManager: troveManager,
-				priceFeed: priceFeed,
-				borrowerOperations: borrowerOperation
-			}
-
-
-
-			let price = await priceFeed.fetchPrice();
-			let tx = await price.wait()
-
-			console.log("------price-----", tx.events[tx.events.length-1].args._lastGoodPrice.toString())
-			// Find hints for redeeming 20 ARTH
-			price = tx.events[tx.events.length-1].args._lastGoodPrice.toString();
-
-			await openTrove(contracts, price, {
-				extraARTHAmount: tradingResult.toString(),
-				extraParams: {  },
-			  });
-			
-			// // skip bootstrapping phase
-			// await th.fastForwardTime(timeValues.SECONDS_IN_ONE_WEEK * 2, web3.currentProvider);
-
-			// Don't pay for gas, as it makes it easier to calculate the received Ether
-
-			const { partialRedemptionHintNICR } = await hintHelpers.getRedemptionHints(
-				tradingResult,
-				price,
-				0
-			);
-			// We don't need to use getApproxHint for this test, since it's not the subject of this
-			// test case, and the list is very small, so the correct position is quickly found
-			const {
-			0: upperPartialRedemptionHint,
-			1: lowerPartialRedemptionHint
-			} = await sortedTroves.findInsertPosition(partialRedemptionHintNICR, wallet.address, wallet.address);
-			
-			console.log("==============before ETH=========", (await wallet.provider.getBalance(wallet.address)).toString())
-			await troveManager.redeemCollateral(
-				tradingResult,
-				"0x" + "0".repeat(40), // invalid first hint
-				upperPartialRedemptionHint,
-				lowerPartialRedemptionHint,
-				partialRedemptionHintNICR,
-				0,
-				"1000000000000000000"
-			);
-			console.log("==============after ETH=========", (await wallet.provider.getBalance(wallet.address)).toString())
-		} else {
-			console.log("Fail in trading Uniswap V3")
-			return;
-		}
+		const USDCAmount = await sellETHForUSDC(wallet, amountIn);
+		const ArthAmount = await depositAndBorrow(wallet, USDCAmount)
+		await sellARTH(wallet, ArthAmount)
+		
 	} catch(e) {
 		console.log("Error in trading Uniswap V3:", e)
 		return;
