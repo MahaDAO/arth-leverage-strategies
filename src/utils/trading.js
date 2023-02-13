@@ -54,7 +54,6 @@
       await WETH_Contract.deposit({value: amount.toString()});
   
       await WETH_Contract.approve(SWAP_ROUTER_ADDRESS, amount.toString())
-      console.log("-------------------amountIn--------------",amount.toString(), (await WETH_Contract.balanceOf(wallet.address)).toString())
   
       const routerContract = await ethers.getContractAt(UniswapRouterABI, SWAP_ROUTER_ADDRESS, wallet);
       await routerContract.exactInputSingle([
@@ -91,10 +90,8 @@
       const ArthPrice = await AaveOracle.getAssetPrice(ADDRESSES['MAINNET']['ARTH'])
       let userData = await lendingPoolContract.getUserAccountData(wallet.address)
       const ArthAmount = (userData.availableBorrowsBase).mul('1000000000000000000').div(ArthPrice)
-      console.log('----------ArthAmount----------', userData.toString(), ArthAmount.toString())
       await lendingPoolContract.borrow(ADDRESSES['MAINNET']['ARTH'], ArthAmount, 1, 0, wallet.address)
       userData = await lendingPoolContract.getUserAccountData(wallet.address)
-      console.log('----------User Data after borrowing----------', userData.toString())
       console.log('--------------arth balance-------------', (await ArthContract.balanceOf(wallet.address)).toString())
       const newValue = await ArthContract.balanceOf(wallet.address)
       return newValue.sub(oldValue);
