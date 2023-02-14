@@ -87,11 +87,15 @@
       const oldValue = await ArthContract.balanceOf(wallet.address)
       await USDCContract.approve(lendingPoolContract.address, amount)
       await lendingPoolContract.deposit(ADDRESSES['MAINNET']['USDC'], amount, wallet.address, 0)
+      await lendingPoolContract.setUserEMode(1)
       const ArthPrice = await AaveOracle.getAssetPrice(ADDRESSES['MAINNET']['ARTH'])
       let userData = await lendingPoolContract.getUserAccountData(wallet.address)
       const ArthAmount = (userData.availableBorrowsBase).mul('1000000000000000000').div(ArthPrice)
+      // console.log('-----userData----------', userData.toString())
       await lendingPoolContract.borrow(ADDRESSES['MAINNET']['ARTH'], ArthAmount, 1, 0, wallet.address)
-      userData = await lendingPoolContract.getUserAccountData(wallet.address)
+      // userData = await lendingPoolContract.getUserAccountData(wallet.address)
+      // console.log('-----after borrow userData----------', userData.toString())
+
       console.log('--------------arth balance-------------', (await ArthContract.balanceOf(wallet.address)).toString())
       const newValue = await ArthContract.balanceOf(wallet.address)
       return newValue.sub(oldValue);
