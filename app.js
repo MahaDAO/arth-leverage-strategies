@@ -4,20 +4,18 @@ const Web3 = require('web3');
 const store = require('data-store')({ path: process.cwd() + '/localstore.json' });
 const { arbitrageStatus, executeArbitrage, executeArbitrageAbovePeg } = require('./src/utils/prices');
 const { Wallet } = require('ethers');
-const { ethers } = require('hardhat')
+// const { ethers } = require('hardhat')
+const { ethers } = require('./src/utils/CreatInstance')
 
 const HTTPS_PROVIDER_URL = process.env.HTTPS_PROVIDER;
 const WSS_PROVIDER_URL = process.env.WSS_PROVIDER;
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
+const TEST_MODE = process.env.PRODUCTION_MODE === "Test" ? true : false
 
-// let webSocketProvider;
 const webSocketProvider = new Web3.providers.WebsocketProvider(WSS_PROVIDER_URL);
 const webSocketWeb3 = new Web3(webSocketProvider);
-// const webSocketWeb3 = new ethers.providers.WebSocketProvider(WSS_PROVIDER_URL)
 
-// let jsonRpcProvider = new providers.JsonRpcProvider(HTTPS_PROVIDER_URL);
 let wallet;
-// let wallet = new Wallet(PRIVATE_KEY).connect(jsonRpcProvider);
 const app = express();
 const port = 3000;
 const ONGOING_STATUS = 'TX_ONGOING';
@@ -84,23 +82,25 @@ const performArbitrage = async () => {
 };
 
 const init = async() => {
-	console.log("----init----")
-	console.log("-------Alchemy address-------", HTTPS_PROVIDER_URL)
-	await ethers.provider.send(
-		"hardhat_reset",
-		[
-			{
-				forking: {
-					jsonRpcUrl: HTTPS_PROVIDER_URL,
-					
-					// blockNumber: 15611047
+	console.log("initializing...")
+	if (TEST_MODE) {
+		await ethers.provider.send(
+			"hardhat_reset",
+			[
+				{
+					forking: {
+						jsonRpcUrl: HTTPS_PROVIDER_URL,
+					},
 				},
-			},
-		],
-	);
-
-	const accounts = await ethers.getSigners()
-	wallet = accounts[0];
+			],
+		);
+	
+		const accounts = await ethers.getSigners()
+		wallet = accounts[0];
+	} else {
+		const provider = new ethers.providers.JsonRpcProvider(HTTPS_PROVIDER_URL)
+		wallet = new Wallet(PRIVATE_KEY, provider);
+	}
 	store.set(ONGOING_STATUS, false);
 	webSocketWeb3.eth.accounts.wallet.add(PRIVATE_KEY);
 };

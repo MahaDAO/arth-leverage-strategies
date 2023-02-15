@@ -1,6 +1,4 @@
-  // const { ethers } = require('ethers')
-  const { ethers } = require('hardhat')
-  
+  const { createContract } = require('./CreatInstance')
   const ERC20_ABI = require("../common/abi/ERC20.json")
   const {
     SWAP_ROUTER_ADDRESS,
@@ -15,16 +13,16 @@
   // Trading Functions
   
   exports.createTrade = async (wallet, amount) => {
-    try{
-      const arthContract = await ethers.getContractAt(ERC20_ABI, ADDRESSES['MAINNET']['ARTH'], wallet)
+    try {
+      const arthContract = await createContract(ERC20_ABI, ADDRESSES['MAINNET']['ARTH'], wallet)
       const oldValue = await arthContract.balanceOf(wallet.address)
-      const WETH_Contract = await ethers.getContractAt(WETH_ABI, ADDRESSES['MAINNET']['WETH'], wallet)
+      const WETH_Contract = await createContract(WETH_ABI, ADDRESSES['MAINNET']['WETH'], wallet)
       await WETH_Contract.deposit({value: amount.toString()});
   
       await WETH_Contract.approve(SWAP_ROUTER_ADDRESS, amount.toString())
       console.log("-------------------amountIn--------------",amount.toString())
   
-      const routerContract = await ethers.getContractAt(UniswapRouterABI, SWAP_ROUTER_ADDRESS, wallet);
+      const routerContract = await createContract(UniswapRouterABI, SWAP_ROUTER_ADDRESS, wallet);
       await routerContract.exactInputSingle([
         ADDRESSES['MAINNET']['WETH'],
         ADDRESSES['MAINNET']['ARTH'],
@@ -41,21 +39,21 @@
       return newValue.sub(oldValue);
     } catch (e) {
       console.log(" error ", e)
-      return ethers.BigNumber.from(0)
+      throw new Error(e);
     }
     
   }
 
   exports.sellETHForUSDC = async (wallet, amount) => {
-    try{
-      const USDCContract = await ethers.getContractAt(ERC20_ABI, ADDRESSES['MAINNET']['USDC'], wallet)
+    try {
+      const USDCContract = await createContract(ERC20_ABI, ADDRESSES['MAINNET']['USDC'], wallet)
       const oldValue = await USDCContract.balanceOf(wallet.address)
-      const WETH_Contract = await ethers.getContractAt(WETH_ABI, ADDRESSES['MAINNET']['WETH'], wallet)
+      const WETH_Contract = await createContract(WETH_ABI, ADDRESSES['MAINNET']['WETH'], wallet)
       await WETH_Contract.deposit({value: amount.toString()});
   
       await WETH_Contract.approve(SWAP_ROUTER_ADDRESS, amount.toString())
   
-      const routerContract = await ethers.getContractAt(UniswapRouterABI, SWAP_ROUTER_ADDRESS, wallet);
+      const routerContract = await createContract(UniswapRouterABI, SWAP_ROUTER_ADDRESS, wallet);
       await routerContract.exactInputSingle([
         ADDRESSES['MAINNET']['WETH'],
         ADDRESSES['MAINNET']['USDC'],
@@ -80,10 +78,10 @@
   exports.depositAndBorrow = async (wallet, amount) => {
     try {
       console.log("************************  deposit and borrow *****************************")
-      const lendingPoolContract = await ethers.getContractAt(LendingPoolABI, ADDRESSES['MAINNET']['LendingPool'], wallet)
-      const USDCContract = await ethers.getContractAt(ERC20_ABI, ADDRESSES['MAINNET']['USDC'], wallet)
-      const AaveOracle = await ethers.getContractAt(AaveOracleABI, ADDRESSES['MAINNET']['AaveOracle'], wallet)
-      const ArthContract = await ethers.getContractAt(ERC20_ABI, ADDRESSES['MAINNET']['ARTH'], wallet)
+      const lendingPoolContract = await createContract(LendingPoolABI, ADDRESSES['MAINNET']['LendingPool'], wallet)
+      const USDCContract = await createContract(ERC20_ABI, ADDRESSES['MAINNET']['USDC'], wallet)
+      const AaveOracle = await createContract(AaveOracleABI, ADDRESSES['MAINNET']['AaveOracle'], wallet)
+      const ArthContract = await createContract(ERC20_ABI, ADDRESSES['MAINNET']['ARTH'], wallet)
       const oldValue = await ArthContract.balanceOf(wallet.address)
       await USDCContract.approve(lendingPoolContract.address, amount)
       await lendingPoolContract.deposit(ADDRESSES['MAINNET']['USDC'], amount, wallet.address, 0)
@@ -106,16 +104,16 @@
   }
 
   exports.sellARTH = async (wallet, amount) => {
-    try{
+    try {
       console.log("************************  sell Arth *****************************")
-      const arthContract = await ethers.getContractAt(ERC20_ABI, ADDRESSES['MAINNET']['ARTH'], wallet)
-      const WETH_Contract = await ethers.getContractAt(WETH_ABI, ADDRESSES['MAINNET']['WETH'], wallet)
+      const arthContract = await createContract(ERC20_ABI, ADDRESSES['MAINNET']['ARTH'], wallet)
+      const WETH_Contract = await createContract(WETH_ABI, ADDRESSES['MAINNET']['WETH'], wallet)
       const oldValue = await WETH_Contract.balanceOf(wallet.address)
   
       console.log("-------------------amountIn--------------",amount)
       await arthContract.approve(SWAP_ROUTER_ADDRESS, amount.toString())
   
-      const routerContract = await ethers.getContractAt(UniswapRouterABI, SWAP_ROUTER_ADDRESS, wallet);
+      const routerContract = await createContract(UniswapRouterABI, SWAP_ROUTER_ADDRESS, wallet);
       await routerContract.exactInputSingle([
         ADDRESSES['MAINNET']['ARTH'],
         ADDRESSES['MAINNET']['WETH'],
@@ -136,5 +134,4 @@
       console.log(" error ", e)
       throw new Error(e);
     }
-    
   }

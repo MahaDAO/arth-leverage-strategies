@@ -1,8 +1,7 @@
 const { ADDRESSES } = require('../common/constants.js');
 const { Token, SupportedChainId } = require('@uniswap/sdk-core')
 const { Pool } = require('@uniswap/v3-sdk/')
-// const { ethers } = require('ethers')
-const { ethers } = require('hardhat')
+const { ethers } = require('./CreatInstance')
 const { createTrade, sellETHForUSDC, sellARTH, depositAndBorrow } = require("./trading")
 
 const IUniswapV3PoolABI = require('@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json')
@@ -100,9 +99,7 @@ const getFeasibleTrade = async (pair, wallet) => {
 
 	let ethTradeAmout;
 	if (ethBalanceInWallet.lt(ethUniswapReserve)) {
-		// if(ethBalanceInWallet.gt(POINT_TWO_ETH))
-			ethTradeAmout = ethBalanceInWallet.sub(POINT_TWO_ETH); // To keep some spare eth for gas prices
-		// else ethTradeAmout = ethers.BigNumber.from("0");
+		ethTradeAmout = ethBalanceInWallet.sub(POINT_TWO_ETH); // To keep some spare eth for gas prices
 	} else {
 		ethTradeAmout = ethUniswapReserve;
 	}
@@ -110,9 +107,7 @@ const getFeasibleTrade = async (pair, wallet) => {
 	console.log("----ethTradeAmount----", ethTradeAmout.toString())
 
 	return {
-		// trade: trade,
 		ethForSwap: ethTradeAmout,
-		// populatedRedemption: populatedRedemption,
 	};
 };
 
@@ -122,7 +117,6 @@ const fetchPrices = async (wallet, pair) => {
 	const roundData = await priceFeed.latestRoundData();
 
 	const chainLinkPrice = roundData['answer'];
-	// const outputAmount = toBN(toWei(trade.outputAmount.toFixed(), 'Mwei'));
 
 	const immutables = await getPoolImmutables(pair);
     const state = await getPoolState(pair);
@@ -148,7 +142,6 @@ const fetchPrices = async (wallet, pair) => {
 	const redemptionFeeInWei = await troveManager.getRedemptionRate();
 	return {
 		uniswapPrice: p,
-		// uniswapPrice: outputAmount.div(ethForSwap).toNumber(),
 		chainLinkPrice: parseInt(chainLinkPrice.toString()) / 100000000,
 		redemptionFee: parseFloat(ethers.utils.formatEther(redemptionFeeInWei)),
 	};
@@ -267,13 +260,10 @@ const executeArbitrage = async (amountIn, wallet) => {
 				borrowerOperations: borrowerOperation
 			}
 
-
-
 			let price = await priceFeed.fetchPrice();
 			let tx = await price.wait()
 
 			console.log("------price-----", tx.events[tx.events.length-1].args._lastGoodPrice.toString())
-			// Find hints for redeeming 20 ARTH
 			price = tx.events[tx.events.length-1].args._lastGoodPrice.toString();
 
 			await openTrove(contracts, price, {
