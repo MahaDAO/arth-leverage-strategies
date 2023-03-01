@@ -2,8 +2,10 @@
 
 pragma solidity 0.8.4;
 
+import "./ILiquityBase.sol";
+
 // Common interface for the Trove Manager.
-interface IBorrowerOperations {
+interface IBorrowerOperations is ILiquityBase {
     enum BorrowerOperation {
         openTrove,
         closeTrove,
