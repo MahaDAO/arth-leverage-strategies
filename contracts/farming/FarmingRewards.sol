@@ -53,7 +53,8 @@ contract FarmingRewards is Ownable {
     }
 
     function withdraw(uint256 tokenId_) external {
-
+        _removeLP(tokenId_);
+        borrowerOperations.closeTrove();
     }
 
     function onERC721Received(
@@ -170,21 +171,6 @@ contract FarmingRewards is Ownable {
             });
 
         (amount0, amount1) = nonfungiblePositionManager.decreaseLiquidity(params);
-
-        //send liquidity back to owner
-        _sendToOwner(tokenId, amount0, amount1);
     }
 
-    function _sendToOwner(
-        uint256 tokenId,
-        uint256 amount0,
-        uint256 amount1
-    ) private {
-        // get owner of contract
-        address owner = deposits[tokenId].owner;
-
-        // send collected fees to owner
-        TransferHelper.safeTransfer(ARTH, owner, amount0);
-        TransferHelper.safeTransfer(WETH, owner, amount1);
-    }
 }
