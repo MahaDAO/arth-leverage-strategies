@@ -81,9 +81,8 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
 
         totalmArthSupplied = mArth.balanceOf(me);
 
-        _stakingRewardsChildInit(__maha, _rewardsDuration, _owner);
+        _stakingRewardsChildInit(__maha, _rewardsDuration);
         _transferOwnership(_owner);
-        _transferOperator(_owner);
     }
 
     function deposit(
@@ -116,11 +115,7 @@ contract ETHTroveStrategy is VersionedInitializable, StakingRewardsChild {
         );
     }
 
-    function withdraw(
-        uint256 maxFee,
-        address upperHint,
-        address lowerHint
-    ) external nonReentrant {
+    function withdraw(uint256 maxFee, address upperHint, address lowerHint) external nonReentrant {
         require(!paused, "paused");
 
         _withdraw(msg.sender, positions[msg.sender].ethForLoan);

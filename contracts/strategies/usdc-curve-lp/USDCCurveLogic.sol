@@ -47,43 +47,43 @@ library USDCCurveLogic {
 
     function deposit(
         mapping(address => Position) storage positions,
-        address who,
-        uint256 totalUsdc,
-        uint256 minLiquidityReceived,
-        uint64 lockDuration,
-        DepositParams memory p
+        address _who,
+        uint256 _totalUsdc,
+        uint256 _minLiquidityReceived,
+        uint64 _lockDuration,
+        DepositParams memory _p
     ) external returns (uint256 arthBorrowed) {
         // 1. Check that position is not already open.
-        require(positions[who].depositedAt == 0, "position open");
+        require(positions[_who].depositedAt == 0, "position open");
 
         // 2. Calculate usdc amount for pools.
         // LTV = 95% -> 51.282051% into lending
-        uint256 usdcToLendingPool = totalUsdc.mul(51282051).div(100000000); // 51% into lending
-        uint256 usdcToLiquidityPool = totalUsdc.sub(usdcToLendingPool);
+        uint256 usdcToLendingPool = _totalUsdc.mul(51282051).div(100000000); // 51% into lending
+        uint256 usdcToLiquidityPool = _totalUsdc.sub(usdcToLendingPool);
 
         // 3. Supply usdc to the lending pool.
-        p.lendingPool.supply(address(p.usdc), usdcToLendingPool, p.me, 0);
+        _p.lendingPool.supply(address(_p.usdc), usdcToLendingPool, _p.me, 0);
 
         // 4. Borrow ARTH at a 95% LTV
-        arthBorrowed = usdcToLendingPool.mul(95e30).div(p.priceFeed.fetchPrice()).div(100);
-        p.lendingPool.borrow(address(p.arth), arthBorrowed, 2, 0, p.me);
+        arthBorrowed = usdcToLendingPool.mul(95e30).div(_p.priceFeed.fetchPrice()).div(100);
+        _p.lendingPool.borrow(address(_p.arth), arthBorrowed, 2, 0, _p.me);
 
         // 5. Supply to curve lp pool.
         uint256[2] memory inAmounts = [arthBorrowed, usdcToLiquidityPool];
-        uint256 lpTokensMinted = p.stableswap.add_liquidity(inAmounts, minLiquidityReceived);
+        uint256 lpTokensMinted = _p.stableswap.add_liquidity(inAmounts, _minLiquidityReceived);
 
         // 6. Record the position.
-        positions[who] = Position({
+        positions[_who] = Position({
             depositedAt: uint64(block.timestamp),
-            lockDuration: lockDuration,
+            lockDuration: _lockDuration,
             arthBorrowed: arthBorrowed,
-            totalUsdc: totalUsdc,
+            totalUsdc: _totalUsdc,
             usdcSupplied: usdcToLendingPool,
             usdcInLp: usdcToLiquidityPool,
             lpTokensMinted: lpTokensMinted
         });
 
-        emit Deposit(who, totalUsdc);
+        emit Deposit(_who, _totalUsdc);
     }
 
     function withdraw(

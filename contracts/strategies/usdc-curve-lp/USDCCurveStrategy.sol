@@ -45,8 +45,7 @@ contract USDCCurveStrategy is VersionedInitializable, StakingRewardsChild {
         address _stableswap,
         uint256 _rewardsDuration,
         address _priceFeed,
-        address _treasury,
-        address _owner
+        address _treasury
     ) external initializer {
         arth = IERC20(_arth);
         usdc = IERC20(_usdc);
@@ -64,8 +63,7 @@ contract USDCCurveStrategy is VersionedInitializable, StakingRewardsChild {
         usdc.approve(_stableswap, type(uint256).max);
         arth.approve(_stableswap, type(uint256).max);
 
-        _stakingRewardsChildInit(_maha, _rewardsDuration, _owner);
-        _transferOwnership(_owner);
+        _stakingRewardsChildInit(_maha, _rewardsDuration);
 
         minDepositForPermit = 1000 * 1e6; // min 1000$ for gasless tx's
         minLockDuration = 86400 * 5; // 5 day lock for normal deposits
@@ -75,14 +73,14 @@ contract USDCCurveStrategy is VersionedInitializable, StakingRewardsChild {
         lendingPool.setUserEMode(1);
     }
 
-    function seedLP(uint256 usdcAmt) external {
-        usdc.transferFrom(msg.sender, _me, usdcAmt);
-        uint256[2] memory inAmounts = [0, usdcAmt];
+    function seedLP(uint256 _usdcAmt) external {
+        usdc.transferFrom(msg.sender, _me, _usdcAmt);
+        uint256[2] memory inAmounts = [0, _usdcAmt];
         stableswap.add_liquidity(inAmounts, 0);
     }
 
-    function deposit(uint256 usdcSupplied, uint256 minLiquidityReceived) external {
-        _deposit(msg.sender, usdcSupplied, minLiquidityReceived, minLockDuration);
+    function deposit(uint256 usdcSupplied, uint256 _minLiquidityReceived) external {
+        _deposit(msg.sender, usdcSupplied, _minLiquidityReceived, minLockDuration);
     }
 
     function depositWithPermit(
@@ -93,17 +91,17 @@ contract USDCCurveStrategy is VersionedInitializable, StakingRewardsChild {
         bytes32 r,
         bytes32 s,
         uint256 usdcSupplied,
-        uint256 minLiquidityReceived
+        uint256 _minLiquidityReceived
     ) external {
         require(value >= minDepositForPermit, "!minDepositForPermit");
         IERC20Permit(address(usdc)).permit(who, _me, value, deadline, v, r, s);
-        _deposit(who, usdcSupplied, minLiquidityReceived, minLockDurationForPermit);
+        _deposit(who, usdcSupplied, _minLiquidityReceived, minLockDurationForPermit);
     }
 
     function _deposit(
         address who,
         uint256 usdcSupplied,
-        uint256 minLiquidityReceived,
+        uint256 _minLiquidityReceived,
         uint64 lockDuration
     ) internal nonReentrant {
         usdc.transferFrom(who, _me, usdcSupplied);
@@ -112,7 +110,7 @@ contract USDCCurveStrategy is VersionedInitializable, StakingRewardsChild {
             positions,
             who,
             usdcSupplied,
-            minLiquidityReceived,
+            _minLiquidityReceived,
             lockDuration,
             USDCCurveLogic.DepositParams({
                 me: _me, // address me;
@@ -163,34 +161,14 @@ contract USDCCurveStrategy is VersionedInitializable, StakingRewardsChild {
         totalUsdcSupplied -= _usdcSupplied;
     }
 
-    function setStrategyParams(
-        uint256 _withdrawalPenalty,
-        uint256 _minDepositForPermit,
-        uint256 _totalUsdcSupplied,
-        uint256 _totalArthBorrowed
-    ) external onlyOwner {
-        withdrawalPenalty = _withdrawalPenalty;
-        minDepositForPermit = _minDepositForPermit;
-        totalUsdcSupplied = _totalUsdcSupplied;
-        totalArthBorrowed = _totalArthBorrowed;
-    }
-
-    /// @dev in case admin needs to execute some calls directly
-    function emergencyCall(address target, bytes memory signature) external payable onlyOwner {
-        (bool success, bytes memory response) = target.call{value: msg.value}(signature);
-        require(success, string(response));
-    }
-
     function getRevision() public pure virtual override returns (uint256) {
         return 0;
     }
 
-    function minLiquidityReceived(uint256 usdcSupplied, uint256 arthPrice)
-        public
-        view
-        virtual
-        returns (uint256)
-    {
+    function minLiquidityReceived(
+        uint256 usdcSupplied,
+        uint256 arthPrice
+    ) public view virtual returns (uint256) {
         return USDCCurveLogic.minLiquidityReceived(usdcSupplied, arthPrice, stableswap);
     }
 }

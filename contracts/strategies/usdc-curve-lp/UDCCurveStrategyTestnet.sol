@@ -36,17 +36,12 @@ contract USDCCurveStrategyTestnet is VersionedInitializable, StakingRewardsChild
     uint256 public totalUsdcSupplied;
     uint256 public totalArthBorrowed;
 
-    constructor(
-        address _usdc,
-        address _maha,
-        uint256 _rewardsDuration,
-        address _owner
-    ) {
+    constructor(address _usdc, address _maha, uint256 _rewardsDuration, address _owner) {
         usdc = IERC20(_usdc);
 
         _me = address(this);
 
-        _stakingRewardsChildInit(_maha, _rewardsDuration, _owner);
+        _stakingRewardsChildInit(_maha, _rewardsDuration);
         _transferOwnership(_owner);
 
         minDepositForPermit = 1000 * 1e6; // min 1000$ for gasless tx's
