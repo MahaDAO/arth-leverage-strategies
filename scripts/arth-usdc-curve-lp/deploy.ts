@@ -6,7 +6,7 @@ import * as config from "./constants";
 async function main() {
     const deployer = (await ethers.getSigners())[0];
 
-    console.log("Deploying ETHTroveLogic...");
+    console.log("Deploying USDCCurveStrategy...", deployer.address);
     const USDCCurveLogic = await deployOrLoadAndVerify("USDCCurveLogic", "USDCCurveLogic", []);
 
     const libraries = { USDCCurveLogic: USDCCurveLogic.address };
@@ -30,17 +30,18 @@ async function main() {
         config.stableSwapAddr, // address _liquidityPool,
         86400 * 30, // uint256 _rewardsDuration,
         config.priceFeedAddr, // address _priceFeed,
-        config.treasury, // address _treasury,
-        deployer.address // address _owner
+        config.treasury // address _treasury,
     ]);
 
-    const proxy = await deployOrLoadAndVerify("USDCCurveStrategy", "TransparentUpgradeableProxy", [
-        implementation.address,
-        config.gnosisProxy,
-        initDecode
-    ]);
+    console.log("initDecode", initDecode);
 
-    console.log("USDCCurveStrategy deployed at", proxy.address);
+    // const proxy = await deployOrLoadAndVerify("USDCCurveStrategy", "TransparentUpgradeableProxy", [
+    //     implementation.address,
+    //     config.gnosisProxy,
+    //     initDecode
+    // ]);
+
+    // console.log("USDCCurveStrategy deployed at", proxy.address);
 }
 
 // We recommend this pattern to be able to use async/await everywhere

@@ -162,7 +162,7 @@ contract USDCCurveStrategy is VersionedInitializable, StakingRewardsChild {
     }
 
     function getRevision() public pure virtual override returns (uint256) {
-        return 0;
+        return 1;
     }
 
     function minLiquidityReceived(
