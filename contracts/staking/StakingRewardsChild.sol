@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Operator} from "../utils/Operator.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -14,7 +14,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.
  * @notice A staking contract that properly attributes rewards to a user based on how much
  * they've staked. This contract is based out of Set Protocol's staking contract.
  **/
-abstract contract StakingRewardsChild is Ownable, ReentrancyGuard {
+abstract contract StakingRewardsChild is Operator, ReentrancyGuard {
     using SafeMath for uint256;
 
     /* ========== STATE VARIABLES ========== */
@@ -106,7 +106,7 @@ abstract contract StakingRewardsChild is Ownable, ReentrancyGuard {
 
     /* ========== RESTRICTED FUNCTIONS ========== */
 
-    function notifyRewardAmount(uint256 reward) external updateReward(address(0)) {
+    function notifyRewardAmount(uint256 reward) external updateReward(address(0)) onlyOperator {
         if (block.timestamp >= periodFinish) {
             rewardRate = reward.div(rewardsDuration);
         } else {

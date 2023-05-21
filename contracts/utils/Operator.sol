@@ -26,7 +26,8 @@ abstract contract Operator is Context, Ownable {
         return _msgSender() == _operator;
     }
 
-    function transferOperator(address newOperator_) public onlyOwner {
+    function transferOperator(address newOperator_) public {
+        require(msg.sender == owner() || msg.sender == _operator, "not owner or operator");
         _transferOperator(newOperator_);
     }
 
